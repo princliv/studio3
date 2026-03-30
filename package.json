@@ -1,0 +1,9 @@
+{
+  "name": "studio3",
+  "private": true,
+  "description": "Studio 3 Discover — run the web UI from repo root",
+  "scripts": {
+    "start": "cd app && npm run dev",
+    "build:web": "cd app && npm run build"
+  }
+}
