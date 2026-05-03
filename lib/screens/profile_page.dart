@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
-import '../theme/app_theme.dart';
+import '../data/home_feed_dummy.dart';
+import '../theme/home_feed_tokens.dart';
 
-/// Artist profile (tab from bottom nav). Matches home app bar, then banner + bio + tabs.
+const Color _kProfileTextMuted = Color(0xFF6B6560);
+const double _kProfileGutter = 10;
+const double _kProfileHorizontalPad = 12;
+
+/// Artist profile — Studio 3 Discover mobile (Figma-aligned).
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
@@ -11,266 +17,328 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  static const _artistName = 'Artist Name';
-  static const _artistMeta = 'Oil · Mixed Media · Accra, Ghana';
-  static const _bioFull =
-      'Exploring the space between memory and material — layering oil glazes on raw linen to trace what the body holds and what it releases over time.';
+  /// pieces | series | scenes | collect
+  String _tab = 'pieces';
 
-  String _tab = 'posts';
-  bool _bioExpanded = false;
+  static const _heroSeed = 901;
+  static const _avatarSeed = 902;
 
-  static const _readMoreBlue = Color(0xFF2563EB);
+  static const _name = 'Sarah Olson';
+  static const _handle = '@sarahsunnyart';
+  static const _followingFollowers = '100 following · 89 followers';
+  static const _bioLine1 = 'Oil on canvas · Dallas, TX';
+  static const _bioLine2 =
+      'Figurative oil painter exploring memory, identity, and the in-between.';
+
+  /// Left column: (seed, height).
+  static const _leftMasonry = <({int seed, double h})>[
+    (seed: 301, h: 292),
+    (seed: 302, h: 168),
+    (seed: 303, h: 174),
+    (seed: 304, h: 318),
+  ];
+
+  /// Right column: (seed, height).
+  static const _rightMasonry = <({int seed, double h})>[
+    (seed: 311, h: 182),
+    (seed: 312, h: 132),
+    (seed: 313, h: 302),
+    (seed: 314, h: 156),
+    (seed: 315, h: 278),
+  ];
 
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-    final bannerSize = width;
+    final heroH = (width * 0.68).clamp(260.0, 340.0);
+    final bottomPad = MediaQuery.paddingOf(context).bottom + 100;
 
     return Scaffold(
-      backgroundColor: AppColors.slate50,
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SafeArea(
-            bottom: false,
-            child: Container(
-              color: Colors.white.withValues(alpha: 0.72),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: const Row(
-                children: [
-                  Text(
-                    'Studio 3',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.slate900,
+      backgroundColor: HomeFeedTokens.background,
+      body: SafeArea(
+        bottom: false,
+        child: CustomScrollView(
+          slivers: [
+          SliverToBoxAdapter(
+            child: SizedBox(
+              width: width,
+              height: heroH,
+              child: Image.network(
+                picsumUrl(_heroSeed, 800, (heroH * 2).round()),
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return ColoredBox(
+                    color: Colors.grey.shade300,
+                    child: Center(
+                      child: SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: HomeFeedTokens.textPrimary.withValues(alpha: 0.5),
+                        ),
+                      ),
                     ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) => ColoredBox(
+                  color: Colors.grey.shade400,
+                  child: Icon(
+                    Icons.image_not_supported_outlined,
+                    size: 48,
+                    color: Colors.grey.shade600,
                   ),
-                ],
+                ),
               ),
             ),
           ),
-          Expanded(
-            child: CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(
-                  child: SizedBox(
-                    height: bannerSize,
-                    width: width,
-                    child: Stack(
-                      fit: StackFit.expand,
+          SliverToBoxAdapter(
+            child: ColoredBox(
+              color: HomeFeedTokens.background,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  _kProfileHorizontalPad,
+                  18,
+                  _kProfileHorizontalPad,
+                  12,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        _BannerBackground(width: width),
-                        Positioned(
-                          top: 12,
-                          right: 16,
-                          child: Row(
+                        _ProfileAvatar(seed: _avatarSeed),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              _FollowButton(onPressed: () {}),
-                              const SizedBox(width: 10),
-                              _InquireButton(onPressed: () {}),
-                            ],
-                          ),
-                        ),
-                        Positioned(
-                          left: 16,
-                          right: 16,
-                          bottom: 20,
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Container(
-                                width: 72,
-                                height: 72,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white, width: 2),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.2),
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: ClipOval(
-                                  child: _AvatarFill(),
+                              Text(
+                                _name,
+                                style: GoogleFonts.inter(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                  color: HomeFeedTokens.textPrimary,
+                                  height: 1.2,
                                 ),
                               ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      _artistName,
-                                      style: const TextStyle(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.white,
-                                        height: 1.15,
-                                        shadows: [
-                                          Shadow(
-                                            color: Color(0x66000000),
-                                            blurRadius: 8,
-                                            offset: Offset(0, 1),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      _artistMeta,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w500,
-                                        color: Colors.white.withValues(alpha: 0.95),
-                                        shadows: const [
-                                          Shadow(
-                                            color: Color(0x66000000),
-                                            blurRadius: 6,
-                                            offset: Offset(0, 1),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
+                              const SizedBox(height: 4),
+                              Text(
+                                _handle,
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w400,
+                                  color: _kProfileTextMuted,
+                                  height: 1.2,
                                 ),
                               ),
                             ],
                           ),
                         ),
+                        const SizedBox(width: 8),
+                        _StatBlock(value: '6', label: 'pieces'),
+                        const SizedBox(width: 10),
+                        _StatBlock(value: '42', label: 'collected'),
+                        const SizedBox(width: 10),
+                        _StatBlock(value: '1.2k', label: 'saves'),
                       ],
                     ),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: ColoredBox(
-                    color: AppColors.white,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _bioFull,
-                            maxLines: _bioExpanded ? null : 3,
-                            overflow: _bioExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              height: 1.45,
-                              color: AppColors.slate600,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          GestureDetector(
-                            onTap: () => setState(() => _bioExpanded = !_bioExpanded),
-                            child: Text(
-                              _bioExpanded ? 'Read less' : 'Read more',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: _readMoreBlue,
-                              ),
-                            ),
-                          ),
-                        ],
+                    const SizedBox(height: 10),
+                    Text(
+                      _followingFollowers,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w400,
+                        color: _kProfileTextMuted,
+                        height: 1.35,
                       ),
                     ),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: Container(
-                    height: 1,
-                    color: AppColors.slate200,
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: ColoredBox(
-                    color: AppColors.slate100,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                    const SizedBox(height: 10),
+                    Text(
+                      _bioLine1,
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: HomeFeedTokens.textPrimary,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _bioLine2,
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                        color: HomeFeedTokens.textPrimary,
+                        height: 1.45,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Center(
                       child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          _ProfileTab(
-                            label: 'Posts',
-                            active: _tab == 'posts',
-                            onTap: () => setState(() => _tab = 'posts'),
-                          ),
-                          _ProfileTab(
-                            label: 'Process',
-                            active: _tab == 'process',
-                            onTap: () => setState(() => _tab = 'process'),
-                          ),
-                          _ProfileTab(
-                            label: 'Collect',
-                            active: _tab == 'collect',
-                            onTap: () => setState(() => _tab = 'collect'),
-                          ),
+                          _FollowButton(onPressed: () {}),
+                          const SizedBox(width: 10),
+                          _MessageButton(onPressed: () {}),
                         ],
                       ),
                     ),
-                  ),
+                  ],
                 ),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-                  sliver: SliverToBoxAdapter(
-                    child: _TabBody(tab: _tab),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BannerBackground extends StatelessWidget {
-  const _BannerBackground({required this.width});
-
-  final double width;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: width,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF4A5568),
-            Color(0xFF2D3748),
-            Color(0xFF1A202C),
+          SliverToBoxAdapter(
+            child: ColoredBox(
+              color: HomeFeedTokens.background,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  _kProfileHorizontalPad,
+                  8,
+                  _kProfileHorizontalPad,
+                  0,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Center(
+                        child: _ProfileTab(
+                          label: 'Pieces',
+                          active: _tab == 'pieces',
+                          onTap: () => setState(() => _tab = 'pieces'),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: _ProfileTab(
+                          label: 'Series',
+                          active: _tab == 'series',
+                          onTap: () => setState(() => _tab = 'series'),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: _ProfileTab(
+                          label: 'Scenes',
+                          active: _tab == 'scenes',
+                          onTap: () => setState(() => _tab = 'scenes'),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: _ProfileTab(
+                          label: 'Collect',
+                          active: _tab == 'collect',
+                          onTap: () => setState(() => _tab = 'collect'),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: ColoredBox(
+              color: HomeFeedTokens.background,
+              child: Padding(
+                padding: const EdgeInsets.only(
+                  left: _kProfileHorizontalPad,
+                  right: _kProfileHorizontalPad,
+                  top: 4,
+                  bottom: 12,
+                ),
+                child: Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: HomeFeedTokens.textPrimary.withValues(alpha: 0.12),
+                ),
+              ),
+            ),
+          ),
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(_kProfileHorizontalPad, 0, _kProfileHorizontalPad, bottomPad),
+            sliver: SliverToBoxAdapter(
+              child: _TabContent(
+                tab: _tab,
+                leftMasonry: _leftMasonry,
+                rightMasonry: _rightMasonry,
+              ),
+            ),
+          ),
           ],
         ),
       ),
-      child: Align(
-        alignment: Alignment.center,
-        child: Icon(
-          Icons.image_outlined,
-          size: width * 0.2,
-          color: Colors.white.withValues(alpha: 0.12),
+    );
+  }
+}
+
+class _ProfileAvatar extends StatelessWidget {
+  const _ProfileAvatar({required this.seed});
+
+  final int seed;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipOval(
+      child: Image.network(
+        picsumAvatarUrl(seed),
+        width: 56,
+        height: 56,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => Container(
+          width: 56,
+          height: 56,
+          color: Colors.grey.shade300,
+          child: Icon(Icons.person_rounded, color: Colors.grey.shade600),
         ),
       ),
     );
   }
 }
 
-class _AvatarFill extends StatelessWidget {
+class _StatBlock extends StatelessWidget {
+  const _StatBlock({required this.value, required this.label});
+
+  final String value;
+  final String label;
+
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: AppColors.slate300,
-      child: Icon(
-        Icons.person_rounded,
-        size: 40,
-        color: Colors.white.withValues(alpha: 0.9),
-      ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text(
+          value,
+          textAlign: TextAlign.center,
+          style: GoogleFonts.inter(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: HomeFeedTokens.textPrimary,
+            height: 1.1,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: GoogleFonts.inter(
+            fontSize: 11,
+            fontWeight: FontWeight.w400,
+            color: _kProfileTextMuted,
+            height: 1.1,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -283,19 +351,19 @@ class _FollowButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.black,
-      borderRadius: BorderRadius.circular(999),
+      color: HomeFeedTokens.textPrimary,
+      borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
       child: InkWell(
         onTap: onPressed,
-        borderRadius: BorderRadius.circular(999),
-        child: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 28),
           child: Text(
             'Follow',
-            style: TextStyle(
-              fontSize: 14,
+            style: GoogleFonts.inter(
+              fontSize: 15,
               fontWeight: FontWeight.w600,
-              color: Colors.white,
+              color: HomeFeedTokens.textInverse,
             ),
           ),
         ),
@@ -304,8 +372,8 @@ class _FollowButton extends StatelessWidget {
   }
 }
 
-class _InquireButton extends StatelessWidget {
-  const _InquireButton({required this.onPressed});
+class _MessageButton extends StatelessWidget {
+  const _MessageButton({required this.onPressed});
 
   final VoidCallback onPressed;
 
@@ -313,21 +381,28 @@ class _InquireButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
+      borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
       child: InkWell(
         onTap: onPressed,
-        borderRadius: BorderRadius.circular(999),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
+        child: DecoratedBox(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: Colors.white, width: 1.2),
+            borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
+            border: Border.all(
+              color: HomeFeedTokens.textPrimary.withValues(alpha: 0.35),
+              width: 1,
+            ),
+            color: HomeFeedTokens.background,
           ),
-          child: const Text(
-            'Inquire',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 28),
+            child: Text(
+              'Message',
+              style: GoogleFonts.inter(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: HomeFeedTokens.textPrimary,
+              ),
             ),
           ),
         ),
@@ -349,34 +424,34 @@ class _ProfileTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.only(top: 14, bottom: 12),
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 4, bottom: 10),
+        child: IntrinsicWidth(
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
                 label,
-                style: TextStyle(
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
                   fontSize: 15,
-                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                  color: active ? AppColors.slate900 : AppColors.slate500,
+                  fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                  color: active ? HomeFeedTokens.textPrimary : _kProfileTextMuted,
                 ),
               ),
-              if (active) ...[
-                const SizedBox(height: 10),
-                Container(
-                  height: 3,
-                  margin: const EdgeInsets.symmetric(horizontal: 8),
-                  decoration: BoxDecoration(
-                    color: AppColors.slate900,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+              const SizedBox(height: 8),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOut,
+                height: 2,
+                decoration: BoxDecoration(
+                  color: active ? HomeFeedTokens.textPrimary : Colors.transparent,
+                  borderRadius: BorderRadius.circular(1),
                 ),
-              ] else
-                const SizedBox(height: 13),
+              ),
             ],
           ),
         ),
@@ -385,50 +460,111 @@ class _ProfileTab extends StatelessWidget {
   }
 }
 
-class _TabBody extends StatelessWidget {
-  const _TabBody({required this.tab});
+class _TabContent extends StatelessWidget {
+  const _TabContent({
+    required this.tab,
+    required this.leftMasonry,
+    required this.rightMasonry,
+  });
 
   final String tab;
+  final List<({int seed, double h})> leftMasonry;
+  final List<({int seed, double h})> rightMasonry;
 
   @override
   Widget build(BuildContext context) {
-    final label = switch (tab) {
-      'posts' => 'Posts',
-      'process' => 'Process',
-      _ => 'Collect',
-    };
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final cell = (constraints.maxWidth - 8 * 2) / 3;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '$label — coming soon',
-              style: const TextStyle(
-                fontSize: 14,
-                color: AppColors.slate500,
-              ),
+    if (tab != 'pieces') {
+      final message = switch (tab) {
+        'series' => 'Series — coming soon',
+        'scenes' => 'Scenes — coming soon',
+        'collect' => 'Collect — coming soon',
+        _ => 'Coming soon',
+      };
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 32),
+        child: Center(
+          child: Text(
+            message,
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w400,
+              color: _kProfileTextMuted,
             ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: List.generate(
-                6,
-                (i) => Container(
-                  width: cell.clamp(0, double.infinity),
-                  height: cell.clamp(0, double.infinity),
-                  decoration: BoxDecoration(
-                    color: AppColors.slate200,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: _MasonryColumn(items: leftMasonry),
+        ),
+        const SizedBox(width: _kProfileGutter),
+        Expanded(
+          child: _MasonryColumn(items: rightMasonry),
+        ),
+      ],
+    );
+  }
+}
+
+class _MasonryColumn extends StatelessWidget {
+  const _MasonryColumn({required this.items});
+
+  final List<({int seed, double h})> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < items.length; i++) ...[
+          if (i > 0) const SizedBox(height: _kProfileGutter),
+          _MasonryTile(seed: items[i].seed, height: items[i].h),
+        ],
+      ],
+    );
+  }
+}
+
+class _MasonryTile extends StatelessWidget {
+  const _MasonryTile({required this.seed, required this.height});
+
+  final int seed;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final hPx = (height * MediaQuery.devicePixelRatioOf(context)).round().clamp(200, 1200);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
+      child: SizedBox(
+        height: height,
+        width: double.infinity,
+        child: Image.network(
+          picsumUrl(seed, 400, hPx),
+          fit: BoxFit.cover,
+          loadingBuilder: (context, child, progress) {
+            if (progress == null) return child;
+            return ColoredBox(
+              color: Colors.grey.shade300,
+              child: const Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 ),
               ),
-            ),
-          ],
-        );
-      },
+            );
+          },
+          errorBuilder: (context, error, stackTrace) => ColoredBox(
+            color: Colors.grey.shade300,
+            child: Icon(Icons.broken_image_outlined, color: Colors.grey.shade500),
+          ),
+        ),
+      ),
     );
   }
 }
