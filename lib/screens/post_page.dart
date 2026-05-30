@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
-import '../theme/app_theme.dart';
-import '../widgets/pill_input.dart';
-import '../widgets/primary_button.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:google_fonts/google_fonts.dart';
 
+import '../data/post_media_assets.dart';
+import '../theme/home_feed_tokens.dart';
+import 'post_edit_page.dart';
+
+/// Media picker — first step of the posting flow (Figma 1609:1975 / 1953:1164).
 class PostPage extends StatefulWidget {
   const PostPage({super.key});
 
@@ -11,177 +15,383 @@ class PostPage extends StatefulWidget {
 }
 
 class _PostPageState extends State<PostPage> {
-  String _type = 'piece';
-  bool _hasMedia = false;
-  final _titleController = TextEditingController();
-  final _storyController = TextEditingController();
-  final _yearController = TextEditingController();
-  bool _listForSale = false;
-  final _priceController = TextEditingController();
-  final _captionController = TextEditingController();
+  static const _bannerHeight = 64.0;
+  static const _gridGap = 3.0;
+  static const _bottomControlsOffset = 42.0;
 
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _storyController.dispose();
-    _yearController.dispose();
-    _priceController.dispose();
-    _captionController.dispose();
-    super.dispose();
+  String _postType = 'piece';
+  final List<int> _selectedIndices = [];
+
+  void _onPostTypeChanged(String type) {
+    if (type == _postType) return;
+    setState(() {
+      _postType = type;
+      _selectedIndices.clear();
+    });
+  }
+
+  void _onCellTap(int cellIndex) {
+    setState(() {
+      final position = _selectedIndices.indexOf(cellIndex);
+      if (position >= 0) {
+        _selectedIndices.removeAt(position);
+      } else {
+        _selectedIndices.add(cellIndex);
+      }
+    });
+  }
+
+  int? _selectionOrder(int cellIndex) {
+    final position = _selectedIndices.indexOf(cellIndex);
+    return position >= 0 ? position + 1 : null;
   }
 
   @override
   Widget build(BuildContext context) {
+    final topInset = MediaQuery.paddingOf(context).top;
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+
     return Scaffold(
-      backgroundColor: AppColors.white,
-      appBar: AppBar(
-        leading: TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel', style: TextStyle(color: AppColors.slate500)),
-        ),
-        title: const Text('New Post', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-        centerTitle: true,
-        actions: [
-          TextButton(
-            onPressed: _hasMedia ? () {} : null,
-            child: Text('Share', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: _hasMedia ? AppColors.slate900 : AppColors.slate300)),
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          Positioned(
+            top: topInset + _bannerHeight,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _MediaGrid(
+              postType: _postType,
+              selectionOrderFor: _selectionOrder,
+              onSelect: _onCellTap,
+            ),
+          ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: _PostingBanner(
+              topInset: topInset,
+              onClose: () => Navigator.pop(context),
+              hasSelection: _selectedIndices.isNotEmpty,
+              onNext: _selectedIndices.isNotEmpty
+                  ? () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) => PostEditPage(
+                            postType: _postType,
+                            selectedCellIndices:
+                                List<int>.from(_selectedIndices),
+                          ),
+                        ),
+                      );
+                    }
+                  : null,
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: bottomInset + _bottomControlsOffset,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _PostingSelector(
+                  postType: _postType,
+                  onChanged: _onPostTypeChanged,
+                ),
+                const SizedBox(width: 12),
+                GestureDetector(
+                  onTap: () {},
+                  child: SvgPicture.asset(
+                    PostMediaAssets.filterButton,
+                    width: 38,
+                    height: 38,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SizedBox(height: 16),
-            Row(
+    );
+  }
+}
+
+class _PostingBanner extends StatelessWidget {
+  const _PostingBanner({
+    required this.topInset,
+    required this.onClose,
+    required this.hasSelection,
+    required this.onNext,
+  });
+
+  static const _neutral300 = Color(0xFFC8C5BC);
+
+  final double topInset;
+  final VoidCallback onClose;
+  final bool hasSelection;
+  final VoidCallback? onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Colors.black,
+      child: Padding(
+        padding: EdgeInsets.only(top: topInset),
+        child: SizedBox(
+          height: _PostPageState._bannerHeight,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+            child: Row(
               children: [
-                _TypeChip(label: 'Piece', active: _type == 'piece', onTap: () => setState(() => _type = 'piece')),
-                const SizedBox(width: 8),
-                _TypeChip(label: 'Post', active: _type == 'post', onTap: () => setState(() => _type = 'post')),
-              ],
-            ),
-            const SizedBox(height: 20),
-            GestureDetector(
-              onTap: () => setState(() => _hasMedia = !_hasMedia),
-              child: Container(
-                height: 280,
-                decoration: BoxDecoration(
-                  color: _hasMedia ? AppColors.slate200 : AppColors.slate100,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.slate300, width: 2, strokeAlign: BorderSide.strokeAlignInside),
+                GestureDetector(
+                  onTap: onClose,
+                  behavior: HitTestBehavior.opaque,
+                  child: SvgPicture.asset(
+                    PostMediaAssets.closeIcon,
+                    width: 14,
+                    height: 14,
+                  ),
                 ),
-                child: _hasMedia
-                    ? Stack(
-                        alignment: Alignment.bottomCenter,
+                Expanded(
+                  child: Center(
+                    child: GestureDetector(
+                      onTap: () {},
+                      behavior: HitTestBehavior.opaque,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Positioned.fill(
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: AppColors.slate200,
-                                borderRadius: BorderRadius.circular(14),
-                              ),
+                          Text(
+                            'Recents',
+                            style: GoogleFonts.inter(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              color: HomeFeedTokens.textInverse,
                             ),
                           ),
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: TextButton(
-                              onPressed: () => setState(() => _hasMedia = false),
-                              child: const Text('Change'),
-                            ),
+                          const SizedBox(width: 4),
+                          SvgPicture.asset(
+                            PostMediaAssets.chevronDown,
+                            width: 9,
+                            height: 5,
                           ),
                         ],
-                      )
-                    : const Center(
-                        child: Text('Tap to add photo or video', style: TextStyle(fontSize: 14, color: AppColors.slate400)),
                       ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            if (_type == 'piece') ...[
-              PillInput(controller: _titleController, placeholder: 'Title (required)'),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _storyController,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  hintText: 'Story / Intent (optional)',
-                  filled: true,
-                  fillColor: AppColors.slate50,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-              ),
-              const SizedBox(height: 16),
-              PillInput(controller: _yearController, placeholder: 'Year (optional)'),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('List for Sale', style: TextStyle(fontSize: 15, color: AppColors.slate700)),
-                  Switch(
-                    value: _listForSale,
-                    onChanged: (v) => setState(() => _listForSale = v),
-                    activeColor: AppColors.slate900,
+                    ),
                   ),
-                ],
-              ),
-              if (_listForSale) ...[
-                const SizedBox(height: 16),
-                PillInput(controller: _priceController, placeholder: 'Price (\$)'),
+                ),
+                Opacity(
+                  opacity: hasSelection ? 1 : 0.3,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: onNext,
+                      borderRadius: BorderRadius.circular(100),
+                      child: Container(
+                        width: 60,
+                        height: 32,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: _neutral300,
+                          borderRadius: BorderRadius.circular(100),
+                        ),
+                        child: Text(
+                          'Next',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: HomeFeedTokens.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ],
-              const SizedBox(height: 16),
-              const Text('Tags (up to 10)', style: TextStyle(fontSize: 12, color: AppColors.slate500)),
-              const SizedBox(height: 8),
-              PillInput(placeholder: 'Add tags...'),
-            ],
-            if (_type == 'post') ...[
-              TextField(
-                controller: _captionController,
-                maxLines: 4,
-                maxLength: 2000,
-                decoration: InputDecoration(
-                  hintText: 'Caption',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                  counterStyle: const TextStyle(fontSize: 12, color: AppColors.slate400),
-                ),
-              ),
-              const SizedBox(height: 16),
-              OutlinedButton(
-                onPressed: () {},
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.all(14),
-                  alignment: Alignment.centerLeft,
-                  side: const BorderSide(color: AppColors.slate200),
-                ),
-                child: const Text('Link to a Piece (optional)', style: TextStyle(color: AppColors.slate500)),
-              ),
-            ],
-            const SizedBox(height: 32),
-          ],
+            ),
+          ),
         ),
       ),
     );
   }
 }
 
-class _TypeChip extends StatelessWidget {
-  const _TypeChip({required this.label, required this.active, required this.onTap});
+class _MediaGrid extends StatelessWidget {
+  const _MediaGrid({
+    required this.postType,
+    required this.selectionOrderFor,
+    required this.onSelect,
+  });
+
+  final String postType;
+  final int? Function(int cellIndex) selectionOrderFor;
+  final ValueChanged<int> onSelect;
+
+  bool get _isScene => postType == 'scene';
+
+  List<PostMediaGridRow> get _rows =>
+      _isScene ? PostMediaAssets.sceneGridRows : PostMediaAssets.pieceGridRows;
+
+  List<String> get _thumbs =>
+      _isScene ? PostMediaAssets.sceneGridThumbs : PostMediaAssets.pieceGridThumbs;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      padding: EdgeInsets.zero,
+      itemCount: _rows.length,
+      itemBuilder: (context, rowIndex) {
+        final row = _rows[rowIndex];
+        final rowStartIndex = rowIndex * 3;
+
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: rowIndex < _rows.length - 1 ? _PostPageState._gridGap : 0,
+          ),
+          child: SizedBox(
+            height: row.height,
+            child: Row(
+              children: [
+                for (var col = 0; col < row.thumbIndices.length; col++) ...[
+                  if (col > 0) const SizedBox(width: _PostPageState._gridGap),
+                  Expanded(
+                    child: _MediaCell(
+                      thumbs: _thumbs,
+                      thumbIndex: row.thumbIndices[col],
+                      cellIndex: rowStartIndex + col,
+                      selectionOrder: selectionOrderFor(rowStartIndex + col),
+                      onTap: onSelect,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _MediaCell extends StatelessWidget {
+  const _MediaCell({
+    required this.thumbs,
+    required this.thumbIndex,
+    required this.cellIndex,
+    required this.selectionOrder,
+    required this.onTap,
+  });
+
+  final List<String> thumbs;
+  final int thumbIndex;
+  final int cellIndex;
+  final int? selectionOrder;
+  final ValueChanged<int> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = selectionOrder != null;
+
+    return GestureDetector(
+      onTap: () => onTap(cellIndex),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            thumbs[thumbIndex],
+            fit: BoxFit.cover,
+          ),
+          if (selected)
+            ColoredBox(
+              color: Colors.white.withValues(alpha: 0.5),
+              child: Center(
+                child: Text(
+                  '$selectionOrder',
+                  style: GoogleFonts.inter(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w400,
+                    color: HomeFeedTokens.textPrimary,
+                    height: 1,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PostingSelector extends StatelessWidget {
+  const _PostingSelector({
+    required this.postType,
+    required this.onChanged,
+  });
+
+  static const _selectorBg = Color(0xE6231F1B);
+
+  final String postType;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final pieceSelected = postType == 'piece';
+
+    return Container(
+      width: 160,
+      height: 38,
+      padding: const EdgeInsets.symmetric(horizontal: 30),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: _selectorBg,
+        borderRadius: BorderRadius.circular(100),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          _SelectorTab(
+            label: 'Piece',
+            selected: pieceSelected,
+            onTap: () => onChanged('piece'),
+          ),
+          _SelectorTab(
+            label: 'Scene',
+            selected: !pieceSelected,
+            onTap: () => onChanged('scene'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SelectorTab extends StatelessWidget {
+  const _SelectorTab({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  static const _textSecondary = Color(0xFF8C8880);
 
   final String label;
-  final bool active;
+  final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: active ? AppColors.slate900 : AppColors.slate100,
-          borderRadius: BorderRadius.circular(9999),
+      behavior: HitTestBehavior.opaque,
+      child: Text(
+        label,
+        style: GoogleFonts.inter(
+          fontSize: 13,
+          fontWeight: selected ? FontWeight.w500 : FontWeight.w400,
+          color: selected ? HomeFeedTokens.textInverse : _textSecondary,
         ),
-        child: Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: active ? AppColors.white : AppColors.slate600)),
       ),
     );
   }
