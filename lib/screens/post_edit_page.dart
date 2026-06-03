@@ -10,6 +10,8 @@ import '../data/post_media_assets.dart';
 import '../models/post_image_transform.dart';
 import '../theme/home_feed_tokens.dart';
 import '../utils/crop_cover_math.dart' show CropAspectRatio;
+import '../utils/image_adjust_math.dart';
+import 'post_create_page.dart';
 
 /// Image edit step — posting flow (Figma 1961:1453 / 1973:1223 / 1986:1416).
 class PostEditPage extends StatefulWidget {
@@ -17,10 +19,14 @@ class PostEditPage extends StatefulWidget {
     super.key,
     required this.postType,
     required this.selectedCellIndices,
+    this.initialImageIndex = 0,
+    this.initialTransforms,
   });
 
   final String postType;
   final List<int> selectedCellIndices;
+  final int initialImageIndex;
+  final List<PostImageTransform>? initialTransforms;
 
   @override
   State<PostEditPage> createState() => _PostEditPageState();
@@ -35,7 +41,6 @@ class _PostEditPageState extends State<PostEditPage> {
   static const _thumbStripTopGap = 12.0;
   static const _bottomControlsOffset = 42.0;
   static const _cropToolsGapAboveSelector = 12.0;
-  static const _errorRed = Color(0xFFC03030);
   static const _maxCropHeightFraction = 0.52;
 
   late final List<String> _imagePaths;
@@ -45,11 +50,16 @@ class _PostEditPageState extends State<PostEditPage> {
   int _activeImageIndex = 0;
   String? _editTool;
   CropSubTool? _activeCropSubTool;
+  AdjustSubTool? _activeAdjustSubTool;
 
   double _gestureBaseRotation = 0;
   double _gestureBaseZoom = 1;
+  bool _showAdjustValue = false;
+  bool _showRotationValue = false;
 
   bool get _isCropMode => _editTool == 'crop';
+  bool get _isAdjustMode => _editTool == 'adjust';
+  bool get _isSelectionMode => _editTool == null;
   bool get _isRotateMode =>
       _isCropMode && _activeCropSubTool == CropSubTool.rotate;
 
@@ -64,9 +74,16 @@ class _PostEditPageState extends State<PostEditPage> {
       postType: widget.postType,
       cellIndices: widget.selectedCellIndices,
     );
-    _transforms = List.generate(
-      _imagePaths.length,
-      (_) => PostImageTransform(),
+    _transforms = widget.initialTransforms != null &&
+            widget.initialTransforms!.length == _imagePaths.length
+        ? widget.initialTransforms!.map((t) => t.copy()).toList()
+        : List.generate(
+            _imagePaths.length,
+            (_) => PostImageTransform(),
+          );
+    _activeImageIndex = widget.initialImageIndex.clamp(
+      0,
+      _imagePaths.length - 1,
     );
     for (final path in _imagePaths.toSet()) {
       _loadImageAspect(path);
@@ -91,7 +108,24 @@ class _PostEditPageState extends State<PostEditPage> {
   }
 
   void _applyRotation(double degrees) {
-    setState(() => _currentTransform.rotationDegrees = degrees);
+    setState(() {
+      _currentTransform.rotationDegrees = degrees;
+      _showRotationValue = true;
+    });
+  }
+
+  int _rotationTurnPercent(double degrees) {
+    var d = degrees % 360;
+    if (d > 180) d -= 360;
+    if (d < -180) d += 360;
+    return (d / 360 * 100).round();
+  }
+
+  void _onRotationDragEnd() {
+    setState(() => _showRotationValue = true);
+    Future<void>.delayed(const Duration(milliseconds: 900), () {
+      if (mounted) setState(() => _showRotationValue = false);
+    });
   }
 
   void _onCropSubToolTap(CropSubTool tool) {
@@ -99,6 +133,8 @@ class _PostEditPageState extends State<PostEditPage> {
       _editTool = 'crop';
       if (tool == CropSubTool.rotate) {
         _activeCropSubTool = CropSubTool.rotate;
+        _showRotationValue =
+            _currentTransform.rotationDegrees.abs() > 0.01;
         return;
       }
       if (tool == CropSubTool.flipHorizontal) {
@@ -109,14 +145,67 @@ class _PostEditPageState extends State<PostEditPage> {
     });
   }
 
-  void _resetCurrentTransform() {
+  void _resetForCurrentMode() {
     setState(() {
-      _currentTransform.reset();
+      if (_isCropMode) {
+        _currentTransform.resetCrop();
+      } else if (_isAdjustMode) {
+        _currentTransform.resetAdjust();
+      }
+      _showAdjustValue = false;
+      _showRotationValue = false;
     });
   }
 
-  void _finishRotateMode() {
-    setState(() => _activeCropSubTool = null);
+  void _finishEditing() {
+    setState(() {
+      _editTool = null;
+      _activeCropSubTool = null;
+      _activeAdjustSubTool = null;
+      _showAdjustValue = false;
+      _showRotationValue = false;
+    });
+  }
+
+  Future<void> _openCreatePage() async {
+    _finishEditing();
+    final reopenEdit = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute<bool>(
+        builder: (_) => PostCreatePage(
+          postType: widget.postType,
+          selectedCellIndices: widget.selectedCellIndices,
+          imagePaths: List<String>.from(_imagePaths),
+          transforms: _transforms.map((t) => t.copy()).toList(),
+          previewImageIndex: _activeImageIndex,
+        ),
+      ),
+    );
+    if (reopenEdit == true && mounted) {
+      _finishEditing();
+    }
+  }
+
+  void _onAdjustSubToolTap(AdjustSubTool tool) {
+    setState(() {
+      _editTool = 'adjust';
+      _activeAdjustSubTool = tool;
+    });
+  }
+
+  void _onAdjustValueChanged(double value) {
+    if (_activeAdjustSubTool == null) return;
+    setState(() {
+      _currentTransform.setAdjustValue(_activeAdjustSubTool!, value);
+      _showAdjustValue = true;
+    });
+  }
+
+  void _onAdjustDragEnd() {
+    setState(() => _showAdjustValue = true);
+    Future<void>.delayed(const Duration(milliseconds: 900), () {
+      if (mounted) setState(() => _showAdjustValue = false);
+    });
   }
 
   Size _cropFrameSize(double maxWidth, double maxHeight, CropAspectRatio ratio) {
@@ -152,7 +241,7 @@ class _PostEditPageState extends State<PostEditPage> {
           _EditBanner(
             topInset: topInset,
             onClose: () => Navigator.pop(context),
-            onNext: () {},
+            onNext: _openCreatePage,
           ),
           const SizedBox(height: _previewGapBelowBanner),
           Padding(
@@ -171,7 +260,7 @@ class _PostEditPageState extends State<PostEditPage> {
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        _CropPreviewImage(
+                        _EditPreviewImage(
                           assetPath: _imagePaths[_activeImageIndex],
                           transform: _currentTransform,
                           imageAspect: imageAspect,
@@ -188,9 +277,34 @@ class _PostEditPageState extends State<PostEditPage> {
                               _currentTransform.zoomFactor =
                                   (_gestureBaseZoom * scaleDelta)
                                       .clamp(1.0, 4.0);
+                              if (rotationDelta.abs() > 0.01) {
+                                _showRotationValue = true;
+                              }
                             });
                           },
+                          onScaleEnd: _onRotationDragEnd,
                         ),
+                        if (_isAdjustMode &&
+                            _activeAdjustSubTool != null &&
+                            _showAdjustValue)
+                          IgnorePointer(
+                            child: _PreviewValueOverlay(
+                              text: _currentTransform
+                                  .adjustValueFor(_activeAdjustSubTool!)
+                                  .round()
+                                  .toString(),
+                            ),
+                          ),
+                        if (_isCropMode &&
+                            _showRotationValue &&
+                            (_isRotateMode ||
+                                _currentTransform.rotationDegrees.abs() > 0.01))
+                          IgnorePointer(
+                            child: _PreviewValueOverlay(
+                              text:
+                                  '${_rotationTurnPercent(_currentTransform.rotationDegrees)}%',
+                            ),
+                          ),
                         if (_isCropMode)
                           const IgnorePointer(child: _RuleOfThirdsGrid()),
                       ],
@@ -200,20 +314,19 @@ class _PostEditPageState extends State<PostEditPage> {
               ),
             ),
           ),
-          if (hasMultiple && !_isCropMode) ...[
+          if (hasMultiple && _isSelectionMode) ...[
             const SizedBox(height: _thumbStripTopGap),
             SizedBox(
               height: _thumbSize,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: _CenteredThumbStrip(
                 itemCount: _imagePaths.length,
-                separatorBuilder: (context, _) =>
-                    const SizedBox(width: _thumbGap),
                 itemBuilder: (context, index) {
                   final active = index == _activeImageIndex;
                   return GestureDetector(
-                    onTap: () => setState(() => _activeImageIndex = index),
+                    onTap: () => setState(() {
+                      _finishEditing();
+                      _activeImageIndex = index;
+                    }),
                     child: Container(
                       width: _thumbSize,
                       height: _thumbSize,
@@ -228,9 +341,9 @@ class _PostEditPageState extends State<PostEditPage> {
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(4),
-                        child: Image.asset(
-                          _imagePaths[index],
-                          fit: BoxFit.cover,
+                        child: _EditThumbPreview(
+                          assetPath: _imagePaths[index],
+                          transform: _transforms[index],
                         ),
                       ),
                     ),
@@ -248,46 +361,20 @@ class _PostEditPageState extends State<PostEditPage> {
               },
             ),
             const SizedBox(height: 16),
-            if (_isRotateMode) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    GestureDetector(
-                      onTap: _resetCurrentTransform,
-                      behavior: HitTestBehavior.opaque,
-                      child: Text(
-                        'RESET',
-                        style: GoogleFonts.inter(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w500,
-                          color: _errorRed,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: _finishRotateMode,
-                      behavior: HitTestBehavior.opaque,
-                      child: Text(
-                        'DONE',
-                        style: GoogleFonts.inter(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w500,
-                          color: HomeFeedTokens.textInverse,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: _EditResetDoneRow(
+                onReset: _resetForCurrentMode,
+                onDone: _finishEditing,
               ),
-              const SizedBox(height: 8),
+            ),
+            const SizedBox(height: 8),
+            if (_isRotateMode) ...[
               Center(
                 child: _RotationDial(
                   rotationDegrees: _currentTransform.rotationDegrees,
                   onRotationChanged: _applyRotation,
+                  onDragEnd: _onRotationDragEnd,
                 ),
               ),
               const SizedBox(height: 12),
@@ -298,12 +385,44 @@ class _PostEditPageState extends State<PostEditPage> {
             ),
             const SizedBox(height: _cropToolsGapAboveSelector),
           ],
+          if (_isAdjustMode) ...[
+            if (_activeAdjustSubTool != null) ...[
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: _EditResetDoneRow(
+                  onReset: _resetForCurrentMode,
+                  onDone: _finishEditing,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Center(
+                child: _AdjustDial(
+                  value: _currentTransform.adjustValueFor(_activeAdjustSubTool!),
+                  onChanged: _onAdjustValueChanged,
+                  onDragEnd: _onAdjustDragEnd,
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            _AdjustTransformBar(
+              selectedTool: _activeAdjustSubTool,
+              onToolTap: _onAdjustSubToolTap,
+            ),
+            const SizedBox(height: _cropToolsGapAboveSelector),
+          ],
           Center(
             child: _EditToolSelector(
               editTool: _editTool,
               onChanged: (tool) => setState(() {
                 _editTool = tool;
                 if (tool != 'crop') _activeCropSubTool = null;
+                if (tool != 'adjust') {
+                  _activeAdjustSubTool = null;
+                  _showAdjustValue = false;
+                } else {
+                  _activeAdjustSubTool ??= AdjustSubTool.brightness;
+                }
               }),
             ),
           ),
@@ -314,14 +433,144 @@ class _PostEditPageState extends State<PostEditPage> {
   }
 }
 
-class _CropPreviewImage extends StatelessWidget {
-  const _CropPreviewImage({
+class _CenteredThumbStrip extends StatelessWidget {
+  const _CenteredThumbStrip({
+    required this.itemCount,
+    required this.itemBuilder,
+  });
+
+  final int itemCount;
+  final Widget Function(BuildContext context, int index) itemBuilder;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final contentWidth = itemCount * _PostEditPageState._thumbSize +
+            (itemCount - 1) * _PostEditPageState._thumbGap;
+
+        if (contentWidth <= constraints.maxWidth) {
+          return Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var index = 0; index < itemCount; index++) ...[
+                  if (index > 0) const SizedBox(width: _PostEditPageState._thumbGap),
+                  itemBuilder(context, index),
+                ],
+              ],
+            ),
+          );
+        }
+
+        return ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          itemCount: itemCount,
+          separatorBuilder: (context, _) =>
+              const SizedBox(width: _PostEditPageState._thumbGap),
+          itemBuilder: itemBuilder,
+        );
+      },
+    );
+  }
+}
+
+class _EditResetDoneRow extends StatelessWidget {
+  const _EditResetDoneRow({
+    required this.onReset,
+    required this.onDone,
+  });
+
+  static const _errorRed = Color(0xFFC03030);
+
+  final VoidCallback onReset;
+  final VoidCallback onDone;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        GestureDetector(
+          onTap: onReset,
+          behavior: HitTestBehavior.opaque,
+          child: Text(
+            'RESET',
+            style: GoogleFonts.inter(
+              fontSize: 9,
+              fontWeight: FontWeight.w500,
+              color: _errorRed,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ),
+        GestureDetector(
+          onTap: onDone,
+          behavior: HitTestBehavior.opaque,
+          child: Text(
+            'DONE',
+            style: GoogleFonts.inter(
+              fontSize: 9,
+              fontWeight: FontWeight.w500,
+              color: HomeFeedTokens.textInverse,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EditThumbPreview extends StatelessWidget {
+  const _EditThumbPreview({
+    required this.assetPath,
+    required this.transform,
+  });
+
+  final String assetPath;
+  final PostImageTransform transform;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget image = Image.asset(
+      assetPath,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+    );
+
+    if (!ImageAdjustMath.isNeutral(
+      brightness: transform.brightness,
+      contrast: transform.contrast,
+      exposure: transform.exposure,
+    )) {
+      image = ColorFiltered(
+        colorFilter: ColorFilter.matrix(
+          ImageAdjustMath.combinedMatrix(
+            brightness: transform.brightness,
+            contrast: transform.contrast,
+            exposure: transform.exposure,
+          ),
+        ),
+        child: image,
+      );
+    }
+
+    return image;
+  }
+}
+
+class _EditPreviewImage extends StatelessWidget {
+  const _EditPreviewImage({
     required this.assetPath,
     required this.transform,
     required this.imageAspect,
     required this.gesturesEnabled,
     required this.onScaleStart,
     required this.onScaleUpdate,
+    this.onScaleEnd,
   });
 
   final String assetPath;
@@ -330,6 +579,7 @@ class _CropPreviewImage extends StatelessWidget {
   final bool gesturesEnabled;
   final VoidCallback onScaleStart;
   final void Function(double rotationDelta, double scaleDelta) onScaleUpdate;
+  final VoidCallback? onScaleEnd;
 
   @override
   Widget build(BuildContext context) {
@@ -338,20 +588,39 @@ class _CropPreviewImage extends StatelessWidget {
     final sx = (transform.flipHorizontal ? -1.0 : 1.0) * scale;
     final sy = (transform.flipVertical ? -1.0 : 1.0) * scale;
 
+    final matrix = ImageAdjustMath.combinedMatrix(
+      brightness: transform.brightness,
+      contrast: transform.contrast,
+      exposure: transform.exposure,
+    );
+
+    Widget imageContent = Transform(
+      alignment: Alignment.center,
+      transform: Matrix4.identity()
+        ..rotateZ(radians)
+        ..scaleByDouble(sx, sy, 1.0, 1),
+      child: Image.asset(
+        assetPath,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+      ),
+    );
+
+    if (!ImageAdjustMath.isNeutral(
+      brightness: transform.brightness,
+      contrast: transform.contrast,
+      exposure: transform.exposure,
+    )) {
+      imageContent = ColorFiltered(
+        colorFilter: ColorFilter.matrix(matrix),
+        child: imageContent,
+      );
+    }
+
     final image = ColoredBox(
       color: Colors.black,
-      child: Transform(
-        alignment: Alignment.center,
-        transform: Matrix4.identity()
-          ..rotateZ(radians)
-          ..scaleByDouble(sx, sy, 1.0, 1),
-        child: Image.asset(
-          assetPath,
-          fit: BoxFit.cover,
-          width: double.infinity,
-          height: double.infinity,
-        ),
-      ),
+      child: imageContent,
     );
 
     if (!gesturesEnabled) return image;
@@ -365,7 +634,152 @@ class _CropPreviewImage extends StatelessWidget {
           details.scale,
         );
       },
+      onScaleEnd: (_) => onScaleEnd?.call(),
       child: image,
+    );
+  }
+}
+
+class _PreviewValueOverlay extends StatelessWidget {
+  const _PreviewValueOverlay({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.45),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          text,
+          style: GoogleFonts.inter(
+            fontSize: 28,
+            fontWeight: FontWeight.w500,
+            color: HomeFeedTokens.textInverse,
+            height: 1,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AdjustDial extends StatelessWidget {
+  const _AdjustDial({
+    required this.value,
+    required this.onChanged,
+    required this.onDragEnd,
+  });
+
+  static const _valuePerPixel = 0.5;
+
+  final double value;
+  final ValueChanged<double> onChanged;
+  final VoidCallback onDragEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    return _TickDial(
+      offsetX: -(value - 50) / _valuePerPixel,
+      onHorizontalDragUpdate: (deltaDx) {
+        onChanged((value - deltaDx * _valuePerPixel).clamp(0.0, 100.0));
+      },
+      onDragEnd: onDragEnd,
+    );
+  }
+}
+
+class _AdjustTransformBar extends StatelessWidget {
+  const _AdjustTransformBar({
+    required this.selectedTool,
+    required this.onToolTap,
+  });
+
+  static const _iconSize = 24.0;
+  static const _barWidth = 140.0;
+  static const _barHeight = 32.0;
+
+  final AdjustSubTool? selectedTool;
+  final ValueChanged<AdjustSubTool> onToolTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: _barHeight,
+      child: Center(
+        child: SizedBox(
+          width: _barWidth,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _AdjustToolButton(
+                  asset: PostMediaAssets.adjustBrightness,
+                  selected: selectedTool == AdjustSubTool.brightness,
+                  onTap: () => onToolTap(AdjustSubTool.brightness),
+                ),
+                _AdjustToolButton(
+                  asset: PostMediaAssets.adjustContrast,
+                  selected: selectedTool == AdjustSubTool.contrast,
+                  onTap: () => onToolTap(AdjustSubTool.contrast),
+                ),
+                _AdjustToolButton(
+                  asset: PostMediaAssets.adjustExposure,
+                  selected: selectedTool == AdjustSubTool.exposure,
+                  onTap: () => onToolTap(AdjustSubTool.exposure),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AdjustToolButton extends StatelessWidget {
+  const _AdjustToolButton({
+    required this.asset,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String asset;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SvgPicture.asset(
+            asset,
+            width: _AdjustTransformBar._iconSize,
+            height: _AdjustTransformBar._iconSize,
+          ),
+          if (selected) ...[
+            const SizedBox(height: 4),
+            Container(
+              width: 2,
+              height: 2,
+              decoration: BoxDecoration(
+                color: HomeFeedTokens.textInverse,
+                borderRadius: BorderRadius.circular(1),
+              ),
+            ),
+          ] else
+            const SizedBox(height: 6),
+        ],
+      ),
     );
   }
 }
@@ -453,19 +867,43 @@ class _RotationDial extends StatelessWidget {
   const _RotationDial({
     required this.rotationDegrees,
     required this.onRotationChanged,
+    required this.onDragEnd,
   });
 
-  static const _dialWidth = 160.0;
-  static const _dialHeight = 12.0;
   static const _degreesPerPixel = 0.35;
 
   final double rotationDegrees;
   final ValueChanged<double> onRotationChanged;
+  final VoidCallback onDragEnd;
 
   @override
   Widget build(BuildContext context) {
-    final dialOffset = -rotationDegrees / _degreesPerPixel;
+    return _TickDial(
+      offsetX: -rotationDegrees / _degreesPerPixel,
+      onHorizontalDragUpdate: (deltaDx) {
+        onRotationChanged(rotationDegrees - deltaDx * _degreesPerPixel);
+      },
+      onDragEnd: onDragEnd,
+    );
+  }
+}
 
+class _TickDial extends StatelessWidget {
+  const _TickDial({
+    required this.offsetX,
+    required this.onHorizontalDragUpdate,
+    required this.onDragEnd,
+  });
+
+  static const _dialWidth = 160.0;
+  static const _dialHeight = 12.0;
+
+  final double offsetX;
+  final ValueChanged<double> onHorizontalDragUpdate;
+  final VoidCallback onDragEnd;
+
+  @override
+  Widget build(BuildContext context) {
     return SizedBox(
       width: _dialWidth,
       height: 28,
@@ -481,14 +919,13 @@ class _RotationDial extends StatelessWidget {
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onHorizontalDragUpdate: (details) {
-                onRotationChanged(
-                  rotationDegrees - details.delta.dx * _degreesPerPixel,
-                );
+                onHorizontalDragUpdate(details.delta.dx);
               },
+              onHorizontalDragEnd: (_) => onDragEnd(),
               child: ClipRect(
                 child: CustomPaint(
                   size: const Size(_dialWidth, _dialHeight),
-                  painter: _RotationDialPainter(offsetX: dialOffset),
+                  painter: _TickDialPainter(offsetX: offsetX),
                 ),
               ),
             ),
@@ -510,8 +947,8 @@ class _RotationDial extends StatelessWidget {
   }
 }
 
-class _RotationDialPainter extends CustomPainter {
-  const _RotationDialPainter({required this.offsetX});
+class _TickDialPainter extends CustomPainter {
+  const _TickDialPainter({required this.offsetX});
 
   static const _tickSpacing = 6.0;
   static const _baselineY = 11.625;
@@ -543,7 +980,7 @@ class _RotationDialPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _RotationDialPainter oldDelegate) =>
+  bool shouldRepaint(covariant _TickDialPainter oldDelegate) =>
       oldDelegate.offsetX != offsetX;
 }
 

@@ -1,0 +1,8 @@
+<svg preserveAspectRatio="none" width="100%" height="100%" overflow="visible" style="display: block;" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="exposure">
+<rect width="24" height="24" rx="12" fill="#231F1B" fill-opacity="0.8"/>
+<path d="M8.5 15.5L12 8.5L15.5 15.5H8.5Z" stroke="#8C8880" stroke-width="1.1" stroke-linejoin="round"/>
+<path d="M10.5 13H13.5" stroke="#8C8880" stroke-width="1.1" stroke-linecap="round"/>
+<circle cx="12" cy="12.5" r="6.75" stroke="#8C8880" stroke-width="1.1"/>
+</g>
+</svg>

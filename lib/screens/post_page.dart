@@ -18,6 +18,7 @@ class _PostPageState extends State<PostPage> {
   static const _bannerHeight = 64.0;
   static const _gridGap = 3.0;
   static const _bottomControlsOffset = 42.0;
+  static const _maxSelection = 10;
 
   String _postType = 'piece';
   final List<int> _selectedIndices = [];
@@ -31,14 +32,48 @@ class _PostPageState extends State<PostPage> {
   }
 
   void _onCellTap(int cellIndex) {
-    setState(() {
-      final position = _selectedIndices.indexOf(cellIndex);
-      if (position >= 0) {
-        _selectedIndices.removeAt(position);
-      } else {
-        _selectedIndices.add(cellIndex);
-      }
-    });
+    final position = _selectedIndices.indexOf(cellIndex);
+    if (position >= 0) {
+      setState(() => _selectedIndices.removeAt(position));
+      return;
+    }
+    if (_selectedIndices.length >= _maxSelection) {
+      _showMaxSelectionMessage();
+      return;
+    }
+    setState(() => _selectedIndices.add(cellIndex));
+  }
+
+  void _showMaxSelectionMessage() {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          elevation: 0,
+          padding: EdgeInsets.zero,
+          backgroundColor: Colors.transparent,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+          duration: const Duration(seconds: 2),
+          content: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.75),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              'You can select up to 10 photos at a time.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: Colors.white,
+                height: 1.3,
+              ),
+            ),
+          ),
+        ),
+      );
   }
 
   int? _selectionOrder(int cellIndex) {

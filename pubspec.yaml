@@ -64,6 +64,8 @@ flutter:
     - assets/post/grid/
     - assets/post/scene_grid/
     - assets/post/crop/
+    - assets/post/adjust/
+    - assets/post/create/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

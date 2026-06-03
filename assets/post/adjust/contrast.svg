@@ -1,0 +1,7 @@
+<svg preserveAspectRatio="none" width="100%" height="100%" overflow="visible" style="display: block;" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="contrast">
+<rect width="24" height="24" rx="12" fill="#231F1B" fill-opacity="0.8"/>
+<path d="M12 5.5C8.5 5.5 5.75 8.25 5.75 11.75C5.75 15.25 8.5 18 12 18V5.5Z" fill="#8C8880"/>
+<circle cx="12" cy="12" r="6.5" stroke="#8C8880" stroke-width="1.1"/>
+</g>
+</svg>
