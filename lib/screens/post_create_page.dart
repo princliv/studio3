@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../data/post_material_options.dart';
 import '../data/post_location_options.dart';
 import '../data/post_picker_options.dart';
 import '../data/post_media_assets.dart';
@@ -10,6 +11,7 @@ import '../theme/home_feed_tokens.dart';
 import '../utils/image_adjust_math.dart';
 import '../widgets/choose_location_sheet.dart';
 import '../widgets/post_create_option_sheet.dart';
+import 'add_materials_page.dart';
 
 /// Create post details — posting flow (Figma 1995:1486).
 class PostCreatePage extends StatefulWidget {
@@ -46,6 +48,7 @@ class _PostCreatePageState extends State<PostCreatePage> {
   final List<PostLocationOption> _selectedLocations = [];
   String? _selectedMediumId;
   final Set<String> _selectedStyleIds = {};
+  final List<PostMaterialOption> _selectedMaterials = [];
 
   void _openLocationPicker() {
     ChooseLocationSheet.show(
@@ -106,6 +109,26 @@ class _PostCreatePageState extends State<PostCreatePage> {
       return PostStyleOptions.byId(_selectedStyleIds.first)?.name;
     }
     return '${_selectedStyleIds.length}/${PostStyleOptions.maxSelections}';
+  }
+
+  Future<void> _openMaterialsPage() async {
+    final result = await Navigator.push<List<PostMaterialOption>>(
+      context,
+      MaterialPageRoute<List<PostMaterialOption>>(
+        builder: (_) => AddMaterialsPage(
+          previewImagePath: widget.imagePaths[widget.previewImageIndex],
+          transform: widget.transforms[widget.previewImageIndex],
+          initialMaterials: List<PostMaterialOption>.from(_selectedMaterials),
+        ),
+      ),
+    );
+    if (result != null && mounted) {
+      setState(() {
+        _selectedMaterials
+          ..clear()
+          ..addAll(result);
+      });
+    }
   }
 
   @override
@@ -268,7 +291,10 @@ class _PostCreatePageState extends State<PostCreatePage> {
                     iconWidth: 12,
                     iconHeight: 11,
                     label: 'Materials used',
-                    onTap: () {},
+                    countBadge: _selectedMaterials.isEmpty
+                        ? null
+                        : _selectedMaterials.length,
+                    onTap: _openMaterialsPage,
                   ),
                   _MetadataRow(
                     iconAsset: PostMediaAssets.createSeriesIcon,
@@ -473,6 +499,7 @@ class _MetadataRow extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.trailing,
+    this.countBadge,
   });
 
   final String iconAsset;
@@ -481,6 +508,7 @@ class _MetadataRow extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
   final String? trailing;
+  final int? countBadge;
 
   static const _textSecondary = Color(0xFF8C8880);
 
@@ -516,6 +544,26 @@ class _MetadataRow extends StatelessWidget {
                   fontSize: 11,
                   fontWeight: FontWeight.w400,
                   color: _textSecondary,
+                ),
+              ),
+              const SizedBox(width: 10),
+            ],
+            if (countBadge != null && countBadge! > 0) ...[
+              Container(
+                width: 20,
+                height: 20,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  '$countBadge',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: HomeFeedTokens.textPrimary,
+                  ),
                 ),
               ),
               const SizedBox(width: 10),

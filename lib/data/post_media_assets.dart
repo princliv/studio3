@@ -24,6 +24,7 @@ abstract final class PostMediaAssets {
   static const createScenesIcon = 'assets/post/create/scenes_icon.svg';
   static const createAiToolsIcon = 'assets/post/create/ai_tools_icon.svg';
   static const createSearchIcon = 'assets/post/create/search_icon.svg';
+  static const addPlusIcon = 'assets/post/create/add_plus_icon.svg';
 
   static const pieceGridThumbs = <String>[
     'assets/post/grid/grid_00.png',
