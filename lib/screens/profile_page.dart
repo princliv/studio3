@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/home_feed_dummy.dart';
+import '../services/auth_session.dart';
 import '../theme/home_feed_tokens.dart';
 import 'profile/models/profile_series_data.dart';
 import 'profile/profile_constants.dart';
@@ -115,6 +116,9 @@ class _ProfilePageState extends State<ProfilePage> {
     final width = MediaQuery.sizeOf(context).width;
     final heroH = (width * 0.68).clamp(260.0, 340.0);
     final bottomPad = MediaQuery.paddingOf(context).bottom + 100;
+    final sessionUser = AuthSession.instance.user;
+    final name = sessionUser?.name ?? _name;
+    final handle = sessionUser != null ? '@${sessionUser.username}' : _handle;
 
     return Scaffold(
       backgroundColor: HomeFeedTokens.background,
@@ -123,12 +127,23 @@ class _ProfilePageState extends State<ProfilePage> {
         child: CustomScrollView(
           slivers: [
             SliverToBoxAdapter(
-              child: _ProfileHero(heroSeed: _heroSeed, height: heroH, width: width),
+              child: Stack(
+                children: [
+                  _ProfileHero(heroSeed: _heroSeed, height: heroH, width: width),
+                  Positioned(
+                    top: 8,
+                    right: 12,
+                    child: _ProfileSettingsButton(
+                      onPressed: () => Navigator.pushNamed(context, '/profile-settings'),
+                    ),
+                  ),
+                ],
+              ),
             ),
             SliverToBoxAdapter(
               child: ProfileHeader(
-                name: _name,
-                handle: _handle,
+                name: name,
+                handle: handle,
                 followingFollowers: _followingFollowers,
                 bioLine1: _bioLine1,
                 bioLine2: _bioLine2,
@@ -202,6 +217,29 @@ class _ProfileHero extends StatelessWidget {
             size: 48,
             color: Colors.grey.shade600,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileSettingsButton extends StatelessWidget {
+  const _ProfileSettingsButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black.withValues(alpha: 0.35),
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onPressed,
+        child: const SizedBox(
+          width: 40,
+          height: 40,
+          child: Icon(Icons.menu_rounded, color: Colors.white, size: 22),
         ),
       ),
     );

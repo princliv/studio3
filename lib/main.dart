@@ -2,16 +2,23 @@ import 'package:flutter/material.dart';
 
 import 'theme/app_theme.dart';
 import 'widgets/bottom_nav.dart' show BottomNav, BottomNavIndex;
+import 'services/auth_session.dart';
 import 'screens/login_page.dart';
 import 'screens/signup_page.dart';
+import 'screens/forgot_password_page.dart';
+import 'screens/welcome_page.dart';
+import 'screens/profile_settings_page.dart';
 import 'screens/home_feed_page.dart';
 import 'screens/discover_page.dart';
 import 'screens/chat_page.dart';
 import 'screens/profile_page.dart';
 import 'screens/post_page.dart';
 import 'screens/notifications_page.dart';
+import 'models/auth_user.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await AuthSession.instance.initialize();
   runApp(const Studio3App());
 }
 
@@ -20,14 +27,22 @@ class Studio3App extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final loggedIn = AuthSession.instance.isLoggedIn;
+
     return MaterialApp(
       title: 'Studio 3 Discover',
       theme: AppTheme.light,
-      initialRoute: '/',
+      initialRoute: loggedIn ? '/' : '/login',
       routes: {
         '/': (context) => const MainShell(),
         '/login': (context) => const LoginPage(),
         '/signup': (context) => const SignUpPage(),
+        '/forgot-password': (context) => const ForgotPasswordPage(),
+        '/welcome': (context) {
+          final user = ModalRoute.of(context)?.settings.arguments as AuthUser?;
+          return WelcomePage(user: user ?? const AuthUser(username: '', name: 'Artist', email: ''));
+        },
+        '/profile-settings': (context) => const ProfileSettingsPage(),
         '/post': (context) => const PostPage(),
         '/notifications': (context) => const NotificationsPage(),
       },
