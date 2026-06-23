@@ -35,18 +35,26 @@ class ApiClient {
     Map<String, dynamic>? body,
     bool auth = false,
   }) async {
-    final uri = Uri.parse('${ApiConfig.baseUrl}$path');
-    final headers = {..._jsonHeaders};
-    if (auth) {
-      final token = AuthSession.instance.accessToken;
-      if (token != null) headers['Authorization'] = 'Bearer $token';
+    try {
+      final uri = Uri.parse('${ApiConfig.baseUrl}$path');
+      final headers = {..._jsonHeaders};
+      if (auth) {
+        final token = AuthSession.instance.accessToken;
+        if (token != null) headers['Authorization'] = 'Bearer $token';
+      }
+      final response = await _client.post(
+        uri,
+        headers: headers,
+        body: body == null ? null : jsonEncode(body),
+      );
+      return _parse(response);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException(
+        'Cannot reach server at ${ApiConfig.baseUrl}. Is the API running?',
+      );
     }
-    final response = await _client.post(
-      uri,
-      headers: headers,
-      body: body == null ? null : jsonEncode(body),
-    );
-    return _parse(response);
   }
 
   Future<Map<String, dynamic>> patch(

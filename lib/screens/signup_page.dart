@@ -1,14 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:url_launcher/url_launcher.dart';
-import '../config/api_config.dart';
 import '../services/auth_service.dart';
 import '../utils/auth_validators.dart';
 import '../widgets/auth_ui.dart';
 
 enum _SignUpStep {
-  chooseMethod,
   name,
   email,
   emailVerify,
@@ -25,7 +22,7 @@ class SignUpPage extends StatefulWidget {
 }
 
 class _SignUpPageState extends State<SignUpPage> {
-  _SignUpStep _step = _SignUpStep.chooseMethod;
+  _SignUpStep _step = _SignUpStep.name;
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -50,7 +47,6 @@ class _SignUpPageState extends State<SignUpPage> {
   static const _formSteps = 6;
 
   int get _progressStep => switch (_step) {
-        _SignUpStep.chooseMethod => 0,
         _SignUpStep.name => 1,
         _SignUpStep.email => 2,
         _SignUpStep.emailVerify => 3,
@@ -89,32 +85,23 @@ class _SignUpPageState extends State<SignUpPage> {
   }
 
   void _goBack() {
+    if (_step == _SignUpStep.name) {
+      Navigator.maybePop(context);
+      return;
+    }
     setState(() {
       _submitted = false;
       _loading = false;
       _step = switch (_step) {
-        _SignUpStep.name => _SignUpStep.chooseMethod,
         _SignUpStep.email => _SignUpStep.name,
         _SignUpStep.emailVerify => _SignUpStep.email,
         _SignUpStep.username => _SignUpStep.emailVerify,
         _SignUpStep.phone => _SignUpStep.username,
         _SignUpStep.password => _SignUpStep.phone,
-        _SignUpStep.chooseMethod => _SignUpStep.chooseMethod,
+        _SignUpStep.name => _SignUpStep.name,
       };
     });
   }
-
-  Future<void> _googleSignUp() async {
-    final uri = Uri.parse(ApiConfig.googleAuthUrl);
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      if (mounted) showAuthSnackBar(context, 'Could not open Google sign-up', isError: true);
-    }
-  }
-
-  void _startEmailSignup() => setState(() {
-        _submitted = false;
-        _step = _SignUpStep.name;
-      });
 
   String? _nameError() {
     if (!_submitted) return null;
@@ -279,31 +266,42 @@ class _SignUpPageState extends State<SignUpPage> {
   @override
   Widget build(BuildContext context) {
     return AuthScaffold(
-      compact: _step != _SignUpStep.chooseMethod,
-      showBackButton: _step != _SignUpStep.chooseMethod,
-      onBackPressed: _step != _SignUpStep.chooseMethod ? _goBack : null,
-      child: AuthFormBody(
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 280),
-          switchInCurve: Curves.easeOut,
-          switchOutCurve: Curves.easeIn,
-          transitionBuilder: (child, animation) => FadeTransition(
-            opacity: animation,
-            child: SlideTransition(
-              position: Tween<Offset>(begin: const Offset(0.03, 0), end: Offset.zero)
-                  .animate(CurvedAnimation(parent: animation, curve: Curves.easeOut)),
-              child: child,
+      compact: true,
+      showBackButton: true,
+      onBackPressed: _goBack,
+      child: Column(
+        children: [
+          AuthFormBody(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 280),
+              switchInCurve: Curves.easeOut,
+              switchOutCurve: Curves.easeIn,
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(begin: const Offset(0.03, 0), end: Offset.zero)
+                      .animate(CurvedAnimation(parent: animation, curve: Curves.easeOut)),
+                  child: child,
+                ),
+              ),
+              child: _buildStep(),
             ),
           ),
-          child: _buildStep(),
-        ),
+          if (_step == _SignUpStep.name) ...[
+            const SizedBox(height: 24),
+            AuthLinkFooter(
+              prompt: 'Already have an account? ',
+              actionLabel: 'Sign in',
+              onTap: () => Navigator.pushNamed(context, '/login'),
+            ),
+          ],
+        ],
       ),
     );
   }
 
   Widget _buildStep() {
     return switch (_step) {
-      _SignUpStep.chooseMethod => _buildChooseMethod(key: const ValueKey('method')),
       _SignUpStep.name => _buildNameStep(key: const ValueKey('name')),
       _SignUpStep.email => _buildEmailStep(key: const ValueKey('email')),
       _SignUpStep.emailVerify => _buildOtpStep(key: const ValueKey('otp')),
@@ -311,31 +309,6 @@ class _SignUpPageState extends State<SignUpPage> {
       _SignUpStep.phone => _buildPhoneStep(key: const ValueKey('phone')),
       _SignUpStep.password => _buildPasswordStep(key: const ValueKey('password')),
     };
-  }
-
-  Widget _buildChooseMethod({required Key key}) {
-    return Column(
-      key: key,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const AuthPageTitle(
-          title: 'Create account',
-          subtitle: 'Join the Studio 3 community',
-        ),
-        const SizedBox(height: 28),
-        GoogleAuthButton(label: 'Continue with Google', onPressed: _googleSignUp),
-        const SizedBox(height: 20),
-        const AuthDivider(label: 'or sign up with email'),
-        const SizedBox(height: 20),
-        AuthPrimaryButton(label: 'Continue with email', onPressed: _startEmailSignup),
-        const SizedBox(height: 20),
-        AuthLinkFooter(
-          prompt: 'Already have an account? ',
-          actionLabel: 'Sign in',
-          onTap: () => Navigator.pushNamed(context, '/login'),
-        ),
-      ],
-    );
   }
 
   Widget _buildNameStep({required Key key}) {

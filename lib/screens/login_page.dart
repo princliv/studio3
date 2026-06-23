@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
-import '../config/api_config.dart';
 import '../services/auth_service.dart';
 import '../services/auth_session.dart';
 import '../utils/auth_validators.dart';
@@ -39,13 +37,13 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   String? get _usernameError =>
-      _submitted ? AuthValidators.username(_usernameController.text) : null;
+      _submitted ? AuthValidators.loginIdentifier(_usernameController.text) : null;
 
   String? get _passwordError =>
       _submitted && _passwordController.text.isEmpty ? 'Password is required' : null;
 
   bool get _canSubmit =>
-      AuthValidators.username(_usernameController.text) == null &&
+      AuthValidators.loginIdentifier(_usernameController.text) == null &&
       _passwordController.text.isNotEmpty;
 
   Future<void> _signIn() async {
@@ -69,13 +67,6 @@ class _LoginPageState extends State<LoginPage> {
       if (mounted) showAuthError(context, e);
     } finally {
       if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _googleSignIn() async {
-    final uri = Uri.parse(ApiConfig.googleAuthUrl);
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      if (mounted) showAuthSnackBar(context, 'Could not open Google sign-in', isError: true);
     }
   }
 
@@ -117,9 +108,7 @@ class _LoginPageState extends State<LoginPage> {
             ),
             const SizedBox(height: 20),
             AuthPrimaryButton(label: 'Login', enabled: _canSubmit, loading: _loading, onPressed: _signIn),
-            const SizedBox(height: 20),
-            GoogleAuthButton(onPressed: _googleSignIn),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             AuthLinkFooter(
               prompt: "Don't have an account? ",
               actionLabel: 'Sign Up',

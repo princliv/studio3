@@ -10,6 +10,4 @@ abstract final class ApiConfig {
     if (Platform.isAndroid) return 'http://10.0.2.2:$port';
     return 'http://localhost:$port';
   }
-
-  static String get googleAuthUrl => '$baseUrl/api/auth/google';
 }
