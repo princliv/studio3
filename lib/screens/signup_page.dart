@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_service.dart';
 import '../utils/auth_validators.dart';
 import '../widgets/auth_ui.dart';
+import '../widgets/studio_loading.dart';
 
 enum _SignUpStep {
   name,
@@ -265,11 +266,14 @@ class _SignUpPageState extends State<SignUpPage> {
 
   @override
   Widget build(BuildContext context) {
-    return AuthScaffold(
-      compact: true,
-      showBackButton: true,
-      onBackPressed: _goBack,
-      child: Column(
+    return StudioLoadingGate(
+      loading: _loading,
+      dark: true,
+      child: AuthScaffold(
+        compact: true,
+        showBackButton: true,
+        onBackPressed: _goBack,
+        child: Column(
         children: [
           AuthFormBody(
             child: AnimatedSwitcher(
@@ -297,6 +301,7 @@ class _SignUpPageState extends State<SignUpPage> {
           ],
         ],
       ),
+    ),
     );
   }
 
@@ -365,7 +370,7 @@ class _SignUpPageState extends State<SignUpPage> {
         AuthPrimaryButton(
           label: 'Send code',
           enabled: AuthValidators.email(_emailController.text) == null,
-          loading: _loading,
+          loading: false,
           onPressed: _continueEmail,
         ),
       ],
@@ -460,7 +465,7 @@ class _SignUpPageState extends State<SignUpPage> {
         AuthPrimaryButton(
           label: 'Continue',
           enabled: localValid && _usernameAvailable != false,
-          loading: _loading,
+          loading: false,
           onPressed: _continueUsername,
         ),
       ],
@@ -546,7 +551,7 @@ class _SignUpPageState extends State<SignUpPage> {
           label: 'Create Account',
           enabled: AuthValidators.password(_passwordController.text) == null &&
               AuthValidators.confirmPassword(_confirmPasswordController.text, _passwordController.text) == null,
-          loading: _loading,
+          loading: false,
           onPressed: _createAccount,
         ),
       ],

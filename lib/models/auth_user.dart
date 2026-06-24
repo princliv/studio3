@@ -6,6 +6,7 @@ class AuthUser {
     this.emailVerified = false,
     this.onboardingComplete = false,
     this.role,
+    this.sellerEnabled = false,
   });
 
   final String username;
@@ -14,6 +15,27 @@ class AuthUser {
   final bool emailVerified;
   final bool onboardingComplete;
   final String? role;
+  final bool sellerEnabled;
+
+  AuthUser copyWith({
+    String? username,
+    String? name,
+    String? email,
+    bool? emailVerified,
+    bool? onboardingComplete,
+    String? role,
+    bool? sellerEnabled,
+  }) {
+    return AuthUser(
+      username: username ?? this.username,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      emailVerified: emailVerified ?? this.emailVerified,
+      onboardingComplete: onboardingComplete ?? this.onboardingComplete,
+      role: role ?? this.role,
+      sellerEnabled: sellerEnabled ?? this.sellerEnabled,
+    );
+  }
 
   factory AuthUser.fromJson(Map<String, dynamic> json) {
     return AuthUser(
@@ -23,6 +45,9 @@ class AuthUser {
       emailVerified: json['emailVerified'] as bool? ?? false,
       onboardingComplete: json['onboardingComplete'] as bool? ?? false,
       role: json['role'] as String?,
+      sellerEnabled: json['sellerEnabled'] as bool? ??
+          json['isSeller'] as bool? ??
+          false,
     );
   }
 
@@ -33,6 +58,7 @@ class AuthUser {
         'emailVerified': emailVerified,
         'onboardingComplete': onboardingComplete,
         'role': role,
+        'sellerEnabled': sellerEnabled,
       };
 }
 

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
+import '../models/feed_item.dart';
 import '../models/feed_row.dart';
+import '../services/feed_service.dart';
 import '../theme/home_feed_tokens.dart';
 import '../utils/feed_layout_generator.dart';
 import '../widgets/home_feed/home_feed_widgets.dart';
+import '../widgets/studio_loading.dart';
+import '../widgets/studio_logo.dart';
 import 'artwork_detail_page.dart';
 
 class HomeFeedPage extends StatefulWidget {
@@ -15,20 +18,22 @@ class HomeFeedPage extends StatefulWidget {
 }
 
 class _HomeFeedPageState extends State<HomeFeedPage> {
-  static const int _initialBatch = 16;
-  static const int _loadMoreCount = 10;
   static const double _loadMoreThreshold = 200;
 
   final FeedLayoutGenerator _generator = FeedLayoutGenerator();
   final ScrollController _scrollController = ScrollController();
   final List<FeedRowModel> _rows = [];
+  final List<FeedItem> _apiItems = [];
   bool _loadingMore = false;
+  bool _useApi = false;
+  bool _refreshingApi = false;
 
   @override
   void initState() {
     super.initState();
-    _rows.addAll(_generator.nextBatch(_initialBatch));
     _scrollController.addListener(_onScroll);
+    _rows.addAll(_generator.nextBatch(16));
+    _loadFeed();
   }
 
   @override
@@ -38,8 +43,30 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
     super.dispose();
   }
 
+  Future<void> _loadFeed() async {
+    if (_refreshingApi) return;
+    setState(() => _refreshingApi = true);
+    try {
+      final items = await FeedService.instance.getFollowing();
+      if (!mounted) return;
+      setState(() {
+        _apiItems
+          ..clear()
+          ..addAll(items);
+        _useApi = items.isNotEmpty;
+        _refreshingApi = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _useApi = false;
+        _refreshingApi = false;
+      });
+    }
+  }
+
   void _onScroll() {
-    if (_loadingMore) return;
+    if (_loadingMore || _useApi) return;
     final pos = _scrollController.position;
     if (!pos.hasPixels || !pos.hasViewportDimension) return;
     if (pos.pixels >= pos.maxScrollExtent - _loadMoreThreshold) {
@@ -48,19 +75,17 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
   }
 
   void _loadMore() {
-    setState(() {
-      _loadingMore = true;
-    });
+    setState(() => _loadingMore = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       setState(() {
-        _rows.addAll(_generator.nextBatch(_loadMoreCount));
+        _rows.addAll(_generator.nextBatch(10));
         _loadingMore = false;
       });
     });
   }
 
-  void _openDetail(String imageUrl, FeedCardData data) {
+  void _openDetailFromCard(String imageUrl, FeedCardData data) {
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (context) => ArtworkDetailPage(
@@ -72,118 +97,144 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.paddingOf(context).bottom + 100;
-
-    return Scaffold(
-      backgroundColor: HomeFeedTokens.background,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                HomeFeedTokens.sideMargin,
-                8,
-                HomeFeedTokens.sideMargin,
-                12,
-              ),
-              child: Row(
-                children: [
-                  const _Studio3BrandTitle(),
-                  const Spacer(),
-                  Material(
-                    color: const Color(0xFF1A1A1A),
-                    shape: const CircleBorder(),
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
-                      onTap: () {},
-                      child: const Padding(
-                        padding: EdgeInsets.all(10),
-                        child: Icon(
-                          Icons.shopping_bag_outlined,
-                          color: HomeFeedTokens.textInverse,
-                          size: 22,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: EdgeInsets.only(bottom: bottomInset),
-                itemCount: _rows.length + (_loadingMore ? 1 : 0),
-                itemBuilder: (context, index) {
-                  if (index >= _rows.length) {
-                    return const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      child: Center(
-                        child: SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      ),
-                    );
-                  }
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: HomeFeedTokens.rowGap),
-                    child: FeedRowView(
-                      model: _rows[index],
-                      onImageTap: _openDetail,
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
+  void _openApiItem(FeedItem item) {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (context) => ArtworkDetailPage(
+          imageUrl: item.mediaUrl ?? '',
+          artistName: item.authorName,
+          medium: item.type == FeedItemType.piece ? item.piece?.medium : null,
+          pieceId: item.type == FeedItemType.piece ? item.piece?.id : null,
+          postId: item.type == FeedItemType.post ? item.post?.id : null,
+          title: item.title,
+          forSale: item.isForSale,
+          price: item.priceDisplay,
         ),
       ),
     );
   }
-}
-
-class _Studio3BrandTitle extends StatelessWidget {
-  const _Studio3BrandTitle();
-
-  static const String _text = 'Studio 3';
 
   @override
   Widget build(BuildContext context) {
-    final fillStyle = GoogleFonts.inter(
-      fontSize: 36,
-      fontWeight: FontWeight.w700,
-      color: HomeFeedTokens.textPrimary,
-      height: 1.05,
-      shadows: const [
-        Shadow(
-          offset: Offset(0, 4),
-          blurRadius: 4,
-          color: Color(0x40000000),
-        ),
-      ],
-    );
+    final bottomInset = MediaQuery.paddingOf(context).bottom + 100;
 
-    return Stack(
-      alignment: Alignment.centerLeft,
-      clipBehavior: Clip.none,
-      children: [
-        Text(
-          _text,
-          style: fillStyle.copyWith(
-            foreground: Paint()
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = 1
-              ..color = Colors.black,
+    return StudioLoadingGate(
+      loading: _refreshingApi || _loadingMore,
+      child: Scaffold(
+        backgroundColor: HomeFeedTokens.background,
+        body: SafeArea(
+          bottom: false,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  HomeFeedTokens.sideMargin,
+                  8,
+                  HomeFeedTokens.sideMargin,
+                  12,
+                ),
+                child: const Row(
+                  children: [
+                    StudioHeaderLogo(),
+                    Spacer(),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: _useApi
+                    ? RefreshIndicator(
+                        onRefresh: _loadFeed,
+                        child: GridView.builder(
+                            padding: EdgeInsets.fromLTRB(
+                              HomeFeedTokens.sideMargin,
+                              0,
+                              HomeFeedTokens.sideMargin,
+                              bottomInset,
+                            ),
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              crossAxisSpacing: 8,
+                              mainAxisSpacing: 8,
+                              childAspectRatio: 0.75,
+                            ),
+                            itemCount: _apiItems.length,
+                            itemBuilder: (context, index) {
+                              final item = _apiItems[index];
+                              final url = item.mediaUrl;
+                              return GestureDetector(
+                                onTap: () => _openApiItem(item),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(
+                                    HomeFeedTokens.cardRadius,
+                                  ),
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      if (url != null)
+                                        Image.network(
+                                          url,
+                                          fit: BoxFit.cover,
+                                          gaplessPlayback: true,
+                                        )
+                                      else
+                                        ColoredBox(
+                                          color: Colors.grey.shade300,
+                                        ),
+                                      if (item.isForSale && item.priceDisplay != null)
+                                        Positioned(
+                                          left: 8,
+                                          bottom: 8,
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.black
+                                                  .withValues(alpha: 0.65),
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              item.priceDisplay!,
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        )
+                  : ListView.builder(
+                      controller: _scrollController,
+                      padding: EdgeInsets.only(bottom: bottomInset),
+                      itemCount: _rows.length,
+                      itemBuilder: (context, index) {
+                        return Padding(
+                          padding: const EdgeInsets.only(
+                            bottom: HomeFeedTokens.rowGap,
+                          ),
+                          child: FeedRowView(
+                            model: _rows[index],
+                            onImageTap: _openDetailFromCard,
+                          ),
+                        );
+                      },
+                    ),
+              ),
+            ],
           ),
         ),
-        Text(_text, style: fillStyle),
-      ],
+      ),
     );
   }
 }

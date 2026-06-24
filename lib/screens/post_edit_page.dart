@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -19,12 +20,14 @@ class PostEditPage extends StatefulWidget {
     super.key,
     required this.postType,
     required this.selectedCellIndices,
+    this.customImagePaths,
     this.initialImageIndex = 0,
     this.initialTransforms,
   });
 
   final String postType;
   final List<int> selectedCellIndices;
+  final List<String>? customImagePaths;
   final int initialImageIndex;
   final List<PostImageTransform>? initialTransforms;
 
@@ -70,10 +73,14 @@ class _PostEditPageState extends State<PostEditPage> {
   @override
   void initState() {
     super.initState();
-    _imagePaths = PostMediaAssets.assetPathsForCells(
-      postType: widget.postType,
-      cellIndices: widget.selectedCellIndices,
-    );
+    if (widget.customImagePaths != null && widget.customImagePaths!.isNotEmpty) {
+      _imagePaths = List<String>.from(widget.customImagePaths!);
+    } else {
+      _imagePaths = PostMediaAssets.assetPathsForCells(
+        postType: widget.postType,
+        cellIndices: widget.selectedCellIndices,
+      );
+    }
     _transforms = widget.initialTransforms != null &&
             widget.initialTransforms!.length == _imagePaths.length
         ? widget.initialTransforms!.map((t) => t.copy()).toList()
@@ -93,13 +100,22 @@ class _PostEditPageState extends State<PostEditPage> {
   Future<void> _loadImageAspect(String path) async {
     if (_imageAspects.containsKey(path)) return;
     try {
-      final data = await rootBundle.load(path);
-      final codec = await ui.instantiateImageCodec(
-        data.buffer.asUint8List(),
-      );
-      final frame = await codec.getNextFrame();
-      final w = frame.image.width.toDouble();
-      final h = frame.image.height.toDouble();
+      ui.Image? decoded;
+      if (path.startsWith('assets/')) {
+        final data = await rootBundle.load(path);
+        final codec = await ui.instantiateImageCodec(
+          data.buffer.asUint8List(),
+        );
+        final frame = await codec.getNextFrame();
+        decoded = frame.image;
+      } else {
+        final bytes = await File(path).readAsBytes();
+        final codec = await ui.instantiateImageCodec(bytes);
+        final frame = await codec.getNextFrame();
+        decoded = frame.image;
+      }
+      final w = decoded.width.toDouble();
+      final h = decoded.height.toDouble();
       if (!mounted || h == 0) return;
       setState(() => _imageAspects[path] = w / h);
     } catch (_) {

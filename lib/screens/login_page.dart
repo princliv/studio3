@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+
+import '../utils/app_routes.dart';
 import '../services/auth_service.dart';
 import '../services/auth_session.dart';
 import '../utils/auth_validators.dart';
+import '../widgets/studio_loading.dart';
 import '../widgets/auth_ui.dart';
 
 class LoginPage extends StatefulWidget {
@@ -62,7 +65,7 @@ class _LoginPageState extends State<LoginPage> {
         await AuthSession.instance.clearRememberedUsername();
       }
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/');
+      Navigator.pushReplacementNamed(context, resolvePostAuthRoute());
     } catch (e) {
       if (mounted) showAuthError(context, e);
     } finally {
@@ -72,49 +75,53 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    return AuthScaffold(
-      compact: true,
-      child: AuthFormBody(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const AuthPageTitle(title: 'Login'),
-            const SizedBox(height: 28),
-            AuthIconInput(
-              controller: _usernameController,
-              placeholder: 'Username',
-              prefixIcon: Icons.person_outline_rounded,
-              errorText: _usernameError,
-              textInputAction: TextInputAction.next,
-              onChanged: (_) => setState(() {}),
-            ),
-            const SizedBox(height: 14),
-            AuthIconInput(
-              controller: _passwordController,
-              placeholder: 'Password',
-              prefixIcon: Icons.lock_outline_rounded,
-              obscureText: _obscurePassword,
-              errorText: _passwordError,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => _signIn(),
-              onChanged: (_) => setState(() {}),
-              onToggleVisibility: () => setState(() => _obscurePassword = !_obscurePassword),
-            ),
-            const SizedBox(height: 14),
-            AuthRememberRow(
-              value: _rememberMe,
-              onChanged: (v) => setState(() => _rememberMe = v),
-              onForgot: () => Navigator.pushNamed(context, '/forgot-password'),
-            ),
-            const SizedBox(height: 20),
-            AuthPrimaryButton(label: 'Login', enabled: _canSubmit, loading: _loading, onPressed: _signIn),
-            const SizedBox(height: 24),
-            AuthLinkFooter(
-              prompt: "Don't have an account? ",
-              actionLabel: 'Sign Up',
-              onTap: () => Navigator.pushNamed(context, '/signup'),
-            ),
-          ],
+    return StudioLoadingGate(
+      loading: _loading,
+      dark: true,
+      child: AuthScaffold(
+        compact: true,
+        child: AuthFormBody(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const AuthPageTitle(title: 'Login'),
+              const SizedBox(height: 28),
+              AuthIconInput(
+                controller: _usernameController,
+                placeholder: 'Username',
+                prefixIcon: Icons.person_outline_rounded,
+                errorText: _usernameError,
+                textInputAction: TextInputAction.next,
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 14),
+              AuthIconInput(
+                controller: _passwordController,
+                placeholder: 'Password',
+                prefixIcon: Icons.lock_outline_rounded,
+                obscureText: _obscurePassword,
+                errorText: _passwordError,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _signIn(),
+                onChanged: (_) => setState(() {}),
+                onToggleVisibility: () => setState(() => _obscurePassword = !_obscurePassword),
+              ),
+              const SizedBox(height: 14),
+              AuthRememberRow(
+                value: _rememberMe,
+                onChanged: (v) => setState(() => _rememberMe = v),
+                onForgot: () => Navigator.pushNamed(context, '/forgot-password'),
+              ),
+              const SizedBox(height: 20),
+              AuthPrimaryButton(label: 'Login', enabled: _canSubmit, onPressed: _signIn),
+              const SizedBox(height: 24),
+              AuthLinkFooter(
+                prompt: "Don't have an account? ",
+                actionLabel: 'Sign Up',
+                onTap: () => Navigator.pushNamed(context, '/signup'),
+              ),
+            ],
+          ),
         ),
       ),
     );

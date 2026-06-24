@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import '../../../data/home_feed_dummy.dart';
 import '../../../theme/home_feed_tokens.dart';
 import '../profile_constants.dart';
@@ -12,7 +13,17 @@ class ProfileHeader extends StatelessWidget {
     required this.followingFollowers,
     required this.bioLine1,
     required this.bioLine2,
-    required this.avatarSeed,
+    this.avatarUrl,
+    this.avatarSeed = 902,
+    this.piecesCount,
+    this.collectedCount,
+    this.savesCount,
+    this.salesCount,
+    this.sellerMode = false,
+    this.isOwnProfile = true,
+    this.isFollowing = false,
+    this.onFollow,
+    this.onMessage,
   });
 
   final String name;
@@ -20,18 +31,54 @@ class ProfileHeader extends StatelessWidget {
   final String followingFollowers;
   final String bioLine1;
   final String bioLine2;
+  final String? avatarUrl;
   final int avatarSeed;
+  final int? piecesCount;
+  final int? collectedCount;
+  final int? savesCount;
+  final int? salesCount;
+  final bool sellerMode;
+  final bool isOwnProfile;
+  final bool isFollowing;
+  final VoidCallback? onFollow;
+  final VoidCallback? onMessage;
+
+  static const _avatarSize = 44.0;
+
+  String _formatCount(int? value) {
+    if (value == null) return '—';
+    if (value >= 1000) return '${(value / 1000).toStringAsFixed(1)}k';
+    return '$value';
+  }
+
+  List<({String value, String label})> get _stats {
+    if (sellerMode) {
+      return [
+        (value: _formatCount(piecesCount), label: 'pieces'),
+        (value: _formatCount(collectedCount), label: 'collected'),
+        (value: _formatCount(savesCount), label: 'saves'),
+        (value: _formatCount(salesCount), label: 'sales'),
+      ];
+    }
+    return [
+      (value: _formatCount(piecesCount), label: 'pieces'),
+      (value: _formatCount(collectedCount), label: 'collected'),
+      (value: _formatCount(savesCount), label: 'saves'),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
+    final stats = _stats;
+
     return ColoredBox(
       color: HomeFeedTokens.background,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
           kProfileHorizontalPad,
-          18,
+          14,
           kProfileHorizontalPad,
-          12,
+          10,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -39,84 +86,119 @@ class ProfileHeader extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                _ProfileAvatar(seed: avatarSeed),
-                const SizedBox(width: 12),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
+                  child: Row(
                     children: [
-                      Text(
-                        name,
-                        style: GoogleFonts.inter(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          color: HomeFeedTokens.textPrimary,
-                          height: 1.2,
-                        ),
+                      _ProfileAvatar(
+                        url: avatarUrl,
+                        seed: avatarSeed,
+                        size: _avatarSize,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        handle,
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w400,
-                          color: kProfileTextMuted,
-                          height: 1.2,
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: HomeFeedTokens.textPrimary,
+                                height: 1.15,
+                              ),
+                            ),
+                            Text(
+                              handle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w400,
+                                color: kProfileTextMuted,
+                                height: 1.15,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                const _StatBlock(value: '6', label: 'pieces'),
-                const SizedBox(width: 10),
-                const _StatBlock(value: '42', label: 'collected'),
-                const SizedBox(width: 10),
-                const _StatBlock(value: '1.2k', label: 'saves'),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (var i = 0; i < stats.length; i++) ...[
+                          if (i > 0) const SizedBox(width: 8),
+                          _StatBlock(
+                            value: stats[i].value,
+                            label: stats[i].label,
+                            compact: sellerMode,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 10),
             Text(
               followingFollowers,
               style: GoogleFonts.inter(
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: FontWeight.w400,
                 color: kProfileTextMuted,
                 height: 1.35,
               ),
             ),
-            const SizedBox(height: 10),
-            Text(
-              bioLine1,
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: HomeFeedTokens.textPrimary,
-                height: 1.4,
+            const SizedBox(height: 8),
+            if (bioLine1.isNotEmpty)
+              Text(
+                bioLine1,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: HomeFeedTokens.textPrimary,
+                  height: 1.35,
+                ),
               ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              bioLine2,
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w400,
-                color: HomeFeedTokens.textPrimary,
-                height: 1.45,
+            if (bioLine2.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                bioLine2,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
+                  color: HomeFeedTokens.textPrimary,
+                  height: 1.4,
+                ),
               ),
-            ),
-            const SizedBox(height: 14),
-            Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _FollowButton(onPressed: () {}),
-                  const SizedBox(width: 10),
-                  _MessageButton(onPressed: () {}),
-                ],
+            ],
+            if (!isOwnProfile) ...[
+              const SizedBox(height: 12),
+              Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _FollowButton(
+                      isFollowing: isFollowing,
+                      onPressed: onFollow,
+                    ),
+                    const SizedBox(width: 10),
+                    _MessageButton(onPressed: onMessage),
+                  ],
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -125,34 +207,55 @@ class ProfileHeader extends StatelessWidget {
 }
 
 class _ProfileAvatar extends StatelessWidget {
-  const _ProfileAvatar({required this.seed});
+  const _ProfileAvatar({
+    this.url,
+    required this.seed,
+    required this.size,
+  });
 
+  final String? url;
   final int seed;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
-    return ClipOval(
-      child: Image.network(
-        picsumAvatarUrl(seed),
-        width: 56,
-        height: 56,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => Container(
-          width: 56,
-          height: 56,
-          color: Colors.grey.shade300,
-          child: Icon(Icons.person_rounded, color: Colors.grey.shade600),
-        ),
-      ),
-    );
+    final image = url != null && url!.isNotEmpty
+        ? Image.network(
+            url!,
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => _fallback(),
+          )
+        : Image.network(
+            picsumAvatarUrl(seed),
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => _fallback(),
+          );
+
+    return ClipOval(child: image);
   }
+
+  Widget _fallback() => Container(
+        width: size,
+        height: size,
+        color: Colors.grey.shade300,
+        child: Icon(Icons.person_rounded, color: Colors.grey.shade600, size: 22),
+      );
 }
 
 class _StatBlock extends StatelessWidget {
-  const _StatBlock({required this.value, required this.label});
+  const _StatBlock({
+    required this.value,
+    required this.label,
+    this.compact = false,
+  });
 
   final String value;
   final String label;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -164,10 +267,10 @@ class _StatBlock extends StatelessWidget {
           value,
           textAlign: TextAlign.center,
           style: GoogleFonts.inter(
-            fontSize: 15,
+            fontSize: compact ? 12 : 13,
             fontWeight: FontWeight.w700,
             color: HomeFeedTokens.textPrimary,
-            height: 1.1,
+            height: 1.0,
           ),
         ),
         const SizedBox(height: 2),
@@ -175,10 +278,10 @@ class _StatBlock extends StatelessWidget {
           label,
           textAlign: TextAlign.center,
           style: GoogleFonts.inter(
-            fontSize: 11,
+            fontSize: compact ? 8 : 9,
             fontWeight: FontWeight.w400,
             color: kProfileTextMuted,
-            height: 1.1,
+            height: 1.0,
           ),
         ),
       ],
@@ -187,26 +290,40 @@ class _StatBlock extends StatelessWidget {
 }
 
 class _FollowButton extends StatelessWidget {
-  const _FollowButton({required this.onPressed});
+  const _FollowButton({required this.isFollowing, this.onPressed});
 
-  final VoidCallback onPressed;
+  final bool isFollowing;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: HomeFeedTokens.textPrimary,
+      color: isFollowing ? Colors.transparent : HomeFeedTokens.textPrimary,
       borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
       child: InkWell(
         onTap: onPressed,
         borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 28),
-          child: Text(
-            'Follow',
-            style: GoogleFonts.inter(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: HomeFeedTokens.textInverse,
+        child: DecoratedBox(
+          decoration: isFollowing
+              ? BoxDecoration(
+                  borderRadius:
+                      BorderRadius.circular(HomeFeedTokens.cardRadius),
+                  border: Border.all(
+                    color: HomeFeedTokens.textPrimary.withValues(alpha: 0.35),
+                  ),
+                )
+              : const BoxDecoration(),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 28),
+            child: Text(
+              isFollowing ? 'Following' : 'Follow',
+              style: GoogleFonts.inter(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: isFollowing
+                    ? HomeFeedTokens.textPrimary
+                    : HomeFeedTokens.textInverse,
+              ),
             ),
           ),
         ),
@@ -216,9 +333,9 @@ class _FollowButton extends StatelessWidget {
 }
 
 class _MessageButton extends StatelessWidget {
-  const _MessageButton({required this.onPressed});
+  const _MessageButton({this.onPressed});
 
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {

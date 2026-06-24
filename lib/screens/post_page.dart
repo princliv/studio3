@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../data/post_media_assets.dart';
+import '../services/auth_session.dart';
 import '../theme/home_feed_tokens.dart';
 import 'post_edit_page.dart';
 
@@ -22,6 +24,8 @@ class _PostPageState extends State<PostPage> {
 
   String _postType = 'piece';
   final List<int> _selectedIndices = [];
+  List<String>? _pickedImagePaths;
+  final _picker = ImagePicker();
 
   void _onPostTypeChanged(String type) {
     if (type == _postType) return;
@@ -76,6 +80,33 @@ class _PostPageState extends State<PostPage> {
       );
   }
 
+  Future<void> _pickFromGallery() async {
+    final images = await _picker.pickMultiImage(limit: _maxSelection);
+    if (images.isEmpty || !mounted) return;
+    setState(() {
+      _pickedImagePaths = images.map((x) => x.path).toList();
+      _selectedIndices.clear();
+      for (var i = 0; i < _pickedImagePaths!.length; i++) {
+        _selectedIndices.add(i);
+      }
+    });
+  }
+
+  void _goToEdit() {
+    final isPicked = _pickedImagePaths != null && _pickedImagePaths!.isNotEmpty;
+    if (!isPicked && _selectedIndices.isEmpty) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => PostEditPage(
+          postType: _postType,
+          selectedCellIndices: List<int>.from(_selectedIndices),
+          customImagePaths: isPicked ? _pickedImagePaths : null,
+        ),
+      ),
+    );
+  }
+
   int? _selectionOrder(int cellIndex) {
     final position = _selectedIndices.indexOf(cellIndex);
     return position >= 0 ? position + 1 : null;
@@ -85,6 +116,8 @@ class _PostPageState extends State<PostPage> {
   Widget build(BuildContext context) {
     final topInset = MediaQuery.paddingOf(context).top;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final sellerEnabled = AuthSession.instance.sellerEnabled;
+    final hasSelection = _selectedIndices.isNotEmpty;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -108,21 +141,9 @@ class _PostPageState extends State<PostPage> {
             child: _PostingBanner(
               topInset: topInset,
               onClose: () => Navigator.pop(context),
-              hasSelection: _selectedIndices.isNotEmpty,
-              onNext: _selectedIndices.isNotEmpty
-                  ? () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                          builder: (_) => PostEditPage(
-                            postType: _postType,
-                            selectedCellIndices:
-                                List<int>.from(_selectedIndices),
-                          ),
-                        ),
-                      );
-                    }
-                  : null,
+              hasSelection: hasSelection,
+              onNext: hasSelection ? _goToEdit : null,
+              onPickGallery: _pickFromGallery,
             ),
           ),
           Positioned(
@@ -134,6 +155,7 @@ class _PostPageState extends State<PostPage> {
               children: [
                 _PostingSelector(
                   postType: _postType,
+                  showListing: sellerEnabled,
                   onChanged: _onPostTypeChanged,
                 ),
                 const SizedBox(width: 12),
@@ -160,6 +182,7 @@ class _PostingBanner extends StatelessWidget {
     required this.onClose,
     required this.hasSelection,
     required this.onNext,
+    this.onPickGallery,
   });
 
   static const _neutral300 = Color(0xFFC8C5BC);
@@ -168,6 +191,7 @@ class _PostingBanner extends StatelessWidget {
   final VoidCallback onClose;
   final bool hasSelection;
   final VoidCallback? onNext;
+  final VoidCallback? onPickGallery;
 
   @override
   Widget build(BuildContext context) {
@@ -193,7 +217,7 @@ class _PostingBanner extends StatelessWidget {
                 Expanded(
                   child: Center(
                     child: GestureDetector(
-                      onTap: () {},
+                      onTap: onPickGallery,
                       behavior: HitTestBehavior.opaque,
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -363,21 +387,25 @@ class _PostingSelector extends StatelessWidget {
   const _PostingSelector({
     required this.postType,
     required this.onChanged,
+    this.showListing = false,
   });
 
   static const _selectorBg = Color(0xE6231F1B);
 
   final String postType;
   final ValueChanged<String> onChanged;
+  final bool showListing;
 
   @override
   Widget build(BuildContext context) {
-    final pieceSelected = postType == 'piece';
+    final options = showListing
+        ? const ['piece', 'scene', 'listing']
+        : const ['piece', 'scene'];
 
     return Container(
-      width: 160,
+      width: showListing ? 220 : 160,
       height: 38,
-      padding: const EdgeInsets.symmetric(horizontal: 30),
+      padding: EdgeInsets.symmetric(horizontal: showListing ? 16 : 30),
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: _selectorBg,
@@ -386,16 +414,16 @@ class _PostingSelector extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          _SelectorTab(
-            label: 'Piece',
-            selected: pieceSelected,
-            onTap: () => onChanged('piece'),
-          ),
-          _SelectorTab(
-            label: 'Scene',
-            selected: !pieceSelected,
-            onTap: () => onChanged('scene'),
-          ),
+          for (final type in options)
+            _SelectorTab(
+              label: type == 'listing'
+                  ? 'Listing'
+                  : type == 'scene'
+                      ? 'Scene'
+                      : 'Piece',
+              selected: postType == type,
+              onTap: () => onChanged(type),
+            ),
         ],
       ),
     );

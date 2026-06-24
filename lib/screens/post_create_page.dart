@@ -12,6 +12,9 @@ import '../utils/image_adjust_math.dart';
 import '../widgets/choose_location_sheet.dart';
 import '../widgets/post_create_option_sheet.dart';
 import 'add_materials_page.dart';
+import '../services/api_exception.dart';
+import '../services/post_publish_service.dart';
+import 'listing_details_page.dart';
 
 /// Create post details — posting flow (Figma 1995:1486).
 class PostCreatePage extends StatefulWidget {
@@ -45,6 +48,7 @@ class _PostCreatePageState extends State<PostCreatePage> {
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
   bool _aiToolsUsed = false;
+  bool _publishing = false;
   final List<PostLocationOption> _selectedLocations = [];
   String? _selectedMediumId;
   final Set<String> _selectedStyleIds = {};
@@ -138,8 +142,56 @@ class _PostCreatePageState extends State<PostCreatePage> {
     super.dispose();
   }
 
-  String get _title =>
-      widget.postType == 'scene' ? 'Create scene' : 'Create piece';
+  String get _title {
+    if (widget.postType == 'listing') return 'Piece details';
+    return widget.postType == 'scene' ? 'Create scene' : 'Create piece';
+  }
+
+  PostDraft _buildDraft() {
+    return PostDraft(
+      postType: widget.postType,
+      imagePaths: widget.imagePaths,
+      title: _nameController.text,
+      description: _descriptionController.text,
+      mediumId: _selectedMediumId,
+      styleIds: _selectedStyleIds.toList(),
+      locations: List<PostLocationOption>.from(_selectedLocations),
+      materials: List<PostMaterialOption>.from(_selectedMaterials),
+    );
+  }
+
+  Future<void> _publish(PostDraft draft) async {
+    setState(() => _publishing = true);
+    try {
+      await PostPublishService.instance.publish(draft);
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Published successfully')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final message = e is ApiException ? e.message : e.toString();
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+    } finally {
+      if (mounted) setState(() => _publishing = false);
+    }
+  }
+
+  void _onCreate() {
+    final draft = _buildDraft();
+    if (widget.postType == 'listing') {
+      Navigator.push(
+        context,
+        MaterialPageRoute<void>(
+          builder: (_) => ListingDetailsPage(draft: draft),
+        ),
+      );
+      return;
+    }
+    _publish(draft);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -327,15 +379,15 @@ class _PostCreatePageState extends State<PostCreatePage> {
                   backgroundColor: _neutral700,
                   textColor: HomeFeedTokens.textInverse,
                   width: 68,
-                  onTap: () {},
+                  onTap: _publishing ? null : () => _onCreate(),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: _BottomButton(
-                    label: 'Create',
+                    label: widget.postType == 'listing' ? 'Next' : 'Create',
                     backgroundColor: _neutral300,
                     textColor: HomeFeedTokens.textPrimary,
-                    onTap: () {},
+                    onTap: _publishing ? null : () => _onCreate(),
                   ),
                 ),
               ],
@@ -693,7 +745,7 @@ class _BottomButton extends StatelessWidget {
   final String label;
   final Color backgroundColor;
   final Color textColor;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final double? width;
 
   @override
