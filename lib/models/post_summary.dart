@@ -1,0 +1,52 @@
+class PostSummary {
+  const PostSummary({
+    required this.id,
+    this.caption,
+    this.mediaUrl,
+    this.mediaType,
+    this.pieceId,
+    this.likeCount = 0,
+    this.isLiked = false,
+    this.isSaved = false,
+    this.authorUsername,
+    this.authorName,
+  });
+
+  final String id;
+  final String? caption;
+  final String? mediaUrl;
+  final String? mediaType;
+  final String? pieceId;
+  final int likeCount;
+  final bool isLiked;
+  final bool isSaved;
+  final String? authorUsername;
+  final String? authorName;
+
+  factory PostSummary.fromJson(Map<String, dynamic> json) {
+    final author = json['author'] as Map<String, dynamic>?;
+    final user = json['user'] as Map<String, dynamic>?;
+    return PostSummary(
+      id: json['id'] as String? ?? json['_id'] as String? ?? '',
+      caption: json['caption'] as String? ?? json['body'] as String?,
+      mediaUrl: json['mediaUrl'] as String?,
+      mediaType: json['mediaType'] as String?,
+      pieceId: json['pieceId'] as String?,
+      likeCount: _intFrom(json['likeCount'] ?? json['likes']),
+      isLiked: json['isLiked'] as bool? ?? false,
+      isSaved: json['isSaved'] as bool? ?? false,
+      authorUsername: author?['username'] as String? ??
+          user?['username'] as String? ??
+          json['authorUsername'] as String?,
+      authorName: author?['name'] as String? ??
+          user?['name'] as String? ??
+          json['authorName'] as String?,
+    );
+  }
+
+  static int _intFrom(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return 0;
+  }
+}

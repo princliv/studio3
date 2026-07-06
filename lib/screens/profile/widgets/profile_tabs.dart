@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import '../../../theme/home_feed_tokens.dart';
 import '../profile_constants.dart';
 
@@ -8,13 +9,22 @@ class ProfileTabs extends StatelessWidget {
     super.key,
     required this.currentTab,
     required this.onTabChanged,
+    this.showCollect = false,
   });
 
   final String currentTab;
   final ValueChanged<String> onTabChanged;
+  final bool showCollect;
 
   @override
   Widget build(BuildContext context) {
+    final tabs = <({String id, String label})>[
+      (id: 'pieces', label: 'Pieces'),
+      (id: 'series', label: 'Series'),
+      (id: 'scenes', label: 'Scenes'),
+      if (showCollect) (id: 'collect', label: 'Collect'),
+    ];
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -29,26 +39,12 @@ class ProfileTabs extends StatelessWidget {
             ),
             child: Row(
               children: [
-                _TabItem(
-                  label: 'Pieces',
-                  active: currentTab == 'pieces',
-                  onTap: () => onTabChanged('pieces'),
-                ),
-                _TabItem(
-                  label: 'Series',
-                  active: currentTab == 'series',
-                  onTap: () => onTabChanged('series'),
-                ),
-                _TabItem(
-                  label: 'Scenes',
-                  active: currentTab == 'scenes',
-                  onTap: () => onTabChanged('scenes'),
-                ),
-                _TabItem(
-                  label: 'Collect',
-                  active: currentTab == 'collect',
-                  onTap: () => onTabChanged('collect'),
-                ),
+                for (final tab in tabs)
+                  _TabItem(
+                    label: tab.label,
+                    active: currentTab == tab.id,
+                    onTap: () => onTabChanged(tab.id),
+                  ),
               ],
             ),
           ),

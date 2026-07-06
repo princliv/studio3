@@ -1,8 +1,160 @@
 import 'package:flutter/material.dart';
-import '../../../data/home_feed_dummy.dart';
+
+import '../../../models/piece_summary.dart';
+import '../../../models/post_summary.dart';
 import '../../../theme/home_feed_tokens.dart';
 import '../profile_constants.dart';
 
+class ProfileContentGrid extends StatelessWidget {
+  const ProfileContentGrid._({required this.items});
+
+  final List<({String? url, double height, bool forSale, String? price})> items;
+
+  factory ProfileContentGrid.fromPieces(List<PieceSummary> pieces) {
+    final heights = [292.0, 168.0, 174.0, 318.0, 182.0, 132.0, 302.0, 156.0];
+    final mapped = <({String? url, double height, bool forSale, String? price})>[];
+    for (var i = 0; i < pieces.length; i++) {
+      final p = pieces[i];
+      mapped.add((
+        url: p.mediaUrl,
+        height: heights[i % heights.length],
+        forSale: p.isForSale,
+        price: p.priceDisplay,
+      ));
+    }
+    return ProfileContentGrid._(items: mapped);
+  }
+
+  factory ProfileContentGrid.fromPosts(List<PostSummary> posts) {
+    final heights = [292.0, 168.0, 174.0, 318.0, 182.0, 132.0, 302.0, 156.0];
+    final mapped = <({String? url, double height, bool forSale, String? price})>[];
+    for (var i = 0; i < posts.length; i++) {
+      final p = posts[i];
+      mapped.add((
+        url: p.mediaUrl,
+        height: heights[i % heights.length],
+        forSale: false,
+        price: null,
+      ));
+    }
+    return ProfileContentGrid._(items: mapped);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final left = <({String? url, double height, bool forSale, String? price})>[];
+    final right = <({String? url, double height, bool forSale, String? price})>[];
+    for (var i = 0; i < items.length; i++) {
+      if (i.isEven) {
+        left.add(items[i]);
+      } else {
+        right.add(items[i]);
+      }
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: _MasonryColumn(items: left)),
+        const SizedBox(width: kProfileGutter),
+        Expanded(child: _MasonryColumn(items: right)),
+      ],
+    );
+  }
+}
+
+class _MasonryColumn extends StatelessWidget {
+  const _MasonryColumn({required this.items});
+
+  final List<({String? url, double height, bool forSale, String? price})> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < items.length; i++) ...[
+          if (i > 0) const SizedBox(height: kProfileGutter),
+          _MasonryTile(
+            url: items[i].url,
+            height: items[i].height,
+            forSale: items[i].forSale,
+            price: items[i].price,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _MasonryTile extends StatelessWidget {
+  const _MasonryTile({
+    required this.url,
+    required this.height,
+    this.forSale = false,
+    this.price,
+  });
+
+  final String? url;
+  final double height;
+  final bool forSale;
+  final String? price;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
+      child: SizedBox(
+        height: height,
+        width: double.infinity,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (url != null && url!.isNotEmpty)
+              Image.network(
+                url!,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => ColoredBox(
+                  color: Colors.grey.shade300,
+                  child: Icon(Icons.broken_image_outlined,
+                      color: Colors.grey.shade500),
+                ),
+              )
+            else
+              ColoredBox(color: Colors.grey.shade300),
+            if (forSale && price != null)
+              Positioned(
+                left: 8,
+                bottom: 8,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.65),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    price!,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Legacy seed-based grid kept for compatibility.
 class ProfileMasonryGrid extends StatelessWidget {
   const ProfileMasonryGrid({
     super.key,
@@ -15,76 +167,11 @@ class ProfileMasonryGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: _MasonryColumn(items: leftItems),
-        ),
-        const SizedBox(width: kProfileGutter),
-        Expanded(
-          child: _MasonryColumn(items: rightItems),
-        ),
+    return ProfileContentGrid._(
+      items: [
+        ...leftItems.map((e) => (url: null as String?, height: e.h, forSale: false, price: null as String?)),
+        ...rightItems.map((e) => (url: null as String?, height: e.h, forSale: false, price: null as String?)),
       ],
-    );
-  }
-}
-
-class _MasonryColumn extends StatelessWidget {
-  const _MasonryColumn({required this.items});
-
-  final List<({int seed, double h})> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (var i = 0; i < items.length; i++) ...[
-          if (i > 0) const SizedBox(height: kProfileGutter),
-          _MasonryTile(seed: items[i].seed, height: items[i].h),
-        ],
-      ],
-    );
-  }
-}
-
-class _MasonryTile extends StatelessWidget {
-  const _MasonryTile({required this.seed, required this.height});
-
-  final int seed;
-  final double height;
-
-  @override
-  Widget build(BuildContext context) {
-    final hPx = (height * MediaQuery.devicePixelRatioOf(context)).round().clamp(200, 1200);
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
-      child: SizedBox(
-        height: height,
-        width: double.infinity,
-        child: Image.network(
-          picsumUrl(seed, 400, hPx),
-          fit: BoxFit.cover,
-          loadingBuilder: (context, child, progress) {
-            if (progress == null) return child;
-            return ColoredBox(
-              color: Colors.grey.shade300,
-              child: const Center(
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-            );
-          },
-          errorBuilder: (context, error, stackTrace) => ColoredBox(
-            color: Colors.grey.shade300,
-            child: Icon(Icons.broken_image_outlined, color: Colors.grey.shade500),
-          ),
-        ),
-      ),
     );
   }
 }

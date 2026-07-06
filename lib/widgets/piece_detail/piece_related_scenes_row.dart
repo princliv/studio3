@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../data/home_feed_dummy.dart';
-import '../../models/feed_item.dart';
+import '../../models/feed_preview_item.dart';
 import '../../theme/home_feed_tokens.dart';
 import '../home_feed/home_feed_widgets.dart';
 

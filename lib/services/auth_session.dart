@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/auth_user.dart';
 
@@ -9,10 +10,22 @@ class AuthSession {
   static const _tokenKey = 'access_token';
   static const _userKey = 'auth_user';
   static const _rememberedUsernameKey = 'remembered_username';
+  static const _sellerKey = 'seller_enabled';
 
   SharedPreferences? _prefs;
   String? accessToken;
   AuthUser? user;
+  bool sellerEnabled = false;
+
+  final List<VoidCallback> _listeners = [];
+
+  void addListener(VoidCallback listener) => _listeners.add(listener);
+  void removeListener(VoidCallback listener) => _listeners.remove(listener);
+  void notifyListeners() {
+    for (final l in List<VoidCallback>.from(_listeners)) {
+      l();
+    }
+  }
 
   Future<void> initialize() async {
     _prefs = await SharedPreferences.getInstance();
@@ -21,20 +34,69 @@ class AuthSession {
     if (userJson != null) {
       user = AuthUser.fromJson(jsonDecode(userJson) as Map<String, dynamic>);
     }
+    sellerEnabled = _prefs!.getBool(_sellerKey) ?? user?.sellerEnabled ?? false;
   }
 
   bool get isLoggedIn => accessToken != null && accessToken!.isNotEmpty;
+
+  bool get isOnboarded => user?.onboardingComplete ?? false;
 
   String? get rememberedUsername => _prefs?.getString(_rememberedUsernameKey);
 
   Future<void> saveSession({
     required String token,
     required AuthUser authUser,
+    bool? seller,
   }) async {
     accessToken = token;
     user = authUser;
+    if (seller != null) sellerEnabled = seller;
     await _prefs?.setString(_tokenKey, token);
     await _prefs?.setString(_userKey, jsonEncode(authUser.toJson()));
+    if (seller != null) await _prefs?.setBool(_sellerKey, seller);
+    notifyListeners();
+  }
+
+  Future<void> updateToken(String token) async {
+    accessToken = token;
+    await _prefs?.setString(_tokenKey, token);
+    notifyListeners();
+  }
+
+  Future<void> updateUser(AuthUser authUser) async {
+    user = authUser;
+    sellerEnabled = authUser.sellerEnabled;
+    await _prefs?.setString(_userKey, jsonEncode(authUser.toJson()));
+    await _prefs?.setBool(_sellerKey, authUser.sellerEnabled);
+    notifyListeners();
+  }
+
+  Future<void> updateUserFromJson(Map<String, dynamic> json) async {
+    final current = user;
+    if (current == null) return;
+    final merged = AuthUser(
+      username: json['username'] as String? ?? current.username,
+      name: json['name'] as String? ?? current.name,
+      email: json['email'] as String? ?? current.email,
+      emailVerified: json['emailVerified'] as bool? ?? current.emailVerified,
+      onboardingComplete:
+          json['onboardingComplete'] as bool? ?? current.onboardingComplete,
+      role: json['role'] as String? ?? current.role,
+      sellerEnabled: json['sellerEnabled'] as bool? ??
+          json['isSeller'] as bool? ??
+          current.sellerEnabled,
+    );
+    await updateUser(merged);
+  }
+
+  Future<void> setSellerEnabled(bool enabled) async {
+    sellerEnabled = enabled;
+    await _prefs?.setBool(_sellerKey, enabled);
+    if (user != null) {
+      await updateUser(user!.copyWith(sellerEnabled: enabled));
+    } else {
+      notifyListeners();
+    }
   }
 
   Future<void> saveRememberedUsername(String username) async {
@@ -48,7 +110,10 @@ class AuthSession {
   Future<void> clear() async {
     accessToken = null;
     user = null;
+    sellerEnabled = false;
     await _prefs?.remove(_tokenKey);
     await _prefs?.remove(_userKey);
+    await _prefs?.remove(_sellerKey);
+    notifyListeners();
   }
 }

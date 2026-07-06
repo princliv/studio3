@@ -1,7 +1,7 @@
 import 'dart:math';
 
 import '../data/home_feed_dummy.dart';
-import '../models/feed_item.dart';
+import '../models/feed_preview_item.dart';
 
 /// Produces feed items with portrait 3:4 or landscape 16:9 aspect ratios.
 class FeedLayoutGenerator {
@@ -13,7 +13,7 @@ class FeedLayoutGenerator {
 
   int _nextImageSeed() => _seedCounter++;
 
-  FeedItem nextItem() {
+  FeedPreviewItem nextItem() {
     final artistIndex = _random.nextInt(kHomeFeedArtists.length);
     final artist = kHomeFeedArtists[artistIndex];
     final mediumIndex = _random.nextInt(kHomeFeedMediums.length);
@@ -39,7 +39,7 @@ class FeedLayoutGenerator {
       );
     });
 
-    return FeedItem(
+    return FeedPreviewItem(
       id: 'feed_${_idCounter++}',
       imageSeeds: seeds,
       artistIndex: artistIndex,
@@ -60,6 +60,6 @@ class FeedLayoutGenerator {
     );
   }
 
-  List<FeedItem> nextBatch(int count) =>
-      List<FeedItem>.generate(count, (_) => nextItem());
+  List<FeedPreviewItem> nextBatch(int count) =>
+      List<FeedPreviewItem>.generate(count, (_) => nextItem());
 }

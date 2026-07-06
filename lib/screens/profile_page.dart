@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../data/home_feed_dummy.dart';
+import '../models/piece_summary.dart';
+import '../models/post_summary.dart';
+import '../models/user_profile.dart';
 import '../services/auth_session.dart';
+import '../services/piece_service.dart';
+import '../services/post_service.dart';
+import '../services/user_service.dart';
 import '../theme/home_feed_tokens.dart';
+import '../widgets/studio_loading.dart';
 import 'profile/models/profile_series_data.dart';
 import 'profile/profile_constants.dart';
 import 'profile/widgets/profile_header.dart';
@@ -18,12 +25,20 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  /// pieces | series | scenes | collect
   String _tab = 'pieces';
+  UserProfile? _profile;
+  List<PieceSummary> _pieces = [];
+  List<PostSummary> _scenes = [];
+  List<PieceSummary> _collected = [];
+  bool _tabContentLoading = false;
+  bool _profileLoading = true;
+  bool? _lastKnownSeller;
+  bool _piecesLoaded = false;
+  bool _scenesLoaded = false;
+  bool _collectedLoaded = false;
 
   static const _heroSeed = 901;
   static const _avatarSeed = 902;
-
   static const _name = 'Sarah Olson';
   static const _handle = '@sarahsunnyart';
   static const _followingFollowers = '100 following · 89 followers';
@@ -31,7 +46,6 @@ class _ProfilePageState extends State<ProfilePage> {
   static const _bioLine2 =
       'Figurative oil painter exploring memory, identity, and the in-between.';
 
-  /// Left column: (seed, height).
   static const _leftMasonry = <({int seed, double h})>[
     (seed: 301, h: 292),
     (seed: 302, h: 168),
@@ -39,7 +53,6 @@ class _ProfilePageState extends State<ProfilePage> {
     (seed: 304, h: 318),
   ];
 
-  /// Right column: (seed, height).
   static const _rightMasonry = <({int seed, double h})>[
     (seed: 311, h: 182),
     (seed: 312, h: 132),
@@ -48,168 +61,275 @@ class _ProfilePageState extends State<ProfilePage> {
     (seed: 315, h: 278),
   ];
 
-  /// Includes entries with 1 piece (hidden on Series tab).
-  static final List<ProfileSeriesData> _allSeries = [
-    ProfileSeriesData(name: 'Solo Study', pieceCount: 1, imageSeeds: const [501]),
-    ProfileSeriesData(
-      name: 'Two Piece Series',
-      pieceCount: 2,
-      imageSeeds: const [602, 603],
-    ),
-    ProfileSeriesData(
-      name: 'Three Piece Series',
-      pieceCount: 3,
-      imageSeeds: const [611, 612, 613],
-    ),
-    ProfileSeriesData(
-      name: 'Four Piece Series',
-      pieceCount: 4,
-      imageSeeds: const [621, 622, 623, 624],
-    ),
-    ProfileSeriesData(
-      name: 'Riverwalk Dream',
-      pieceCount: 3,
-      imageSeeds: const [511, 512, 513],
-    ),
-    ProfileSeriesData(
-      name: 'Sunset Stories',
-      pieceCount: 2,
-      imageSeeds: const [521, 522],
-    ),
-    ProfileSeriesData(
-      name: 'Strolls in the Park',
-      pieceCount: 6,
-      imageSeeds: const [531, 532, 533, 534, 535, 536],
-    ),
-    ProfileSeriesData(
-      name: 'Morning Light',
-      pieceCount: 2,
-      imageSeeds: const [541, 542],
-    ),
-    ProfileSeriesData(
-      name: 'Urban Echoes',
-      pieceCount: 4,
-      imageSeeds: const [551, 552, 553, 554],
-    ),
-    ProfileSeriesData(
-      name: 'Coastal Forms',
-      pieceCount: 5,
-      imageSeeds: const [561, 562, 563, 564, 565],
-    ),
-    ProfileSeriesData(
-      name: 'Studio Notes',
-      pieceCount: 1,
-      imageSeeds: const [571],
-    ),
-    ProfileSeriesData(
-      name: 'Paper Boats',
-      pieceCount: 3,
-      imageSeeds: const [581, 582, 583],
-    ),
+  static final List<ProfileSeriesData> _seriesEligible = [
+    ProfileSeriesData(name: 'Two Piece Series', pieceCount: 2, imageSeeds: const [602, 603]),
+    ProfileSeriesData(name: 'Three Piece Series', pieceCount: 3, imageSeeds: const [611, 612, 613]),
+    ProfileSeriesData(name: 'Riverwalk Dream', pieceCount: 3, imageSeeds: const [511, 512, 513]),
   ];
 
-  static final List<ProfileSeriesData> _seriesEligible =
-      _allSeries.where((s) => s.pieceCount > 1).toList(growable: false);
+  @override
+  void initState() {
+    super.initState();
+    _lastKnownSeller = AuthSession.instance.sellerEnabled;
+    AuthSession.instance.addListener(_onSessionChanged);
+    _loadProfileShell();
+  }
+
+  @override
+  void dispose() {
+    AuthSession.instance.removeListener(_onSessionChanged);
+    super.dispose();
+  }
+
+  void _onSessionChanged() {
+    final seller = AuthSession.instance.sellerEnabled;
+    if (seller == _lastKnownSeller) return;
+    _lastKnownSeller = seller;
+    if (!mounted) return;
+    setState(() {
+      if (seller) {
+        _tab = 'collect';
+        _collectedLoaded = false;
+      } else if (_tab == 'collect') {
+        _tab = 'pieces';
+        _collected = [];
+        _collectedLoaded = false;
+      }
+    });
+    _loadProfileShell(silent: true);
+    _loadActiveTab(force: true);
+  }
+
+  Future<void> _loadProfileShell({bool silent = false}) async {
+    if (!silent) setState(() => _profileLoading = true);
+    try {
+      final profile = await UserService.instance.getMe();
+      if (!mounted) return;
+      setState(() {
+        _profile = profile;
+        _lastKnownSeller = profile.sellerEnabled;
+        _profileLoading = false;
+        if (!profile.sellerEnabled && _tab == 'collect') _tab = 'pieces';
+      });
+      if (!silent) _loadActiveTab();
+    } catch (_) {
+      if (mounted) setState(() => _profileLoading = false);
+    }
+  }
+
+  Future<void> _loadProfile() async {
+    await _loadProfileShell();
+    await _loadActiveTab(force: true);
+  }
+
+  Future<void> _loadActiveTab({bool force = false}) async {
+    final profile = _profile;
+    if (profile == null) return;
+
+    final tab = _tab;
+    if (tab == 'pieces' && (_piecesLoaded && !force)) return;
+    if (tab == 'scenes' && (_scenesLoaded && !force)) return;
+    if (tab == 'collect' && (_collectedLoaded && !force)) return;
+    if (tab == 'series') return;
+
+    setState(() => _tabContentLoading = true);
+
+    try {
+      if (tab == 'pieces') {
+        final pieces = await PieceService.instance.getUserPieces(profile.username);
+        if (!mounted) return;
+        setState(() {
+          _pieces = pieces;
+          _piecesLoaded = true;
+          _tabContentLoading = false;
+        });
+      } else if (tab == 'scenes') {
+        final scenes = await PostService.instance.getUserPosts(profile.username);
+        if (!mounted) return;
+        setState(() {
+          _scenes = scenes;
+          _scenesLoaded = true;
+          _tabContentLoading = false;
+        });
+      } else if (tab == 'collect' && profile.sellerEnabled) {
+        final collected = await _loadCollected(profile);
+        if (!mounted) return;
+        setState(() {
+          _collected = collected;
+          _collectedLoaded = true;
+          _tabContentLoading = false;
+        });
+      } else {
+        if (mounted) setState(() => _tabContentLoading = false);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _tabContentLoading = false);
+    }
+  }
+
+  Future<List<PieceSummary>> _loadCollected(UserProfile profile) async {
+    if (profile.savedPieces.isNotEmpty) return profile.savedPieces;
+    try {
+      return await UserService.instance.getSavedPieces();
+    } catch (_) {
+      try {
+        return await PieceService.instance.getUserPiecesForSale(profile.username);
+      } catch (_) {
+        return const [];
+      }
+    }
+  }
+
+  void _onTabChanged(String tab) {
+    setState(() => _tab = tab);
+    _loadActiveTab();
+  }
 
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final heroH = (width * 0.68).clamp(260.0, 340.0);
     final bottomPad = MediaQuery.paddingOf(context).bottom + 100;
+    final profile = _profile;
     final sessionUser = AuthSession.instance.user;
-    final name = sessionUser?.name ?? _name;
-    final handle = sessionUser != null ? '@${sessionUser.username}' : _handle;
+    final sellerEnabled =
+        profile?.sellerEnabled ?? AuthSession.instance.sellerEnabled;
 
-    return Scaffold(
-      backgroundColor: HomeFeedTokens.background,
-      body: SafeArea(
-        bottom: false,
-        child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(
-              child: Stack(
-                children: [
-                  _ProfileHero(heroSeed: _heroSeed, height: heroH, width: width),
-                  Positioned(
-                    top: 8,
-                    right: 12,
-                    child: _ProfileSettingsButton(
-                      onPressed: () => Navigator.pushNamed(context, '/profile-settings'),
+    final name = profile?.name ?? sessionUser?.name ?? _name;
+    final handle = profile?.handle ??
+        (sessionUser != null ? '@${sessionUser.username}' : _handle);
+    final coverUrl = profile?.coverPhotoUrl;
+    final avatarUrl = profile?.profilePhotoUrl;
+
+    return StudioLoadingGate(
+      loading: _profileLoading || _tabContentLoading,
+      child: Scaffold(
+        backgroundColor: HomeFeedTokens.background,
+        body: SafeArea(
+          bottom: false,
+          child: RefreshIndicator(
+            onRefresh: () async {
+              _piecesLoaded = false;
+              _scenesLoaded = false;
+              _collectedLoaded = false;
+              await _loadProfile();
+            },
+            child: CustomScrollView(
+              slivers: [
+              SliverToBoxAdapter(
+                child: Stack(
+                  children: [
+                    _ProfileHero(
+                      imageUrl: coverUrl,
+                      heroSeed: _heroSeed,
+                      height: heroH,
+                      width: width,
                     ),
-                  ),
-                ],
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: ProfileHeader(
-                name: name,
-                handle: handle,
-                followingFollowers: _followingFollowers,
-                bioLine1: _bioLine1,
-                bioLine2: _bioLine2,
-                avatarSeed: _avatarSeed,
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: ProfileTabs(
-                currentTab: _tab,
-                onTabChanged: (tab) => setState(() => _tab = tab),
-              ),
-            ),
-            SliverPadding(
-              padding: EdgeInsets.fromLTRB(kProfileHorizontalPad, 0, kProfileHorizontalPad, bottomPad),
-              sliver: SliverToBoxAdapter(
-                child: ProfileTabContent(
-                  currentTab: _tab,
-                  leftMasonry: _leftMasonry,
-                  rightMasonry: _rightMasonry,
-                  seriesItems: _seriesEligible,
+                    Positioned(
+                      top: 8,
+                      right: 12,
+                      child: _ProfileSettingsButton(
+                        onPressed: () async {
+                          await Navigator.pushNamed(context, '/profile-settings');
+                          if (mounted) {
+                            _piecesLoaded = false;
+                            _scenesLoaded = false;
+                            _collectedLoaded = false;
+                            await _loadProfileShell(silent: true);
+                            await _loadActiveTab(force: true);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ],
+              SliverToBoxAdapter(
+                child: ProfileHeader(
+                  name: name,
+                  handle: handle,
+                  followingFollowers:
+                      profile?.followingFollowers ?? _followingFollowers,
+                  bioLine1: profile?.location?.isNotEmpty == true
+                      ? profile!.location!
+                      : _bioLine1,
+                  bioLine2: profile?.bio?.isNotEmpty == true
+                      ? profile!.bio!
+                      : _bioLine2,
+                  avatarUrl: avatarUrl,
+                  avatarSeed: _avatarSeed,
+                  piecesCount: profile?.piecesCount ?? _pieces.length,
+                  collectedCount: profile?.collectedCount ?? _collected.length,
+                  savesCount: profile?.savesCount,
+                  salesCount: profile?.collectedCount,
+                  sellerMode: sellerEnabled,
+                  isOwnProfile: true,
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: ProfileTabs(
+                  currentTab: _tab,
+                  showCollect: sellerEnabled,
+                  onTabChanged: _onTabChanged,
+                ),
+              ),
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(
+                  kProfileHorizontalPad,
+                  0,
+                  kProfileHorizontalPad,
+                  bottomPad,
+                ),
+                sliver: SliverToBoxAdapter(
+                  child: ProfileTabContent(
+                    currentTab: _tab,
+                    seriesItems: _seriesEligible,
+                    pieces: _pieces,
+                    scenes: _scenes,
+                    collected: _collected,
+                    sellerMode: sellerEnabled,
+                    loading: _tabContentLoading,
+                    leftMasonry: _leftMasonry,
+                    rightMasonry: _rightMasonry,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
+    ),
     );
   }
 }
 
 class _ProfileHero extends StatelessWidget {
   const _ProfileHero({
+    this.imageUrl,
     required this.heroSeed,
     required this.height,
     required this.width,
   });
 
+  final String? imageUrl;
   final int heroSeed;
   final double height;
   final double width;
 
   @override
   Widget build(BuildContext context) {
+    final url = imageUrl?.isNotEmpty == true
+        ? imageUrl!
+        : picsumUrl(heroSeed, 800, (height * 2).round());
+
     return SizedBox(
       width: width,
       height: height,
       child: Image.network(
-        picsumUrl(heroSeed, 800, (height * 2).round()),
+        url,
         fit: BoxFit.cover,
         alignment: Alignment.topCenter,
-        loadingBuilder: (context, child, progress) {
-          if (progress == null) return child;
-          return ColoredBox(
-            color: Colors.grey.shade300,
-            child: Center(
-              child: SizedBox(
-                width: 28,
-                height: 28,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: HomeFeedTokens.textPrimary.withValues(alpha: 0.5),
-                ),
-              ),
-            ),
-          );
-        },
+        gaplessPlayback: true,
         errorBuilder: (context, error, stackTrace) => ColoredBox(
           color: Colors.grey.shade400,
           child: Icon(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../utils/auth_validators.dart';
 import '../services/auth_service.dart';
 import '../widgets/auth_ui.dart';
+import '../widgets/studio_loading.dart';
 
 enum _ForgotStep { email, sent, reset, done }
 
@@ -78,13 +79,17 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
   @override
   Widget build(BuildContext context) {
-    return AuthScaffold(
-      compact: true,
-      showBackButton: true,
-      child: AuthFormBody(
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 250),
-          child: _buildStep(),
+    return StudioLoadingGate(
+      loading: _loading,
+      dark: true,
+      child: AuthScaffold(
+        compact: true,
+        showBackButton: true,
+        child: AuthFormBody(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            child: _buildStep(),
+          ),
         ),
       ),
     );
@@ -120,7 +125,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
           onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 24),
-        AuthPrimaryButton(label: 'Send reset link', loading: _loading, onPressed: _sendResetLink),
+        AuthPrimaryButton(label: 'Send reset link', onPressed: _sendResetLink),
       ],
     );
   }
@@ -193,7 +198,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
           onToggleVisibility: () => setState(() => _obscureConfirm = !_obscureConfirm),
         ),
         const SizedBox(height: 24),
-        AuthPrimaryButton(label: 'Reset Password', loading: _loading, onPressed: _resetPassword),
+        AuthPrimaryButton(label: 'Reset Password', onPressed: _resetPassword),
       ],
     );
   }

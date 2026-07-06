@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../widgets/studio_logo.dart';
 
 /// Dark premium palette — black & grey glass auth.
 abstract final class AuthColors {
@@ -168,19 +169,11 @@ class AuthScaffold extends StatelessWidget {
                     child: Column(
                       children: [
                         SizedBox(
-                          height: 52,
+                          height: showBack ? 52 : null,
                           child: Stack(
                             alignment: Alignment.center,
                             children: [
-                              Text(
-                                'Studio3',
-                                style: GoogleFonts.inter(
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.w700,
-                                  color: AuthColors.textPrimary,
-                                  letterSpacing: -0.5,
-                                ),
-                              ),
+                              const Center(child: StudioAuthLogo()),
                               if (showBack)
                                 Align(
                                   alignment: Alignment.centerLeft,
@@ -409,17 +402,19 @@ class AuthPrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final active = enabled && !loading;
+    final canPress = enabled && !loading;
+    final useAccentStyle = enabled;
     return SizedBox(
       height: AppDims.primaryButtonHeight,
       width: double.infinity,
       child: FilledButton(
-        onPressed: active ? onPressed : null,
+        onPressed: canPress ? onPressed : null,
         style: FilledButton.styleFrom(
-          backgroundColor: active ? AuthColors.accent : AuthColors.surfaceElevated,
-          foregroundColor: active ? AuthColors.backgroundDeep : AuthColors.textDim,
-          disabledBackgroundColor: AuthColors.surfaceElevated,
-          disabledForegroundColor: AuthColors.textDim,
+          backgroundColor: useAccentStyle ? AuthColors.accent : AuthColors.surfaceElevated,
+          foregroundColor: useAccentStyle ? AuthColors.backgroundDeep : AuthColors.textDim,
+          disabledBackgroundColor: useAccentStyle ? AuthColors.accent : AuthColors.surfaceElevated,
+          disabledForegroundColor: useAccentStyle ? AuthColors.backgroundDeep : AuthColors.textDim,
+          overlayColor: AuthColors.backgroundDeep.withValues(alpha: 0.08),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           textStyle: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600),
         ),

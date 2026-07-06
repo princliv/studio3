@@ -32,7 +32,10 @@ class WelcomePage extends StatelessWidget {
             const SizedBox(height: 32),
             AuthPrimaryButton(
               label: 'Get Started',
-              onPressed: () => Navigator.pushReplacementNamed(context, '/'),
+              onPressed: () {
+                final route = user.onboardingComplete ? '/' : '/onboarding';
+                Navigator.pushReplacementNamed(context, route);
+              },
             ),
           ],
         ),

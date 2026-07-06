@@ -1,64 +1,145 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import '../services/auth_service.dart';
 import '../services/auth_session.dart';
+import '../models/user_profile.dart';
+import '../services/user_service.dart';
 import '../theme/home_feed_tokens.dart';
+import '../widgets/studio_loading.dart';
+import 'profile/widgets/profile_seller_insights.dart';
+import 'seller_analytics_page.dart';
 
-class ProfileSettingsPage extends StatelessWidget {
+class ProfileSettingsPage extends StatefulWidget {
   const ProfileSettingsPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final user = AuthSession.instance.user;
+  State<ProfileSettingsPage> createState() => _ProfileSettingsPageState();
+}
 
-    return Scaffold(
-      backgroundColor: HomeFeedTokens.background,
-      appBar: AppBar(
+class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
+  bool _sellerEnabled = false;
+  bool _loadingSeller = true;
+  bool _togglingSeller = false;
+  String? _profileLocation;
+  int? _savesCount;
+  int? _salesCount;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSellerStatus();
+  }
+
+  Future<void> _loadSellerStatus() async {
+    try {
+      final results = await Future.wait([
+        UserService.instance.getSellerStatus(),
+        UserService.instance.getMe(),
+      ]);
+      final status = results[0] as SellerStatus;
+      final profile = results[1] as UserProfile;
+      if (!mounted) return;
+      setState(() {
+        _sellerEnabled = status.enabled;
+        _profileLocation = profile.location;
+        _savesCount = profile.savesCount;
+        _salesCount = profile.collectedCount;
+        _loadingSeller = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _sellerEnabled = AuthSession.instance.sellerEnabled;
+        _loadingSeller = false;
+      });
+    }
+  }
+
+  Future<void> _onSellerToggle(bool value) async {
+    if (_togglingSeller) return;
+    setState(() => _togglingSeller = true);
+    final result = await toggleSellerMode(
+      context: context,
+      enable: value,
+      profileLocation: _profileLocation,
+    );
+    if (!mounted) return;
+    setState(() {
+      _togglingSeller = false;
+      if (result != null) _sellerEnabled = result;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pageLoading = _loadingSeller || _togglingSeller;
+
+    return StudioLoadingGate(
+      loading: pageLoading,
+      child: Scaffold(
         backgroundColor: HomeFeedTokens.background,
-        elevation: 0,
-        centerTitle: true,
-        title: Text(
-          'Settings',
-          style: GoogleFonts.inter(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: HomeFeedTokens.textPrimary,
+        appBar: AppBar(
+          backgroundColor: HomeFeedTokens.background,
+          elevation: 0,
+          centerTitle: true,
+          title: Text(
+            'Settings',
+            style: GoogleFonts.inter(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: HomeFeedTokens.textPrimary,
+            ),
+          ),
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back_ios_new_rounded,
+                color: HomeFeedTokens.textPrimary, size: 20),
+            onPressed: () => Navigator.pop(context, true),
           ),
         ),
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded, color: HomeFeedTokens.textPrimary, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          if (user != null) ...[
-            Text(
-              user.name,
-              style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w700, color: HomeFeedTokens.textPrimary),
+        body: ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            _SellerToggleTile(
+              enabled: _sellerEnabled,
+              onChanged: _onSellerToggle,
             ),
-            const SizedBox(height: 4),
-            Text(
-              '@${user.username}',
-              style: GoogleFonts.inter(fontSize: 14, color: HomeFeedTokens.textPrimary.withValues(alpha: 0.55)),
+          if (_sellerEnabled) ...[
+            _SettingsTile(
+              icon: Icons.bar_chart_rounded,
+              label: 'Seller analytics',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => SellerAnalyticsPage(
+                      savesCount: _savesCount,
+                      salesCount: _salesCount,
+                    ),
+                  ),
+                );
+              },
             ),
-            const SizedBox(height: 4),
-            Text(
-              user.email,
-              style: GoogleFonts.inter(fontSize: 13, color: HomeFeedTokens.textPrimary.withValues(alpha: 0.45)),
-            ),
-            const SizedBox(height: 28),
           ],
+          const SizedBox(height: 8),
           _SettingsTile(
             icon: Icons.person_outline_rounded,
             label: 'Edit profile',
-            onTap: () {},
+            onTap: () => Navigator.pushNamed(context, '/edit-profile'),
           ),
           _SettingsTile(
             icon: Icons.lock_outline_rounded,
             label: 'Password & security',
             onTap: () => Navigator.pushNamed(context, '/forgot-password'),
+          ),
+          _SettingsTile(
+            icon: Icons.devices_other_outlined,
+            label: 'Log out of all devices',
+            onTap: () async {
+              await AuthService.instance.logoutAllDevices();
+              if (!context.mounted) return;
+              Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
+            },
           ),
           _SettingsTile(
             icon: Icons.notifications_outlined,
@@ -75,6 +156,52 @@ class ProfileSettingsPage extends StatelessWidget {
               if (!context.mounted) return;
               Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
             },
+          ),
+        ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SellerToggleTile extends StatelessWidget {
+  const _SellerToggleTile({
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final bool enabled;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: HomeFeedTokens.textPrimary.withValues(alpha: 0.1),
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.storefront_outlined,
+              size: 22, color: HomeFeedTokens.textPrimary.withValues(alpha: 0.75)),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              'Seller account',
+              style: GoogleFonts.inter(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: HomeFeedTokens.textPrimary,
+              ),
+            ),
+          ),
+          Switch.adaptive(
+            value: enabled,
+            onChanged: onChanged,
           ),
         ],
       ),
@@ -97,7 +224,8 @@ class _SettingsTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = destructive ? const Color(0xFFE05252) : HomeFeedTokens.textPrimary;
+    final color =
+        destructive ? const Color(0xFFE05252) : HomeFeedTokens.textPrimary;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -107,15 +235,21 @@ class _SettingsTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
           child: Row(
             children: [
-              Icon(icon, size: 22, color: color.withValues(alpha: destructive ? 1 : 0.75)),
+              Icon(icon,
+                  size: 22, color: color.withValues(alpha: destructive ? 1 : 0.75)),
               const SizedBox(width: 14),
               Expanded(
                 child: Text(
                   label,
-                  style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w500, color: color),
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: color,
+                  ),
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, color: color.withValues(alpha: 0.35)),
+              Icon(Icons.chevron_right_rounded,
+                  color: color.withValues(alpha: 0.35)),
             ],
           ),
         ),

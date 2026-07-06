@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../models/feed_item.dart';
+import '../models/feed_preview_item.dart';
 import '../theme/home_feed_tokens.dart';
 import '../widgets/home_feed/home_feed_widgets.dart';
 import '../widgets/piece_detail/piece_action_bar.dart';
@@ -16,7 +16,7 @@ class PieceDetailPage extends StatefulWidget {
     this.initialImageIndex = 0,
   });
 
-  final FeedItem item;
+  final FeedPreviewItem item;
   final int initialImageIndex;
 
   @override
@@ -28,7 +28,7 @@ class _PieceDetailPageState extends State<PieceDetailPage> {
   bool _saved = false;
   bool _following = false;
 
-  FeedItem get item => widget.item;
+  FeedPreviewItem get item => widget.item;
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +44,7 @@ class _PieceDetailPageState extends State<PieceDetailPage> {
                 AspectRatio(
                   aspectRatio: item.aspectRatioValue,
                   child: FeedPicsumImage(
-                    url: feedItemImageUrl(
+                    url: feedPreviewImageUrl(
                       item,
                       imageIndex: widget.initialImageIndex,
                     ),

@@ -1,7 +1,8 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 
-/// Bottom nav — neutral-950 surfaces (center pill + side circles).
-/// Indices match [MainShell] / [_onNavTap].
+/// Bottom nav — neutral-950 glass surfaces (center pill + side circles).
 abstract final class BottomNavIndex {
   static const int more = 0;
   static const int home = 1;
@@ -12,21 +13,17 @@ abstract final class BottomNavIndex {
   static const int profile = 6;
 }
 
-/// Dark floating pill / circles (spec ~#1A1A1A).
-const Color _kNavSurface = Color(0xFF1A1A1A);
+const Color _kNavGlassFill = Color(0xB31A1A1A);
+const Color _kNavGlassBorder = Color(0x33FFFFFF);
 
-/// Side circles: match center pill height.
 const double _kCircleSize = 60;
 const double _kGap = 10;
 const double _kIconSize = 28;
-/// Center pill icons.
 const double _kPillIconSize = 40;
 const double _kPillIconHit = 56;
 const double _kInactiveWhite = 0.4;
 
-/// Center pill layout (background uses [_kNavSurface]).
 const double _kCenterPillWidth = 256;
-/// Fits [_kPillIconSize] with vertical padding.
 const double _kCenterPillHeight = 60;
 const double _kCenterPillRadius = 100;
 const double _kCenterPillGap = 24;
@@ -102,6 +99,37 @@ class BottomNav extends StatelessWidget {
   }
 }
 
+class _GlassSurface extends StatelessWidget {
+  const _GlassSurface({
+    required this.child,
+    required this.borderRadius,
+    this.border,
+  });
+
+  final Widget child;
+  final BorderRadius borderRadius;
+  final BoxBorder? border;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: borderRadius,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          decoration: BoxDecoration(
+            color: _kNavGlassFill,
+            borderRadius: borderRadius,
+            border: border ??
+                Border.all(color: _kNavGlassBorder, width: 1),
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
 class _SideCircle extends StatelessWidget {
   const _SideCircle({
     required this.selected,
@@ -118,22 +146,19 @@ class _SideCircle extends StatelessWidget {
     final borderColor = selected
         ? Colors.white.withValues(alpha: 0.4)
         : Colors.white.withValues(alpha: 0.14);
-    final double borderWidth = selected ? 1.5 : 1.0;
+    final borderWidth = selected ? 1.5 : 1.0;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         customBorder: const CircleBorder(),
-        child: ClipOval(
-          child: Container(
+        child: _GlassSurface(
+          borderRadius: BorderRadius.circular(_kCircleSize / 2),
+          border: Border.all(color: borderColor, width: borderWidth),
+          child: SizedBox(
             width: _kCircleSize,
             height: _kCircleSize,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: _kNavSurface,
-              border: Border.all(color: borderColor, width: borderWidth),
-            ),
             child: Center(child: child),
           ),
         ),
@@ -161,30 +186,31 @@ class _CenterPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
+    return _GlassSurface(
       borderRadius: BorderRadius.circular(_kCenterPillRadius),
-      child: Container(
+      child: SizedBox(
         width: _kCenterPillWidth,
         height: _kCenterPillHeight,
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-        color: _kNavSurface,
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.center,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              for (var i = 0; i < _slots.length; i++) ...[
-                if (i > 0) const SizedBox(width: _kCenterPillGap),
-                _PillIconButton(
-                  selected: selectedNavIndex == _slots[i].index,
-                  outline: _slots[i].outline,
-                  filled: _slots[i].filled,
-                  onTap: () => onNavTap(_slots[i].index),
-                ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.center,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                for (var i = 0; i < _slots.length; i++) ...[
+                  if (i > 0) const SizedBox(width: _kCenterPillGap),
+                  _PillIconButton(
+                    selected: selectedNavIndex == _slots[i].index,
+                    outline: _slots[i].outline,
+                    filled: _slots[i].filled,
+                    onTap: () => onNavTap(_slots[i].index),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

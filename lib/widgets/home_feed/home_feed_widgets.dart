@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../data/home_feed_dummy.dart';
-import '../../models/feed_item.dart';
+import '../../models/feed_preview_item.dart';
 import '../../theme/home_feed_tokens.dart';
 
-typedef OnFeedItemTap = void Function(FeedItem item, {int imageIndex});
+typedef OnFeedPreviewTap = void Function(FeedPreviewItem item, {int imageIndex});
 
 class Studio3DotLogo extends StatelessWidget {
   const Studio3DotLogo({super.key, this.size = 27});
@@ -189,7 +189,7 @@ class FeedDotIndicators extends StatelessWidget {
 class FeedArtistOverlay extends StatelessWidget {
   const FeedArtistOverlay({super.key, required this.item});
 
-  final FeedItem item;
+  final FeedPreviewItem item;
 
   @override
   Widget build(BuildContext context) {
@@ -332,8 +332,8 @@ class FeedItemCard extends StatefulWidget {
     required this.onTap,
   });
 
-  final FeedItem item;
-  final OnFeedItemTap onTap;
+  final FeedPreviewItem item;
+  final OnFeedPreviewTap onTap;
 
   @override
   State<FeedItemCard> createState() => _FeedItemCardState();
@@ -400,7 +400,7 @@ class _FeedItemCardState extends State<FeedItemCard> {
                     itemCount: n,
                     itemBuilder: (context, index) {
                       return FeedPicsumImage(
-                        url: feedItemImageUrl(item, imageIndex: index),
+                        url: feedPreviewImageUrl(item, imageIndex: index),
                       );
                     },
                   ),

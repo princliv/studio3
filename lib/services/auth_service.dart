@@ -18,10 +18,16 @@ class AuthService {
     await _api.post('/api/auth/otp/resend', body: {'email': email.trim()});
   }
 
-  Future<UsernameCheckResult> checkUsername(String username) async {
+  Future<UsernameCheckResult> checkUsername(
+    String username, {
+    bool forCurrentUser = false,
+  }) async {
+    final query = <String, String>{'username': username.trim()};
+    if (forCurrentUser) query['for_user_id'] = 'me';
     final json = await _api.get(
       '/api/auth/username/check',
-      query: {'username': username.trim()},
+      query: query,
+      auth: forCurrentUser,
     );
     final data = json['data'] as Map<String, dynamic>? ?? json;
     return UsernameCheckResult.fromJson(data);
@@ -72,6 +78,15 @@ class AuthService {
   Future<void> logout() async {
     try {
       await _api.post('/api/auth/logout');
+    } on ApiException {
+      // Clear local session even if server logout fails.
+    }
+    await _session.clear();
+  }
+
+  Future<void> logoutAllDevices() async {
+    try {
+      await _api.post('/api/auth/logout-all', auth: true);
     } on ApiException {
       // Clear local session even if server logout fails.
     }

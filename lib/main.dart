@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'services/auth_session.dart';
+import 'utils/app_routes.dart';
 import 'theme/app_theme.dart';
 import 'widgets/bottom_nav.dart' show BottomNav, BottomNavIndex;
-import 'services/auth_session.dart';
 import 'screens/login_page.dart';
 import 'screens/signup_page.dart';
 import 'screens/forgot_password_page.dart';
@@ -14,6 +15,8 @@ import 'screens/chat_page.dart';
 import 'screens/profile_page.dart';
 import 'screens/post_page.dart';
 import 'screens/notifications_page.dart';
+import 'screens/onboarding/onboarding_page.dart';
+import 'screens/edit_profile_page.dart';
 import 'models/auth_user.dart';
 
 Future<void> main() async {
@@ -27,27 +30,69 @@ class Studio3App extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final loggedIn = AuthSession.instance.isLoggedIn;
-
     return MaterialApp(
       title: 'Studio 3 Discover',
       theme: AppTheme.light,
-      initialRoute: loggedIn ? '/' : '/login',
+      initialRoute: resolveInitialRoute(),
       routes: {
-        '/': (context) => const MainShell(),
+        '/': (context) => const AuthGate(child: MainShell()),
         '/login': (context) => const LoginPage(),
         '/signup': (context) => const SignUpPage(),
         '/forgot-password': (context) => const ForgotPasswordPage(),
+        '/onboarding': (context) => const OnboardingPage(),
         '/welcome': (context) {
           final user = ModalRoute.of(context)?.settings.arguments as AuthUser?;
           return WelcomePage(user: user ?? const AuthUser(username: '', name: 'Artist', email: ''));
         },
         '/profile-settings': (context) => const ProfileSettingsPage(),
+        '/edit-profile': (context) => const EditProfilePage(),
         '/post': (context) => const PostPage(),
         '/notifications': (context) => const NotificationsPage(),
       },
     );
   }
+}
+
+/// Redirects unauthenticated or non-onboarded users.
+class AuthGate extends StatefulWidget {
+  const AuthGate({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  @override
+  void initState() {
+    super.initState();
+    AuthSession.instance.addListener(_onSessionChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkAuth());
+  }
+
+  @override
+  void dispose() {
+    AuthSession.instance.removeListener(_onSessionChanged);
+    super.dispose();
+  }
+
+  void _onSessionChanged() => _checkAuth();
+
+  void _checkAuth() {
+    if (!mounted) return;
+    final session = AuthSession.instance;
+    if (!session.isLoggedIn) {
+      Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
+      return;
+    }
+    if (!session.isOnboarded) {
+      Navigator.pushNamedAndRemoveUntil(context, '/onboarding', (_) => false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 class MainShell extends StatefulWidget {
