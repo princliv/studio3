@@ -60,8 +60,10 @@ class CommentSummary {
     return CommentSummary(
       id: json['id'] as String? ?? json['_id'] as String? ?? '',
       body: json['body'] as String? ?? '',
-      authorUsername: author?['username'] as String? ?? user?['username'] as String?,
-      authorName: author?['name'] as String? ?? user?['name'] as String?,
+      authorUsername: author?['username'] as String? ??
+          user?['username'] as String?,
+      authorName:
+          author?['name'] as String? ?? user?['name'] as String?,
       createdAt: json['createdAt'] as String?,
     );
   }

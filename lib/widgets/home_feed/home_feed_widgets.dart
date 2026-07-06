@@ -2,10 +2,155 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../data/home_feed_dummy.dart';
-import '../../models/feed_row.dart';
+import '../../models/feed_preview_item.dart';
 import '../../theme/home_feed_tokens.dart';
 
-typedef OnFeedImageTap = void Function(String imageUrl, FeedCardData data);
+typedef OnFeedPreviewTap = void Function(FeedPreviewItem item, {int imageIndex});
+
+class Studio3DotLogo extends StatelessWidget {
+  const Studio3DotLogo({super.key, this.size = 27});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final dot = size * 0.22;
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        children: [
+          Positioned(
+            left: size * 0.38,
+            top: 0,
+            child: _Dot(diameter: dot),
+          ),
+          Positioned(
+            left: 0,
+            bottom: 0,
+            child: _Dot(diameter: dot),
+          ),
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: _Dot(diameter: dot),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Dot extends StatelessWidget {
+  const _Dot({required this.diameter});
+
+  final double diameter;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: diameter,
+      height: diameter,
+      decoration: const BoxDecoration(
+        color: HomeFeedTokens.textPrimary,
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+}
+
+class FeedHomeHeader extends StatelessWidget {
+  const FeedHomeHeader({
+    super.key,
+    required this.filter,
+    required this.onFilterChanged,
+    required this.onAddTap,
+    this.onMoonTap,
+  });
+
+  final FeedAvailabilityFilter filter;
+  final ValueChanged<FeedAvailabilityFilter> onFilterChanged;
+  final VoidCallback onAddTap;
+  final VoidCallback? onMoonTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 12, 12),
+      child: Row(
+        children: [
+          const Studio3DotLogo(),
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _FilterTab(
+                  label: 'All',
+                  active: filter == FeedAvailabilityFilter.all,
+                  onTap: () => onFilterChanged(FeedAvailabilityFilter.all),
+                ),
+                const SizedBox(width: 24),
+                _FilterTab(
+                  label: 'Available',
+                  active: filter == FeedAvailabilityFilter.available,
+                  onTap: () =>
+                      onFilterChanged(FeedAvailabilityFilter.available),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: onAddTap,
+            icon: const Icon(Icons.add, size: 22),
+            color: HomeFeedTokens.textPrimary,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          ),
+          IconButton(
+            onPressed: onMoonTap,
+            icon: const Icon(Icons.dark_mode_outlined, size: 20),
+            color: HomeFeedTokens.textPrimary,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterTab extends StatelessWidget {
+  const _FilterTab({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Text(
+        label,
+        style: GoogleFonts.inter(
+          fontSize: 16,
+          fontWeight: FontWeight.w400,
+          color: active
+              ? HomeFeedTokens.textPrimary
+              : HomeFeedTokens.textSecondary,
+          decoration: active ? TextDecoration.underline : null,
+          decorationColor: HomeFeedTokens.textPrimary,
+          decorationThickness: 1,
+        ),
+      ),
+    );
+  }
+}
 
 class FeedDotIndicators extends StatelessWidget {
   const FeedDotIndicators({
@@ -15,7 +160,6 @@ class FeedDotIndicators extends StatelessWidget {
   });
 
   final int count;
-  /// Fractional carousel page (synced with [PageController.page]) for smooth dot fade while swiping.
   final double page;
 
   @override
@@ -43,13 +187,13 @@ class FeedDotIndicators extends StatelessWidget {
 }
 
 class FeedArtistOverlay extends StatelessWidget {
-  const FeedArtistOverlay({super.key, required this.data});
+  const FeedArtistOverlay({super.key, required this.item});
 
-  final FeedCardData data;
+  final FeedPreviewItem item;
 
   @override
   Widget build(BuildContext context) {
-    final avatarUrl = picsumAvatarUrl(data.artist.avatarSeed);
+    final avatarUrl = picsumAvatarUrl(item.artist.avatarSeed);
     return Positioned(
       left: 8,
       right: 48,
@@ -76,30 +220,33 @@ class FeedArtistOverlay extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                SizedBox(
-                  width: HomeFeedTokens.artistTextWidth,
-                  child: Text(
-                    data.artist.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w400,
-                      color: HomeFeedTokens.textInverse,
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  width: HomeFeedTokens.artistTextWidth,
-                  child: Text(
-                    data.medium,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                if (item.isProcess)
+                  Text(
+                    'Process',
                     style: GoogleFonts.inter(
                       fontSize: 10,
-                      fontWeight: FontWeight.w300,
+                      fontWeight: FontWeight.w400,
                       color: HomeFeedTokens.textInverse.withValues(alpha: 0.6),
                     ),
+                  ),
+                Text(
+                  item.artist.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                    color: HomeFeedTokens.textInverse,
+                  ),
+                ),
+                Text(
+                  item.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w300,
+                    color: HomeFeedTokens.textInverse.withValues(alpha: 0.6),
                   ),
                 ),
               ],
@@ -143,13 +290,15 @@ class FeedPicsumImage extends StatelessWidget {
       errorBuilder: (context, error, stackTrace) => Container(
         color: Colors.grey.shade400,
         alignment: Alignment.center,
-        child: Icon(Icons.image_not_supported_outlined, color: Colors.grey.shade600),
+        child: Icon(
+          Icons.image_not_supported_outlined,
+          color: Colors.grey.shade600,
+        ),
       ),
     );
   }
 }
 
-/// Bottom gradient for legibility over artwork.
 class _CardBottomScrim extends StatelessWidget {
   const _CardBottomScrim();
 
@@ -167,7 +316,7 @@ class _CardBottomScrim extends StatelessWidget {
             end: Alignment.bottomCenter,
             colors: [
               Colors.transparent,
-              Colors.black.withValues(alpha: 0.55),
+              const Color(0xFF231F1B).withValues(alpha: 0.8),
             ],
           ),
         ),
@@ -176,28 +325,21 @@ class _CardBottomScrim extends StatelessWidget {
   }
 }
 
-class _FeedImageCarouselCard extends StatefulWidget {
-  const _FeedImageCarouselCard({
-    required this.height,
-    required this.layoutKind,
-    required this.showOverlay,
-    required this.showDots,
-    required this.data,
-    required this.onOpenDetail,
+class FeedItemCard extends StatefulWidget {
+  const FeedItemCard({
+    super.key,
+    required this.item,
+    required this.onTap,
   });
 
-  final double height;
-  final FeedLayoutKind layoutKind;
-  final bool showOverlay;
-  final bool showDots;
-  final FeedCardData data;
-  final void Function(String imageUrl) onOpenDetail;
+  final FeedPreviewItem item;
+  final OnFeedPreviewTap onTap;
 
   @override
-  State<_FeedImageCarouselCard> createState() => _FeedImageCarouselCardState();
+  State<FeedItemCard> createState() => _FeedItemCardState();
 }
 
-class _FeedImageCarouselCardState extends State<_FeedImageCarouselCard> {
+class _FeedItemCardState extends State<FeedItemCard> {
   late final PageController _pageController;
   double _page = 0;
 
@@ -226,181 +368,56 @@ class _FeedImageCarouselCardState extends State<_FeedImageCarouselCard> {
     if (!_pageController.hasClients) return 0;
     final p = _pageController.page;
     if (p == null) return 0;
-    return p.round().clamp(0, widget.data.imageCount - 1);
+    return p.round().clamp(0, widget.item.imageCount - 1);
   }
 
   void _onCardTap() {
-    final i = _resolvedIndex;
-    widget.onOpenDetail(
-      feedCardImageUrl(widget.data, widget.layoutKind, imageIndex: i),
-    );
+    widget.onTap(widget.item, imageIndex: _resolvedIndex);
   }
 
   @override
   Widget build(BuildContext context) {
-    final data = widget.data;
-    final kind = widget.layoutKind;
-    final n = data.imageCount;
+    final item = widget.item;
+    final n = item.imageCount;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: _onCardTap,
-        borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
-        child: ClipRRect(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: HomeFeedTokens.sideMargin),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _onCardTap,
           borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
-          child: SizedBox(
-            height: widget.height,
-            width: double.infinity,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                PageView.builder(
-                  controller: _pageController,
-                  physics: const BouncingScrollPhysics(),
-                  itemCount: n,
-                  itemBuilder: (context, index) {
-                    return FeedPicsumImage(
-                      url: feedCardImageUrl(data, kind, imageIndex: index),
-                    );
-                  },
-                ),
-                if (widget.showOverlay) const _CardBottomScrim(),
-                if (widget.showOverlay) FeedArtistOverlay(data: data),
-                if (widget.showDots && n > 1)
-                  Positioned(
-                    right: HomeFeedTokens.dotInset,
-                    bottom: HomeFeedTokens.dotInset,
-                    child: FeedDotIndicators(count: n, page: _page),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
+            child: AspectRatio(
+              aspectRatio: item.aspectRatioValue,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  PageView.builder(
+                    controller: _pageController,
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: n,
+                    itemBuilder: (context, index) {
+                      return FeedPicsumImage(
+                        url: feedPreviewImageUrl(item, imageIndex: index),
+                      );
+                    },
                   ),
-              ],
+                  const _CardBottomScrim(),
+                  FeedArtistOverlay(item: item),
+                  if (n > 1)
+                    Positioned(
+                      right: HomeFeedTokens.dotInset,
+                      bottom: HomeFeedTokens.dotInset,
+                      child: FeedDotIndicators(count: n, page: _page),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
       ),
     );
-  }
-}
-
-class FeedRowView extends StatelessWidget {
-  const FeedRowView({
-    super.key,
-    required this.model,
-    required this.onImageTap,
-  });
-
-  final FeedRowModel model;
-  final OnFeedImageTap onImageTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final kind = model.kind;
-    switch (kind) {
-      case FeedLayoutKind.a:
-      case FeedLayoutKind.d:
-        final c = model.cards.single;
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: HomeFeedTokens.sideMargin),
-          child: _FeedImageCarouselCard(
-            height: HomeFeedTokens.tallCardHeight,
-            layoutKind: kind,
-            showOverlay: true,
-            showDots: true,
-            data: c,
-            onOpenDetail: (url) => onImageTap(url, c),
-          ),
-        );
-      case FeedLayoutKind.e:
-        final c = model.cards.single;
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: HomeFeedTokens.sideMargin),
-          child: _FeedImageCarouselCard(
-            height: HomeFeedTokens.shortCardHeight,
-            layoutKind: kind,
-            showOverlay: true,
-            showDots: true,
-            data: c,
-            onOpenDetail: (url) => onImageTap(url, c),
-          ),
-        );
-      case FeedLayoutKind.b:
-        final a = model.cards[0];
-        final b = model.cards[1];
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: HomeFeedTokens.sideMargin),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: _FeedImageCarouselCard(
-                  height: HomeFeedTokens.rowBHeight,
-                  layoutKind: kind,
-                  showOverlay: true,
-                  showDots: true,
-                  data: a,
-                  onOpenDetail: (url) => onImageTap(url, a),
-                ),
-              ),
-              const SizedBox(width: HomeFeedTokens.gapB),
-              Expanded(
-                child: _FeedImageCarouselCard(
-                  height: HomeFeedTokens.rowBHeight,
-                  layoutKind: kind,
-                  showOverlay: true,
-                  showDots: true,
-                  data: b,
-                  onOpenDetail: (url) => onImageTap(url, b),
-                ),
-              ),
-            ],
-          ),
-        );
-      case FeedLayoutKind.c:
-        final x = model.cards[0];
-        final y = model.cards[1];
-        final z = model.cards[2];
-        Widget smallTile(FeedCardData d) {
-          return Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => onImageTap(feedCardImageUrl(d, kind), d),
-              borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
-                child: FeedPicsumImage(url: feedCardImageUrl(d, kind)),
-              ),
-            ),
-          );
-        }
-
-        // Same 10px side inset as other rows; three squares fill the row width (no center float).
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: HomeFeedTokens.sideMargin),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final g = HomeFeedTokens.gapC;
-              final tile = (constraints.maxWidth - 2 * g) / 3;
-              Widget cell(FeedCardData d) {
-                return SizedBox(
-                  width: tile,
-                  height: tile,
-                  child: smallTile(d),
-                );
-              }
-
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  cell(x),
-                  SizedBox(width: g),
-                  cell(y),
-                  SizedBox(width: g),
-                  cell(z),
-                ],
-              );
-            },
-          ),
-        );
-    }
   }
 }
