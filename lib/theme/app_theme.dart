@@ -97,4 +97,49 @@ class AppTheme {
       ),
     );
   }
+
+  static ThemeData get dark {
+    final base = ThemeData.dark(useMaterial3: true);
+    final textTheme = GoogleFonts.interTextTheme(base.textTheme).copyWith(
+      headlineMedium: GoogleFonts.inter(
+        fontSize: 28,
+        fontWeight: FontWeight.w700,
+        color: const Color(0xFFFAFAF7),
+      ),
+      titleLarge: GoogleFonts.inter(
+        fontSize: 22,
+        fontWeight: FontWeight.w700,
+        color: const Color(0xFFFAFAF7),
+      ),
+      bodyMedium: GoogleFonts.inter(
+        fontSize: 14,
+        fontWeight: FontWeight.w400,
+        color: const Color(0xFFC8C5BC),
+      ),
+    );
+
+    return ThemeData(
+      useMaterial3: true,
+      fontFamily: _interFamily,
+      brightness: Brightness.dark,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: const Color(0xFF231F1B),
+        brightness: Brightness.dark,
+        primary: const Color(0xFFFAFAF7),
+      ),
+      scaffoldBackgroundColor: const Color(0xFF231F1B),
+      appBarTheme: AppBarTheme(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        foregroundColor: const Color(0xFFFAFAF7),
+        titleTextStyle: GoogleFonts.inter(
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          color: const Color(0xFFFAFAF7),
+        ),
+      ),
+      textTheme: textTheme,
+    );
+  }
 }

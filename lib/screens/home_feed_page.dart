@@ -11,7 +11,9 @@ import 'artwork_detail_page.dart';
 import 'piece_detail_page.dart';
 
 class HomeFeedPage extends StatefulWidget {
-  const HomeFeedPage({super.key});
+  const HomeFeedPage({super.key, this.onThemeToggle});
+
+  final VoidCallback? onThemeToggle;
 
   @override
   State<HomeFeedPage> createState() => _HomeFeedPageState();
@@ -147,10 +149,14 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              FeedHomeHeader(
-                filter: _filter,
-                onFilterChanged: _onFilterChanged,
-                onAddTap: () => Navigator.pushNamed(context, '/post'),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
+                child: FeedHomeHeader(
+                  filter: _filter,
+                  onFilterChanged: _onFilterChanged,
+                  onAddTap: () => Navigator.pushNamed(context, '/post'),
+                  onMoonTap: widget.onThemeToggle,
+                ),
               ),
               Expanded(
                 child: _useApi

@@ -7,29 +7,47 @@ import '../widgets/studio_loading.dart';
 import 'artwork_detail_page.dart';
 
 class DiscoverPage extends StatefulWidget {
-  const DiscoverPage({super.key});
+  const DiscoverPage({super.key, this.reelsOnly = false});
+
+  final bool reelsOnly;
 
   @override
   State<DiscoverPage> createState() => _DiscoverPageState();
 }
 
 class _DiscoverPageState extends State<DiscoverPage> {
-  String _filter = 'All';
-  final _filters = ['All', 'Painting', 'Sculpture', 'Photography', 'Digital'];
+  late String _filter;
+  late final List<String> _filters;
   List<FeedItem> _items = [];
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
+    if (widget.reelsOnly) {
+      _filter = 'Video';
+      _filters = const ['Video'];
+    } else {
+      _filter = 'All';
+      _filters = const [
+        'All',
+        'Painting',
+        'Sculpture',
+        'Photography',
+        'Digital',
+      ];
+    }
     _loadExplore();
   }
 
   Future<void> _loadExplore() async {
     setState(() => _loading = true);
     try {
-      final medium = _filter == 'All' ? null : _filter.toLowerCase();
-      final items = await FeedService.instance.getExplore(medium: medium);
+      final items = widget.reelsOnly
+          ? await FeedService.instance.getExplore(videoOnly: true)
+          : await FeedService.instance.getExplore(
+              medium: _filter == 'All' ? null : _filter.toLowerCase(),
+            );
       if (!mounted) return;
       setState(() {
         _items = items;
@@ -105,7 +123,9 @@ class _DiscoverPageState extends State<DiscoverPage> {
               SliverToBoxAdapter(
                 child: SizedBox(
                   height: 32,
-                  child: ListView.builder(
+                  child: widget.reelsOnly
+                      ? const SizedBox.shrink()
+                      : ListView.builder(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: _filters.length,
@@ -135,10 +155,13 @@ class _DiscoverPageState extends State<DiscoverPage> {
                   ),
                 ),
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 16)),
               if (_items.isEmpty)
-                const SliverFillRemaining(
-                  child: Center(child: Text('No pieces found')),
+                SliverFillRemaining(
+                  child: Center(
+                    child: Text(
+                      widget.reelsOnly ? 'No reels yet' : 'No pieces found',
+                    ),
+                  ),
                 )
               else
                 SliverPadding(

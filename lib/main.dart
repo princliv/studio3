@@ -25,24 +25,44 @@ Future<void> main() async {
   runApp(const Studio3App());
 }
 
-class Studio3App extends StatelessWidget {
+class Studio3App extends StatefulWidget {
   const Studio3App({super.key});
+
+  @override
+  State<Studio3App> createState() => _Studio3AppState();
+}
+
+class _Studio3AppState extends State<Studio3App> {
+  ThemeMode _themeMode = ThemeMode.light;
+
+  void _toggleTheme() {
+    setState(() {
+      _themeMode =
+          _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Studio 3 Discover',
       theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: _themeMode,
       initialRoute: resolveInitialRoute(),
       routes: {
-        '/': (context) => const AuthGate(child: MainShell()),
+        '/': (context) => AuthGate(
+              child: MainShell(onThemeToggle: _toggleTheme),
+            ),
         '/login': (context) => const LoginPage(),
         '/signup': (context) => const SignUpPage(),
         '/forgot-password': (context) => const ForgotPasswordPage(),
         '/onboarding': (context) => const OnboardingPage(),
         '/welcome': (context) {
           final user = ModalRoute.of(context)?.settings.arguments as AuthUser?;
-          return WelcomePage(user: user ?? const AuthUser(username: '', name: 'Artist', email: ''));
+          return WelcomePage(
+            user: user ?? const AuthUser(username: '', name: 'Artist', email: ''),
+          );
         },
         '/profile-settings': (context) => const ProfileSettingsPage(),
         '/edit-profile': (context) => const EditProfilePage(),
@@ -96,68 +116,50 @@ class _AuthGateState extends State<AuthGate> {
 }
 
 class MainShell extends StatefulWidget {
-  const MainShell({super.key});
+  const MainShell({super.key, required this.onThemeToggle});
+
+  final VoidCallback onThemeToggle;
 
   @override
   State<MainShell> createState() => _MainShellState();
 }
 
 class _MainShellState extends State<MainShell> {
-  /// 0=home, 1=discover, 2=chat, 3=profile
-  int _currentScreenIndex = 0;
-
-  int get _selectedNavIndex {
-    switch (_currentScreenIndex) {
-      case 0:
-        return BottomNavIndex.home;
-      case 1:
-        return BottomNavIndex.discover;
-      case 2:
-        return BottomNavIndex.bookmark;
-      case 3:
-        return BottomNavIndex.profile;
-      default:
-        return BottomNavIndex.home;
-    }
-  }
+  int _selectedNavIndex = BottomNavIndex.home;
 
   void _onNavTap(int navIndex) {
-    switch (navIndex) {
-      case BottomNavIndex.more:
-        break;
+    setState(() => _selectedNavIndex = navIndex);
+  }
+
+  Widget _buildScreen() {
+    switch (_selectedNavIndex) {
       case BottomNavIndex.home:
-        setState(() => _currentScreenIndex = 0);
-        break;
+        return HomeFeedPage(onThemeToggle: widget.onThemeToggle);
       case BottomNavIndex.discover:
-        setState(() => _currentScreenIndex = 1);
-        break;
-      case BottomNavIndex.post:
-        Navigator.pushNamed(context, '/post');
-        break;
+        return const DiscoverPage(
+          key: ValueKey('discover'),
+          reelsOnly: false,
+        );
+      case BottomNavIndex.reels:
+        return const DiscoverPage(
+          key: ValueKey('reels'),
+          reelsOnly: true,
+        );
       case BottomNavIndex.bookmark:
-        setState(() => _currentScreenIndex = 2);
-        break;
-      case BottomNavIndex.bell:
-        Navigator.pushNamed(context, '/notifications');
-        break;
+        return const ChatPage();
       case BottomNavIndex.profile:
-        setState(() => _currentScreenIndex = 3);
-        break;
+        return const ProfilePage();
+      default:
+        return HomeFeedPage(onThemeToggle: widget.onThemeToggle);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final screens = [
-      const HomeFeedPage(),
-      const DiscoverPage(),
-      const ChatPage(),
-      const ProfilePage(),
-    ];
     return Scaffold(
       body: Stack(
         children: [
-          screens[_currentScreenIndex],
+          _buildScreen(),
           BottomNav(
             selectedNavIndex: _selectedNavIndex,
             onNavTap: _onNavTap,

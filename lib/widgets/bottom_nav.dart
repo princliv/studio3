@@ -2,31 +2,26 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
-/// Bottom nav — neutral-950 glass surfaces (center pill + side circles).
+/// Bottom nav — Figma Nav/Bottom (4-icon pill + profile avatar).
 abstract final class BottomNavIndex {
-  static const int more = 0;
-  static const int home = 1;
-  static const int discover = 2;
-  static const int post = 3;
-  static const int bookmark = 4;
-  static const int bell = 5;
-  static const int profile = 6;
+  static const int home = 0;
+  static const int discover = 1;
+  static const int reels = 2;
+  static const int bookmark = 3;
+  static const int profile = 4;
 }
 
 const Color _kNavGlassFill = Color(0xB31A1A1A);
 const Color _kNavGlassBorder = Color(0x33FFFFFF);
 
-const double _kCircleSize = 60;
-const double _kGap = 10;
-const double _kIconSize = 28;
-const double _kPillIconSize = 40;
-const double _kPillIconHit = 56;
+const double _kPillWidth = 255;
+const double _kPillHeight = 46;
+const double _kPillRadius = 100;
+const double _kAvatarSize = 44;
+const double _kPillAvatarGap = 8;
+const double _kIconSize = 22;
+const double _kIconHit = 44;
 const double _kInactiveWhite = 0.4;
-
-const double _kCenterPillWidth = 256;
-const double _kCenterPillHeight = 60;
-const double _kCenterPillRadius = 100;
-const double _kCenterPillGap = 24;
 
 class BottomNav extends StatelessWidget {
   const BottomNav({
@@ -43,8 +38,8 @@ class BottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      left: 12,
-      right: 12,
+      left: 10,
+      right: 10,
       bottom: 16,
       child: SafeArea(
         top: false,
@@ -55,40 +50,15 @@ class BottomNav extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                _SideCircle(
-                  selected: selectedNavIndex == BottomNavIndex.more,
-                  onTap: () => onNavTap(BottomNavIndex.more),
-                  child: Icon(
-                    Icons.more_horiz_rounded,
-                    size: _kIconSize,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(width: _kGap),
-                _CenterPill(
+                _NavPill(
                   selectedNavIndex: selectedNavIndex,
                   onNavTap: onNavTap,
                 ),
-                const SizedBox(width: _kGap),
-                _SideCircle(
+                const SizedBox(width: _kPillAvatarGap),
+                _ProfileAvatar(
                   selected: selectedNavIndex == BottomNavIndex.profile,
+                  avatar: avatar,
                   onTap: () => onNavTap(BottomNavIndex.profile),
-                  child: avatar != null
-                      ? ClipOval(
-                          child: Image(
-                            image: avatar!,
-                            width: _kCircleSize,
-                            height: _kCircleSize,
-                            fit: BoxFit.cover,
-                          ),
-                        )
-                      : Icon(
-                          Icons.person_outline_rounded,
-                          size: _kIconSize,
-                          color: selectedNavIndex == BottomNavIndex.profile
-                              ? Colors.white
-                              : Colors.white.withValues(alpha: _kInactiveWhite),
-                        ),
                 ),
               ],
             ),
@@ -103,12 +73,10 @@ class _GlassSurface extends StatelessWidget {
   const _GlassSurface({
     required this.child,
     required this.borderRadius,
-    this.border,
   });
 
   final Widget child;
   final BorderRadius borderRadius;
-  final BoxBorder? border;
 
   @override
   Widget build(BuildContext context) {
@@ -120,8 +88,7 @@ class _GlassSurface extends StatelessWidget {
           decoration: BoxDecoration(
             color: _kNavGlassFill,
             borderRadius: borderRadius,
-            border: border ??
-                Border.all(color: _kNavGlassBorder, width: 1),
+            border: Border.all(color: _kNavGlassBorder, width: 1),
           ),
           child: child,
         ),
@@ -130,45 +97,8 @@ class _GlassSurface extends StatelessWidget {
   }
 }
 
-class _SideCircle extends StatelessWidget {
-  const _SideCircle({
-    required this.selected,
-    required this.onTap,
-    required this.child,
-  });
-
-  final bool selected;
-  final VoidCallback onTap;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final borderColor = selected
-        ? Colors.white.withValues(alpha: 0.4)
-        : Colors.white.withValues(alpha: 0.14);
-    final borderWidth = selected ? 1.5 : 1.0;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        customBorder: const CircleBorder(),
-        child: _GlassSurface(
-          borderRadius: BorderRadius.circular(_kCircleSize / 2),
-          border: Border.all(color: borderColor, width: borderWidth),
-          child: SizedBox(
-            width: _kCircleSize,
-            height: _kCircleSize,
-            child: Center(child: child),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _CenterPill extends StatelessWidget {
-  const _CenterPill({
+class _NavPill extends StatelessWidget {
+  const _NavPill({
     required this.selectedNavIndex,
     required this.onNavTap,
   });
@@ -177,41 +107,46 @@ class _CenterPill extends StatelessWidget {
   final ValueChanged<int> onNavTap;
 
   static const _slots = <({int index, IconData outline, IconData filled})>[
-    (index: BottomNavIndex.home, outline: Icons.home_outlined, filled: Icons.home_rounded),
-    (index: BottomNavIndex.discover, outline: Icons.explore_outlined, filled: Icons.explore_rounded),
-    (index: BottomNavIndex.post, outline: Icons.add, filled: Icons.add),
-    (index: BottomNavIndex.bookmark, outline: Icons.bookmark_border_rounded, filled: Icons.bookmark_rounded),
-    (index: BottomNavIndex.bell, outline: Icons.notifications_outlined, filled: Icons.notifications_rounded),
+    (
+      index: BottomNavIndex.home,
+      outline: Icons.home_outlined,
+      filled: Icons.home_rounded,
+    ),
+    (
+      index: BottomNavIndex.discover,
+      outline: Icons.explore_outlined,
+      filled: Icons.explore_rounded,
+    ),
+    (
+      index: BottomNavIndex.reels,
+      outline: Icons.play_circle_outline,
+      filled: Icons.play_circle_rounded,
+    ),
+    (
+      index: BottomNavIndex.bookmark,
+      outline: Icons.bookmark_border_rounded,
+      filled: Icons.bookmark_rounded,
+    ),
   ];
 
   @override
   Widget build(BuildContext context) {
     return _GlassSurface(
-      borderRadius: BorderRadius.circular(_kCenterPillRadius),
+      borderRadius: BorderRadius.circular(_kPillRadius),
       child: SizedBox(
-        width: _kCenterPillWidth,
-        height: _kCenterPillHeight,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.center,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                for (var i = 0; i < _slots.length; i++) ...[
-                  if (i > 0) const SizedBox(width: _kCenterPillGap),
-                  _PillIconButton(
-                    selected: selectedNavIndex == _slots[i].index,
-                    outline: _slots[i].outline,
-                    filled: _slots[i].filled,
-                    onTap: () => onNavTap(_slots[i].index),
-                  ),
-                ],
-              ],
-            ),
-          ),
+        width: _kPillWidth,
+        height: _kPillHeight,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            for (final slot in _slots)
+              _PillIconButton(
+                selected: selectedNavIndex == slot.index,
+                outline: slot.outline,
+                filled: slot.filled,
+                onTap: () => onNavTap(slot.index),
+              ),
+          ],
         ),
       ),
     );
@@ -242,13 +177,64 @@ class _PillIconButton extends StatelessWidget {
         onTap: onTap,
         customBorder: const CircleBorder(),
         child: SizedBox(
-          width: _kPillIconHit,
-          height: _kPillIconHit,
+          width: _kIconHit,
+          height: _kIconHit,
           child: Icon(
             icon,
-            size: _kPillIconSize,
+            size: _kIconSize,
             color: color,
             applyTextScaling: false,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileAvatar extends StatelessWidget {
+  const _ProfileAvatar({
+    required this.selected,
+    required this.onTap,
+    this.avatar,
+  });
+
+  final bool selected;
+  final VoidCallback onTap;
+  final ImageProvider? avatar;
+
+  @override
+  Widget build(BuildContext context) {
+    final borderColor = selected
+        ? Colors.white.withValues(alpha: 0.4)
+        : Colors.white.withValues(alpha: 0.14);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: _GlassSurface(
+          borderRadius: BorderRadius.circular(_kAvatarSize / 2),
+          child: Container(
+            width: _kAvatarSize,
+            height: _kAvatarSize,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: borderColor,
+                width: selected ? 1.5 : 1,
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: avatar != null
+                ? Image(image: avatar!, fit: BoxFit.cover)
+                : Icon(
+                    Icons.person_outline_rounded,
+                    size: 22,
+                    color: selected
+                        ? Colors.white
+                        : Colors.white.withValues(alpha: _kInactiveWhite),
+                  ),
           ),
         ),
       ),

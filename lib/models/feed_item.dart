@@ -35,6 +35,14 @@ class FeedItem {
 
   String? get priceDisplay =>
       type == FeedItemType.piece ? piece?.priceDisplay : null;
+
+  String? get mediaType =>
+      type == FeedItemType.piece ? piece?.mediaType : post?.mediaType;
+
+  bool get isVideo {
+    final t = mediaType?.toLowerCase();
+    return t == 'video' || t == 'reel' || t == 'reels';
+  }
 }
 
 enum FeedItemType { piece, post }

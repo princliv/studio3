@@ -1,63 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../data/home_feed_dummy.dart';
+import '../../data/nav_assets.dart';
 import '../../models/feed_preview_item.dart';
 import '../../theme/home_feed_tokens.dart';
+import '../studio_logo.dart';
 
 typedef OnFeedPreviewTap = void Function(FeedPreviewItem item, {int imageIndex});
-
-class Studio3DotLogo extends StatelessWidget {
-  const Studio3DotLogo({super.key, this.size = 27});
-
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    final dot = size * 0.22;
-    return SizedBox(
-      width: size,
-      height: size,
-      child: Stack(
-        children: [
-          Positioned(
-            left: size * 0.38,
-            top: 0,
-            child: _Dot(diameter: dot),
-          ),
-          Positioned(
-            left: 0,
-            bottom: 0,
-            child: _Dot(diameter: dot),
-          ),
-          Positioned(
-            right: 0,
-            bottom: 0,
-            child: _Dot(diameter: dot),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Dot extends StatelessWidget {
-  const _Dot({required this.diameter});
-
-  final double diameter;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: diameter,
-      height: diameter,
-      decoration: const BoxDecoration(
-        color: HomeFeedTokens.textPrimary,
-        shape: BoxShape.circle,
-      ),
-    );
-  }
-}
 
 class FeedHomeHeader extends StatelessWidget {
   const FeedHomeHeader({
@@ -73,45 +24,96 @@ class FeedHomeHeader extends StatelessWidget {
   final VoidCallback onAddTap;
   final VoidCallback? onMoonTap;
 
+  static const _headerHeight = 52.0;
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 12, 12),
-      child: Row(
+    return SizedBox(
+      height: _headerHeight,
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          const Studio3DotLogo(),
-          Expanded(
+          Positioned(
+            left: 16,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: Image.asset(
+                StudioLogoPaths.iconBlack,
+                width: 29,
+                height: 27,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _FilterTab(
+                label: 'All',
+                active: filter == FeedAvailabilityFilter.all,
+                onTap: () => onFilterChanged(FeedAvailabilityFilter.all),
+              ),
+              const SizedBox(width: 24),
+              _FilterTab(
+                label: 'Available',
+                active: filter == FeedAvailabilityFilter.available,
+                onTap: () =>
+                    onFilterChanged(FeedAvailabilityFilter.available),
+              ),
+            ],
+          ),
+          Positioned(
+            right: 12,
+            top: 0,
+            bottom: 0,
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                _FilterTab(
-                  label: 'All',
-                  active: filter == FeedAvailabilityFilter.all,
-                  onTap: () => onFilterChanged(FeedAvailabilityFilter.all),
+                GestureDetector(
+                  onTap: onAddTap,
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: SvgPicture.asset(
+                      NavAssets.plusIcon,
+                      width: 16,
+                      height: 16,
+                    ),
+                  ),
                 ),
-                const SizedBox(width: 24),
-                _FilterTab(
-                  label: 'Available',
-                  active: filter == FeedAvailabilityFilter.available,
-                  onTap: () =>
-                      onFilterChanged(FeedAvailabilityFilter.available),
+                const SizedBox(width: 4),
+                GestureDetector(
+                  onTap: onMoonTap,
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        SvgPicture.asset(
+                          NavAssets.moonIcon,
+                          width: 19,
+                          height: 19,
+                        ),
+                        Positioned(
+                          right: -1,
+                          top: -1,
+                          child: Container(
+                            width: 4,
+                            height: 4,
+                            decoration: const BoxDecoration(
+                              color: HomeFeedTokens.textPrimary,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
-          ),
-          IconButton(
-            onPressed: onAddTap,
-            icon: const Icon(Icons.add, size: 22),
-            color: HomeFeedTokens.textPrimary,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-          ),
-          IconButton(
-            onPressed: onMoonTap,
-            icon: const Icon(Icons.dark_mode_outlined, size: 20),
-            color: HomeFeedTokens.textPrimary,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
           ),
         ],
       ),

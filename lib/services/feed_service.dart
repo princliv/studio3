@@ -12,12 +12,22 @@ class FeedService {
     return _api.extractList(json).map(FeedItem.fromJson).toList();
   }
 
-  Future<List<FeedItem>> getExplore({String? medium}) async {
-    final query = medium != null && medium.isNotEmpty && medium != 'All'
-        ? {'medium': medium.toLowerCase()}
-        : null;
-    final json = await _api.get('/api/feed/explore', query: query);
-    return _api.extractList(json).map(FeedItem.fromJson).toList();
+  Future<List<FeedItem>> getExplore({String? medium, bool videoOnly = false}) async {
+    final query = <String, String>{};
+    if (videoOnly) {
+      query['medium'] = 'video';
+    } else if (medium != null && medium.isNotEmpty && medium != 'All') {
+      query['medium'] = medium.toLowerCase();
+    }
+    final json = await _api.get(
+      '/api/feed/explore',
+      query: query.isEmpty ? null : query,
+    );
+    final items = _api.extractList(json).map(FeedItem.fromJson).toList();
+    if (videoOnly) {
+      return items.where((item) => item.isVideo).toList();
+    }
+    return items;
   }
 
   Future<List<FeedItem>> getForYou() async {
