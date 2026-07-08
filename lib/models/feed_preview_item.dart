@@ -1,4 +1,5 @@
 import '../data/home_feed_dummy.dart';
+import 'piece_summary.dart';
 
 enum FeedAspectRatio { portrait3x4, landscape16x9 }
 
@@ -32,6 +33,11 @@ class FeedPreviewItem {
     this.seriesName = '',
     this.seriesThumbs = const [],
     this.relatedScenes = const [],
+    this.priceCents,
+    this.shippingRegion,
+    this.framingNote,
+    this.provenanceNote,
+    this.heroImageUrl,
   });
 
   final String id;
@@ -49,6 +55,11 @@ class FeedPreviewItem {
   final String seriesName;
   final List<int> seriesThumbs;
   final List<RelatedScene> relatedScenes;
+  final int? priceCents;
+  final String? shippingRegion;
+  final String? framingNote;
+  final String? provenanceNote;
+  final String? heroImageUrl;
 
   int get imageCount => imageSeeds.length;
 
@@ -57,6 +68,33 @@ class FeedPreviewItem {
 
   double get aspectRatioValue =>
       aspectRatio == FeedAspectRatio.portrait3x4 ? 3 / 4 : 16 / 9;
+
+  String? get priceDisplay {
+    if (priceCents == null) return null;
+    return '\$${(priceCents! / 100).toStringAsFixed(0)}';
+  }
+
+  /// Builds a preview-shaped item from an API [PieceSummary] for collect detail.
+  factory FeedPreviewItem.fromPieceSummary(PieceSummary piece) {
+    final artistIndex = piece.id.hashCode.abs() % kHomeFeedArtists.length;
+    final username = piece.authorUsername ?? 'artist';
+    return FeedPreviewItem(
+      id: piece.id,
+      imageSeeds: [piece.id.hashCode.abs()],
+      artistIndex: artistIndex,
+      title: piece.title,
+      medium: piece.medium ?? 'Mixed media',
+      year: DateTime.now().year,
+      dimensions: piece.dimensions ?? '',
+      story: piece.caption ?? '',
+      handle: username.startsWith('@') ? username : '@$username',
+      isAvailable: piece.isForSale,
+      aspectRatio: FeedAspectRatio.portrait3x4,
+      priceCents: piece.priceCents,
+      shippingRegion: piece.shippingRegion,
+      heroImageUrl: piece.mediaUrl,
+    );
+  }
 }
 
 String feedPreviewImageUrl(FeedPreviewItem item, {int imageIndex = 0}) {

@@ -188,61 +188,55 @@ class FeedDotIndicators extends StatelessWidget {
   }
 }
 
-class FeedArtistOverlay extends StatelessWidget {
-  const FeedArtistOverlay({super.key, required this.item});
+class FeedCardArtistStrip extends StatelessWidget {
+  const FeedCardArtistStrip({
+    super.key,
+    required this.avatarUrl,
+    required this.name,
+    this.medium,
+  });
 
-  final FeedPreviewItem item;
+  final String avatarUrl;
+  final String name;
+  final String? medium;
 
   @override
   Widget build(BuildContext context) {
-    final avatarUrl = picsumAvatarUrl(item.artist.avatarSeed);
-    return Positioned(
-      left: 8,
-      right: 48,
-      bottom: 8,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          ClipOval(
-            child: Image.network(
-              avatarUrl,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        ClipOval(
+          child: Image.network(
+            avatarUrl,
+            width: HomeFeedTokens.avatarSize,
+            height: HomeFeedTokens.avatarSize,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => Container(
               width: HomeFeedTokens.avatarSize,
               height: HomeFeedTokens.avatarSize,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Container(
-                width: HomeFeedTokens.avatarSize,
-                height: HomeFeedTokens.avatarSize,
-                color: Colors.white24,
-              ),
+              color: Colors.white24,
             ),
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (item.isProcess)
-                  Text(
-                    'Process',
-                    style: GoogleFonts.inter(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w400,
-                      color: HomeFeedTokens.textInverse.withValues(alpha: 0.6),
-                    ),
-                  ),
-                Text(
-                  item.artist.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                    color: HomeFeedTokens.textInverse,
-                  ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                  color: HomeFeedTokens.textInverse,
                 ),
+              ),
+              if (medium != null && medium!.isNotEmpty)
                 Text(
-                  item.title,
+                  medium!,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.inter(
@@ -251,11 +245,64 @@ class FeedArtistOverlay extends StatelessWidget {
                     color: HomeFeedTokens.textInverse.withValues(alpha: 0.6),
                   ),
                 ),
-              ],
-            ),
+            ],
           ),
-        ],
+        ),
+      ],
+    );
+  }
+}
+
+class FeedArtistOverlay extends StatelessWidget {
+  const FeedArtistOverlay({super.key, required this.item});
+
+  final FeedPreviewItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      left: 8,
+      right: 48,
+      bottom: 8,
+      child: FeedCardArtistStrip(
+        avatarUrl: picsumAvatarUrl(item.artist.avatarSeed),
+        name: item.artist.name,
+        medium: item.medium,
       ),
+    );
+  }
+}
+
+/// Bottom scrim + artist strip for API grid cards.
+class FeedApiCardOverlay extends StatelessWidget {
+  const FeedApiCardOverlay({
+    super.key,
+    required this.avatarUrl,
+    required this.name,
+    this.medium,
+  });
+
+  final String avatarUrl;
+  final String name;
+  final String? medium;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const FeedCardBottomScrim(),
+        Positioned(
+          left: 8,
+          right: 8,
+          bottom: 8,
+          child: FeedCardArtistStrip(
+            avatarUrl: avatarUrl,
+            name: name,
+            medium: medium,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -301,8 +348,8 @@ class FeedPicsumImage extends StatelessWidget {
   }
 }
 
-class _CardBottomScrim extends StatelessWidget {
-  const _CardBottomScrim();
+class FeedCardBottomScrim extends StatelessWidget {
+  const FeedCardBottomScrim({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -406,7 +453,7 @@ class _FeedItemCardState extends State<FeedItemCard> {
                       );
                     },
                   ),
-                  const _CardBottomScrim(),
+                  const FeedCardBottomScrim(),
                   FeedArtistOverlay(item: item),
                   if (n > 1)
                     Positioned(

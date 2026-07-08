@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 
+import '../data/home_feed_dummy.dart';
 import '../models/feed_item.dart';
+import '../models/feed_pop_result.dart';
 import '../models/feed_preview_item.dart';
 import '../theme/home_feed_tokens.dart';
 import '../utils/feed_layout_generator.dart';
+import '../utils/slide_up_page_route.dart';
 import '../widgets/home_feed/home_feed_widgets.dart';
 import '../widgets/studio_loading.dart';
 import '../services/feed_service.dart';
+import 'available_piece_detail_page.dart';
 import 'artwork_detail_page.dart';
 import 'piece_detail_page.dart';
 
@@ -32,6 +36,7 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
   bool _loadingMore = false;
   bool _useApi = false;
   bool _refreshingApi = false;
+  bool _didJumpForAdvance = false;
 
   List<FeedPreviewItem> get _visiblePreviewItems {
     if (_filter == FeedAvailabilityFilter.all) return _previewItems;
@@ -108,18 +113,123 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
     }
   }
 
-  void _openPreviewDetail(FeedPreviewItem item, {int imageIndex = 0}) {
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (context) => PieceDetailPage(
-          item: item,
-          initialImageIndex: imageIndex,
-        ),
-      ),
+  double _cardWidth(BuildContext context) {
+    return MediaQuery.sizeOf(context).width -
+        2 * HomeFeedTokens.sideMargin;
+  }
+
+  double _cardHeight(FeedPreviewItem item, BuildContext context) {
+    return _cardWidth(context) / item.aspectRatioValue;
+  }
+
+  double _offsetForIndex(int index, BuildContext context) {
+    final visible = _visiblePreviewItems;
+    var offset = 0.0;
+    for (var i = 0; i < index && i < visible.length; i++) {
+      offset += _cardHeight(visible[i], context) + HomeFeedTokens.rowGap;
+    }
+    return offset;
+  }
+
+  void _jumpToFeedIndex(int index) {
+    if (!_scrollController.hasClients) return;
+
+    final visible = _visiblePreviewItems;
+    if (visible.isEmpty) return;
+
+    final targetIndex = index.clamp(0, visible.length - 1);
+    final offset = _offsetForIndex(targetIndex, context);
+    final maxExtent = _scrollController.position.maxScrollExtent;
+    _scrollController.jumpTo(offset.clamp(0.0, maxExtent));
+    _didJumpForAdvance = true;
+  }
+
+  Future<void> _scrollToFeedIndex(int index) async {
+    if (!_scrollController.hasClients) return;
+
+    final visible = _visiblePreviewItems;
+    if (visible.isEmpty) return;
+
+    var targetIndex = index;
+    if (targetIndex >= visible.length) {
+      if (targetIndex >= visible.length && !_loadingMore) {
+        _loadMore();
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        if (!mounted) return;
+        final updated = _visiblePreviewItems;
+        if (targetIndex >= updated.length) {
+          targetIndex = updated.length - 1;
+        }
+      } else {
+        targetIndex = visible.length - 1;
+      }
+    }
+
+    if (targetIndex < 0) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      final offset = _offsetForIndex(targetIndex, context);
+      final maxExtent = _scrollController.position.maxScrollExtent;
+      _scrollController.animateTo(
+        offset.clamp(0.0, maxExtent),
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  bool _isCollectible(FeedPreviewItem item) => item.isAvailable;
+
+  Future<void> _openPreviewDetail(
+    FeedPreviewItem item, {
+    int imageIndex = 0,
+  }) async {
+    final visible = _visiblePreviewItems;
+    final index = visible.indexWhere((i) => i.id == item.id);
+    final tappedIndex = index >= 0 ? index : 0;
+    _didJumpForAdvance = false;
+
+    final page = _isCollectible(item)
+        ? AvailablePieceDetailPage(
+            item: item,
+            initialImageIndex: imageIndex,
+            tappedIndex: tappedIndex,
+            filter: _filter,
+            onWillAdvance: _jumpToFeedIndex,
+          )
+        : PieceDetailPage(
+            item: item,
+            initialImageIndex: imageIndex,
+            tappedIndex: tappedIndex,
+            filter: _filter,
+            onWillAdvance: _jumpToFeedIndex,
+          );
+
+    final result = await Navigator.of(context).push<FeedPopResult>(
+      SlideUpPageRoute<FeedPopResult>(page: page),
     );
+
+    if (!mounted || result == null) return;
+    if (result.filter != _filter) return;
+    if (_didJumpForAdvance) return;
+    await _scrollToFeedIndex(result.nextIndex);
   }
 
   void _openApiItem(FeedItem item) {
+    if (item.type == FeedItemType.piece &&
+        item.isForSale &&
+        item.piece != null) {
+      Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (context) => AvailablePieceDetailPage(
+            item: FeedPreviewItem.fromPieceSummary(item.piece!),
+          ),
+        ),
+      );
+      return;
+    }
+
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (context) => ArtworkDetailPage(
@@ -220,28 +330,11 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
                     )
                   else
                     ColoredBox(color: Colors.grey.shade300),
-                  if (item.isForSale && item.priceDisplay != null)
-                    Positioned(
-                      left: 8,
-                      bottom: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.65),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          item.priceDisplay!,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
+                  if (item.type == FeedItemType.piece)
+                    FeedApiCardOverlay(
+                      avatarUrl: picsumAvatarUrl(item.id.hashCode),
+                      name: item.authorName ?? 'Artist',
+                      medium: item.piece?.medium,
                     ),
                 ],
               ),

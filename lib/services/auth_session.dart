@@ -85,6 +85,8 @@ class AuthSession {
       sellerEnabled: json['sellerEnabled'] as bool? ??
           json['isSeller'] as bool? ??
           current.sellerEnabled,
+      profilePhotoUrl:
+          json['profilePhotoUrl'] as String? ?? current.profilePhotoUrl,
     );
     await updateUser(merged);
   }

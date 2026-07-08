@@ -160,6 +160,7 @@ class UserService {
       onboardingComplete: profile.onboardingComplete,
       role: profile.role,
       sellerEnabled: profile.sellerEnabled,
+      profilePhotoUrl: profile.profilePhotoUrl,
     ));
     await _session.setSellerEnabled(profile.sellerEnabled);
   }

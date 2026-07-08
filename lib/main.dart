@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'services/auth_session.dart';
+import 'services/user_service.dart';
 import 'utils/app_routes.dart';
 import 'theme/app_theme.dart';
 import 'widgets/bottom_nav.dart' show BottomNav, BottomNavIndex;
@@ -127,8 +128,42 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _selectedNavIndex = BottomNavIndex.home;
 
+  @override
+  void initState() {
+    super.initState();
+    AuthSession.instance.addListener(_onSessionChanged);
+    _loadProfilePhoto();
+  }
+
+  @override
+  void dispose() {
+    AuthSession.instance.removeListener(_onSessionChanged);
+    super.dispose();
+  }
+
+  void _onSessionChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _loadProfilePhoto() async {
+    try {
+      await UserService.instance.getMe();
+    } catch (_) {
+      // Keep placeholder avatar when profile cannot be loaded.
+    }
+  }
+
   void _onNavTap(int navIndex) {
     setState(() => _selectedNavIndex = navIndex);
+    if (navIndex == BottomNavIndex.profile) {
+      _loadProfilePhoto();
+    }
+  }
+
+  ImageProvider? get _navAvatar {
+    final url = AuthSession.instance.user?.profilePhotoUrl;
+    if (url == null || url.isEmpty) return null;
+    return NetworkImage(url);
   }
 
   Widget _buildScreen() {
@@ -163,6 +198,7 @@ class _MainShellState extends State<MainShell> {
           BottomNav(
             selectedNavIndex: _selectedNavIndex,
             onNavTap: _onNavTap,
+            avatar: _navAvatar,
           ),
         ],
       ),

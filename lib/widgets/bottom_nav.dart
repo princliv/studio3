@@ -11,8 +11,8 @@ abstract final class BottomNavIndex {
   static const int profile = 4;
 }
 
-const Color _kNavGlassFill = Color(0xB31A1A1A);
-const Color _kNavGlassBorder = Color(0x33FFFFFF);
+const Color _kNavGlassFill = Color(0x401A1A1A);
+const Color _kNavGlassBorder = Color(0x26FFFFFF);
 
 const double _kPillWidth = 255;
 const double _kPillHeight = 46;
@@ -83,7 +83,7 @@ class _GlassSurface extends StatelessWidget {
     return ClipRRect(
       borderRadius: borderRadius,
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
         child: Container(
           decoration: BoxDecoration(
             color: _kNavGlassFill,

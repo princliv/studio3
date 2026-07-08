@@ -22,7 +22,6 @@ class FeedLayoutGenerator {
     final dimIndex = _random.nextInt(kFeedDimensions.length);
     final seriesIndex = _random.nextInt(kFeedSeriesNames.length);
     final isPortrait = _random.nextBool();
-    final isProcess = !isPortrait && _random.nextDouble() < 0.3;
     final n = 1 + _random.nextInt(4);
     final seeds = List<int>.generate(n, (_) => _nextImageSeed());
     final seriesCount = 3 + _random.nextInt(3);
@@ -39,6 +38,27 @@ class FeedLayoutGenerator {
       );
     });
 
+    final isAvailable = _random.nextBool();
+    final priceCents = isAvailable
+        ? (80000 + _random.nextInt(1120000))
+        : null;
+    const shippingRegions = [
+      'Ships from Dallas, TX',
+      'Ships from Brooklyn, NY',
+      'Ships from Los Angeles, CA',
+      'Ships from Chicago, IL',
+    ];
+    final framingNotes = [
+      'Floated in natural wood frame',
+      'Gallery wrapped, ready to hang',
+      'Unframed on stretched canvas',
+    ];
+    final provenanceNotes = [
+      'Acquired directly from the artist',
+      'Exhibited at Studio 3 Discover 2024',
+      'From a private collection in Austin, TX',
+    ];
+
     return FeedPreviewItem(
       id: 'feed_${_idCounter++}',
       imageSeeds: seeds,
@@ -49,11 +69,20 @@ class FeedLayoutGenerator {
       dimensions: kFeedDimensions[dimIndex],
       story: kFeedStories[storyIndex],
       handle: artistHandle(artist),
-      isAvailable: _random.nextBool(),
+      isAvailable: isAvailable,
+      priceCents: priceCents,
+      shippingRegion: isAvailable
+          ? shippingRegions[_random.nextInt(shippingRegions.length)]
+          : null,
+      framingNote: isAvailable
+          ? framingNotes[_random.nextInt(framingNotes.length)]
+          : null,
+      provenanceNote: isAvailable
+          ? provenanceNotes[_random.nextInt(provenanceNotes.length)]
+          : null,
       aspectRatio: isPortrait
           ? FeedAspectRatio.portrait3x4
           : FeedAspectRatio.landscape16x9,
-      isProcess: isProcess,
       seriesName: kFeedSeriesNames[seriesIndex],
       seriesThumbs: seriesThumbs,
       relatedScenes: relatedScenes,

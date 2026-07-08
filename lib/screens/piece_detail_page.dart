@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/feed_preview_item.dart';
 import '../theme/home_feed_tokens.dart';
 import '../widgets/home_feed/home_feed_widgets.dart';
+import '../widgets/piece_detail/detail_scroll_handoff.dart';
 import '../widgets/piece_detail/piece_action_bar.dart';
 import '../widgets/piece_detail/piece_artist_row.dart';
 import '../widgets/piece_detail/piece_related_scenes_row.dart';
@@ -14,10 +15,16 @@ class PieceDetailPage extends StatefulWidget {
     super.key,
     required this.item,
     this.initialImageIndex = 0,
+    this.tappedIndex = 0,
+    this.filter = FeedAvailabilityFilter.all,
+    this.onWillAdvance,
   });
 
   final FeedPreviewItem item;
   final int initialImageIndex;
+  final int tappedIndex;
+  final FeedAvailabilityFilter filter;
+  final void Function(int nextIndex)? onWillAdvance;
 
   @override
   State<PieceDetailPage> createState() => _PieceDetailPageState();
@@ -32,11 +39,13 @@ class _PieceDetailPageState extends State<PieceDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
-
     return Scaffold(
       backgroundColor: HomeFeedTokens.detailBackground,
-      body: CustomScrollView(
+      body: DetailScrollHandoff(
+        tappedIndex: widget.tappedIndex,
+        filter: widget.filter,
+        onWillAdvance: widget.onWillAdvance,
+        bottomInset: MediaQuery.paddingOf(context).bottom,
         slivers: [
           SliverToBoxAdapter(
             child: Stack(
@@ -161,19 +170,6 @@ class _PieceDetailPageState extends State<PieceDetailPage> {
                 const Divider(height: 1, color: Color(0xFFE8E5DF)),
                 const SizedBox(height: 16),
                 PieceRelatedScenesRow(scenes: item.relatedScenes),
-                const SizedBox(height: 24),
-                const Divider(height: 1, color: Color(0xFFE8E5DF)),
-                const SizedBox(height: 16),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: HomeFeedTokens.sideMargin,
-                  ),
-                  child: FeedItemCard(
-                    item: item,
-                    onTap: (_, {imageIndex = 0}) {},
-                  ),
-                ),
-                SizedBox(height: bottomInset + 24),
               ],
             ),
           ),

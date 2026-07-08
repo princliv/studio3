@@ -7,6 +7,7 @@ class AuthUser {
     this.onboardingComplete = false,
     this.role,
     this.sellerEnabled = false,
+    this.profilePhotoUrl,
   });
 
   final String username;
@@ -16,6 +17,7 @@ class AuthUser {
   final bool onboardingComplete;
   final String? role;
   final bool sellerEnabled;
+  final String? profilePhotoUrl;
 
   AuthUser copyWith({
     String? username,
@@ -25,6 +27,7 @@ class AuthUser {
     bool? onboardingComplete,
     String? role,
     bool? sellerEnabled,
+    String? profilePhotoUrl,
   }) {
     return AuthUser(
       username: username ?? this.username,
@@ -34,6 +37,7 @@ class AuthUser {
       onboardingComplete: onboardingComplete ?? this.onboardingComplete,
       role: role ?? this.role,
       sellerEnabled: sellerEnabled ?? this.sellerEnabled,
+      profilePhotoUrl: profilePhotoUrl ?? this.profilePhotoUrl,
     );
   }
 
@@ -48,6 +52,7 @@ class AuthUser {
       sellerEnabled: json['sellerEnabled'] as bool? ??
           json['isSeller'] as bool? ??
           false,
+      profilePhotoUrl: json['profilePhotoUrl'] as String?,
     );
   }
 
@@ -59,6 +64,7 @@ class AuthUser {
         'onboardingComplete': onboardingComplete,
         'role': role,
         'sellerEnabled': sellerEnabled,
+        'profilePhotoUrl': profilePhotoUrl,
       };
 }
 
