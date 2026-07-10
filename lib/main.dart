@@ -12,6 +12,7 @@ import 'screens/welcome_page.dart';
 import 'screens/profile_settings_page.dart';
 import 'screens/home_feed_page.dart';
 import 'screens/discover_page.dart';
+import 'screens/explore_page.dart';
 import 'screens/chat_page.dart';
 import 'screens/profile_page.dart';
 import 'screens/post_page.dart';
@@ -171,10 +172,7 @@ class _MainShellState extends State<MainShell> {
       case BottomNavIndex.home:
         return HomeFeedPage(onThemeToggle: widget.onThemeToggle);
       case BottomNavIndex.discover:
-        return const DiscoverPage(
-          key: ValueKey('discover'),
-          reelsOnly: false,
-        );
+        return const ExplorePage(key: ValueKey('explore'));
       case BottomNavIndex.reels:
         return const DiscoverPage(
           key: ValueKey('reels'),

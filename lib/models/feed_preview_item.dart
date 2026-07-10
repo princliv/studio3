@@ -1,4 +1,5 @@
 import '../data/home_feed_dummy.dart';
+import 'feed_item.dart';
 import 'piece_summary.dart';
 
 enum FeedAspectRatio { portrait3x4, landscape16x9 }
@@ -89,12 +90,55 @@ class FeedPreviewItem {
       story: piece.caption ?? '',
       handle: username.startsWith('@') ? username : '@$username',
       isAvailable: piece.isForSale,
-      aspectRatio: FeedAspectRatio.portrait3x4,
+      aspectRatio: aspectRatioFromDimensions(piece.dimensions),
       priceCents: piece.priceCents,
       shippingRegion: piece.shippingRegion,
       heroImageUrl: piece.mediaUrl,
     );
   }
+
+  /// Builds a preview item from an explore/home API [FeedItem].
+  factory FeedPreviewItem.fromFeedItem(FeedItem item) {
+    if (item.type == FeedItemType.piece && item.piece != null) {
+      return FeedPreviewItem.fromPieceSummary(item.piece!);
+    }
+
+    final post = item.post!;
+    final artistIndex = post.id.hashCode.abs() % kHomeFeedArtists.length;
+    final username = post.authorUsername ?? 'artist';
+    final isVideo = item.isVideo;
+    return FeedPreviewItem(
+      id: post.id,
+      imageSeeds: [post.id.hashCode.abs()],
+      artistIndex: artistIndex,
+      title: post.caption ?? 'Scene',
+      medium: isVideo ? 'Video' : 'Scene',
+      year: DateTime.now().year,
+      dimensions: '',
+      story: post.caption ?? '',
+      handle: username.startsWith('@') ? username : '@$username',
+      isAvailable: false,
+      aspectRatio: isVideo
+          ? FeedAspectRatio.landscape16x9
+          : FeedAspectRatio.portrait3x4,
+      heroImageUrl: post.mediaUrl,
+    );
+  }
+}
+
+FeedAspectRatio aspectRatioFromDimensions(String? dimensions) {
+  if (dimensions == null || dimensions.isEmpty) {
+    return FeedAspectRatio.portrait3x4;
+  }
+  final match = RegExp(r'(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)')
+      .firstMatch(dimensions);
+  if (match == null) return FeedAspectRatio.portrait3x4;
+  final w = double.tryParse(match.group(1)!);
+  final h = double.tryParse(match.group(2)!);
+  if (w == null || h == null || h == 0) return FeedAspectRatio.portrait3x4;
+  return w / h > 1.2
+      ? FeedAspectRatio.landscape16x9
+      : FeedAspectRatio.portrait3x4;
 }
 
 String feedPreviewImageUrl(FeedPreviewItem item, {int imageIndex = 0}) {
