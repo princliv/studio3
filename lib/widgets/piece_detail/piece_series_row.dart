@@ -9,15 +9,19 @@ class PieceSeriesRow extends StatelessWidget {
   const PieceSeriesRow({
     super.key,
     required this.seriesName,
-    required this.thumbSeeds,
+    this.thumbSeeds = const [],
+    this.thumbUrls = const [],
   });
 
   final String seriesName;
   final List<int> thumbSeeds;
+  final List<String> thumbUrls;
 
   @override
   Widget build(BuildContext context) {
-    if (seriesName.isEmpty || thumbSeeds.isEmpty) {
+    final urls = thumbUrls.where((url) => url.isNotEmpty).toList();
+    final count = urls.isNotEmpty ? urls.length : thumbSeeds.length;
+    if (seriesName.isEmpty || count == 0) {
       return const SizedBox.shrink();
     }
 
@@ -27,7 +31,7 @@ class PieceSeriesRow extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
           child: Text(
-            '$seriesName · ${thumbSeeds.length}',
+            '$seriesName · $count',
             style: GoogleFonts.inter(
               fontSize: 14,
               fontWeight: FontWeight.w400,
@@ -40,17 +44,27 @@ class PieceSeriesRow extends StatelessWidget {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 19),
-            itemCount: thumbSeeds.length,
+            itemCount: count,
             separatorBuilder: (context, index) => const SizedBox(width: 8),
             itemBuilder: (context, index) {
+              final url = urls.isNotEmpty ? urls[index] : null;
               return ClipRRect(
                 borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
                 child: SizedBox(
                   width: 118,
                   height: 118,
-                  child: FeedPicsumImage(
-                    url: picsumUrl(thumbSeeds[index], 118, 118),
-                  ),
+                  child: url != null
+                      ? Image.network(
+                          url,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              FeedPicsumImage(
+                            url: picsumUrl(thumbSeeds[index], 118, 118),
+                          ),
+                        )
+                      : FeedPicsumImage(
+                          url: picsumUrl(thumbSeeds[index], 118, 118),
+                        ),
                 ),
               );
             },

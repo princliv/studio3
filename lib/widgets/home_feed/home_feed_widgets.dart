@@ -6,6 +6,7 @@ import '../../data/home_feed_dummy.dart';
 import '../../data/nav_assets.dart';
 import '../../models/feed_preview_item.dart';
 import '../../theme/home_feed_tokens.dart';
+import '../../utils/profile_navigation.dart';
 import '../studio_logo.dart';
 
 typedef OnFeedPreviewTap = void Function(FeedPreviewItem item, {int imageIndex});
@@ -195,27 +196,41 @@ class FeedCardArtistStrip extends StatelessWidget {
     required this.avatarUrl,
     required this.name,
     this.medium,
+    this.authorUsername,
   });
 
   final String avatarUrl;
   final String name;
   final String? medium;
+  final String? authorUsername;
+
+  void _onAvatarTap(BuildContext context) {
+    openUserProfile(context, authorUsername);
+  }
 
   @override
   Widget build(BuildContext context) {
+    final canNavigate =
+        authorUsername != null && authorUsername!.trim().isNotEmpty;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        ClipOval(
-          child: Image.network(
-            avatarUrl,
-            width: HomeFeedTokens.avatarSize,
-            height: HomeFeedTokens.avatarSize,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) => Container(
+        GestureDetector(
+          onTap: canNavigate ? () => _onAvatarTap(context) : null,
+          behavior:
+              canNavigate ? HitTestBehavior.opaque : HitTestBehavior.deferToChild,
+          child: ClipOval(
+            child: Image.network(
+              avatarUrl,
               width: HomeFeedTokens.avatarSize,
               height: HomeFeedTokens.avatarSize,
-              color: Colors.white24,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(
+                width: HomeFeedTokens.avatarSize,
+                height: HomeFeedTokens.avatarSize,
+                color: Colors.white24,
+              ),
             ),
           ),
         ),
@@ -269,6 +284,7 @@ class FeedArtistOverlay extends StatelessWidget {
         avatarUrl: picsumAvatarUrl(item.artist.avatarSeed),
         name: item.artist.name,
         medium: item.medium,
+        authorUsername: item.handle,
       ),
     );
   }
@@ -281,11 +297,13 @@ class FeedApiCardOverlay extends StatelessWidget {
     required this.avatarUrl,
     required this.name,
     this.medium,
+    this.authorUsername,
   });
 
   final String avatarUrl;
   final String name;
   final String? medium;
+  final String? authorUsername;
 
   @override
   Widget build(BuildContext context) {
@@ -301,6 +319,7 @@ class FeedApiCardOverlay extends StatelessWidget {
             avatarUrl: avatarUrl,
             name: name,
             medium: medium,
+            authorUsername: authorUsername,
           ),
         ),
       ],

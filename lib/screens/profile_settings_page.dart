@@ -6,6 +6,7 @@ import '../services/auth_session.dart';
 import '../models/user_profile.dart';
 import '../services/user_service.dart';
 import '../theme/home_feed_tokens.dart';
+import '../utils/profile_navigation.dart';
 import '../widgets/studio_loading.dart';
 import 'profile/widgets/profile_seller_insights.dart';
 import 'seller_analytics_page.dart';
@@ -123,9 +124,23 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
           ],
           const SizedBox(height: 8),
           _SettingsTile(
+            icon: Icons.collections_bookmark_outlined,
+            label: 'Manage series',
+            onTap: () async {
+              await Navigator.pushNamed(context, '/manage-series');
+              if (!context.mounted) return;
+              // Parent profile reloads when settings is popped; no extra action here.
+            },
+          ),
+          _SettingsTile(
             icon: Icons.person_outline_rounded,
             label: 'Edit profile',
             onTap: () => Navigator.pushNamed(context, '/edit-profile'),
+          ),
+          _SettingsTile(
+            icon: Icons.visibility_outlined,
+            label: 'See profile as viewer',
+            onTap: () => openOwnProfileAsViewer(context),
           ),
           _SettingsTile(
             icon: Icons.lock_outline_rounded,

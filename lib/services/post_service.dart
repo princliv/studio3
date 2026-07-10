@@ -1,5 +1,6 @@
 import '../models/post_summary.dart';
 import 'api_client.dart';
+import 'auth_session.dart';
 
 class PostService {
   PostService._();
@@ -13,8 +14,11 @@ class PostService {
     return PostSummary.fromJson(data);
   }
 
-  Future<PostSummary> getById(String id) async {
-    final json = await _api.get('/api/posts/$id');
+  Future<PostSummary> getById(String id, {bool? auth}) async {
+    final json = await _api.get(
+      '/api/posts/$id',
+      auth: auth ?? AuthSession.instance.isLoggedIn,
+    );
     final data = _api.extractData(json) as Map<String, dynamic>;
     return PostSummary.fromJson(data);
   }

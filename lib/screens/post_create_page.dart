@@ -17,6 +17,7 @@ import '../utils/image_adjust_math.dart';
 import '../widgets/choose_location_sheet.dart';
 import '../widgets/create_flow/create_flow_widgets.dart';
 import '../widgets/create_flow/listing_details_form.dart';
+import '../widgets/create_flow/series_picker_sheet.dart';
 import '../widgets/post_create_option_sheet.dart';
 import '../widgets/seller_mode_required_dialog.dart';
 import 'add_materials_page.dart';
@@ -64,6 +65,9 @@ class _PostCreatePageState extends State<PostCreatePage> {
   String? _selectedMediumId;
   final Set<String> _selectedStyleIds = {};
   final List<PostMaterialOption> _selectedMaterials = [];
+  String? _selectedSeriesId;
+  String? _newSeriesName;
+  String? _seriesLabel;
 
   bool get _isPiece => widget.postType == 'piece';
 
@@ -195,6 +199,26 @@ class _PostCreatePageState extends State<PostCreatePage> {
     }
   }
 
+  Future<void> _openSeriesPicker() async {
+    final result = await SeriesPickerSheet.show(
+      context,
+      selectedSeriesId: _selectedSeriesId,
+      newSeriesName: _newSeriesName,
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      if (!result.hasSelection) {
+        _selectedSeriesId = null;
+        _newSeriesName = null;
+        _seriesLabel = null;
+      } else {
+        _selectedSeriesId = result.selectedSeriesId;
+        _newSeriesName = result.newSeriesName;
+        _seriesLabel = result.displayLabel;
+      }
+    });
+  }
+
   String get _title =>
       widget.postType == 'scene' ? 'Create scene' : 'Create piece';
 
@@ -216,6 +240,8 @@ class _PostCreatePageState extends State<PostCreatePage> {
       locations: List<PostLocationOption>.from(_selectedLocations),
       materials: List<PostMaterialOption>.from(_selectedMaterials),
       listingDetails: listingDetails,
+      selectedSeriesId: _selectedSeriesId,
+      newSeriesName: _newSeriesName,
     );
   }
 
@@ -370,13 +396,16 @@ class _PostCreatePageState extends State<PostCreatePage> {
                         : _selectedMaterials.length,
                     onTap: _openMaterialsPage,
                   ),
-                  CreateFlowMetadataRow(
-                    iconAsset: PostMediaAssets.createSeriesIcon,
-                    iconWidth: 13,
-                    iconHeight: 13,
-                    label: 'Series',
-                    onTap: () {},
-                  ),
+                  if (_isPiece) ...[
+                    CreateFlowMetadataRow(
+                      iconAsset: PostMediaAssets.createSeriesIcon,
+                      iconWidth: 13,
+                      iconHeight: 13,
+                      label: 'Series',
+                      trailing: _seriesLabel,
+                      onTap: _openSeriesPicker,
+                    ),
+                  ],
                   CreateFlowMetadataRow(
                     iconAsset: PostMediaAssets.createScenesIcon,
                     iconWidth: 12,

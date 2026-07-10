@@ -1,16 +1,16 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../services/api_exception.dart';
 import '../services/auth_service.dart';
 import '../services/auth_session.dart';
-import '../services/media_service.dart';
 import '../services/user_service.dart';
 import '../theme/home_feed_tokens.dart';
+import '../utils/profile_photo_upload.dart';
+import '../widgets/profile_avatar.dart';
+import '../widgets/profile_cover_image.dart';
 import '../widgets/studio_loading.dart';
 
 class EditProfilePage extends StatefulWidget {
@@ -25,7 +25,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final _bioController = TextEditingController();
   final _locationController = TextEditingController();
   final _usernameController = TextEditingController();
-  final _picker = ImagePicker();
 
   bool _loading = true;
   bool _saving = false;
@@ -88,15 +87,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
     });
   }
 
-  Future<String?> _uploadPhoto(String purpose) async {
-    final picked = await _picker.pickImage(source: ImageSource.gallery);
-    if (picked == null) return null;
-    final bytes = await File(picked.path).readAsBytes();
-    return MediaService.instance.uploadBytes(
-      purpose: purpose,
-      bytes: bytes,
-      contentType: 'image/jpeg',
-    );
+  Future<String?> _uploadPhoto(String purpose) {
+    return pickAndUploadPhoto(context, purpose);
   }
 
   Future<void> _save() async {
@@ -163,34 +155,54 @@ class _EditProfilePageState extends State<EditProfilePage> {
         body: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-                Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () async {
-                        final url = await _uploadPhoto('profile');
-                        if (url != null) setState(() => _profilePhotoUrl = url);
-                      },
-                      child: CircleAvatar(
-                        radius: 36,
-                        backgroundImage: _profilePhotoUrl != null
-                            ? NetworkImage(_profilePhotoUrl!)
-                            : null,
-                        child: _profilePhotoUrl == null
-                            ? const Icon(Icons.person)
-                            : null,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    OutlinedButton(
-                      onPressed: () async {
-                        final url = await _uploadPhoto('cover');
-                        if (url != null) setState(() => _coverPhotoUrl = url);
-                      },
-                      child: const Text('Change cover'),
-                    ),
-                  ],
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: ProfileCoverImage(
+                url: _coverPhotoUrl,
+                width: MediaQuery.sizeOf(context).width - 40,
+                height: 120,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: OutlinedButton(
+                onPressed: () async {
+                  final url = await _uploadPhoto('cover');
+                  if (url != null) setState(() => _coverPhotoUrl = url);
+                },
+                child: const Text('Change cover'),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                GestureDetector(
+                  onTap: () async {
+                    final url = await _uploadPhoto('profile');
+                    if (url != null) setState(() => _profilePhotoUrl = url);
+                  },
+                  child: ProfileAvatar(
+                    url: _profilePhotoUrl,
+                    seed: 902,
+                    size: 72,
+                  ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    _profilePhotoUrl == null
+                        ? 'Tap photo to add profile picture'
+                        : 'Tap photo to change',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      color: HomeFeedTokens.textPrimary.withValues(alpha: 0.65),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
                 _Field(label: 'Name', controller: _nameController),
                 const SizedBox(height: 16),
                 _Field(

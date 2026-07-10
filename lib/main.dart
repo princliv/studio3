@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'services/auth_session.dart';
 import 'services/user_service.dart';
 import 'utils/app_routes.dart';
+import 'utils/profile_navigation.dart';
 import 'theme/app_theme.dart';
 import 'widgets/bottom_nav.dart' show BottomNav, BottomNavIndex;
 import 'screens/login_page.dart';
@@ -20,6 +21,7 @@ import 'screens/post_page.dart';
 import 'screens/notifications_page.dart';
 import 'screens/onboarding/onboarding_page.dart';
 import 'screens/edit_profile_page.dart';
+import 'screens/manage_series_page.dart';
 import 'models/auth_user.dart';
 import 'theme/home_feed_tokens.dart';
 
@@ -75,7 +77,18 @@ class _Studio3AppState extends State<Studio3App> {
           );
         },
         '/profile-settings': (context) => const ProfileSettingsPage(),
+        '/manage-series': (context) => const ManageSeriesPage(),
         '/edit-profile': (context) => const EditProfilePage(),
+        '/profile': (context) {
+          final args = parseProfileRouteArgs(
+            ModalRoute.of(context)?.settings.arguments,
+          );
+          if (args == null) return const ProfilePage();
+          return ProfilePage(
+            username: args.username,
+            viewerMode: args.viewerMode,
+          );
+        },
         '/post': (context) => const PostPage(),
         '/notifications': (context) => const NotificationsPage(),
       },

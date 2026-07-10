@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../models/feed_preview_item.dart';
 import '../theme/home_feed_tokens.dart';
+import '../utils/content_detail_loader.dart';
 import '../widgets/piece_detail/detail_hero_image.dart';
 import '../widgets/piece_detail/detail_save_state.dart';
 import '../widgets/piece_detail/detail_scroll_handoff.dart';
@@ -32,14 +33,34 @@ class PieceDetailPage extends StatefulWidget {
   State<PieceDetailPage> createState() => _PieceDetailPageState();
 }
 
-class _PieceDetailPageState extends State<PieceDetailPage> with DetailSaveState {
-  bool _liked = false;
+class _PieceDetailPageState extends State<PieceDetailPage>
+    with DetailSaveState, DetailLikeState {
+  late FeedPreviewItem _item;
   bool _following = false;
 
   @override
-  FeedPreviewItem get saveItem => widget.item;
+  FeedPreviewItem get saveItem => _item;
 
-  FeedPreviewItem get item => widget.item;
+  @override
+  FeedPreviewItem get likeItem => _item;
+
+  FeedPreviewItem get item => _item;
+
+  @override
+  void initState() {
+    _item = widget.item;
+    super.initState();
+    liked = _item.isLiked;
+    _loadDetail();
+  }
+
+  Future<void> _loadDetail() async {
+    final loaded = await ContentDetailLoader.loadPiece(_item);
+    if (!mounted) return;
+    setState(() => _item = loaded);
+    applySaveItem(loaded);
+    applyLikeItem(loaded);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -82,9 +103,9 @@ class _PieceDetailPageState extends State<PieceDetailPage> with DetailSaveState 
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 PieceActionBar(
-                  liked: _liked,
+                  liked: liked,
                   saved: saved,
-                  onLike: () => setState(() => _liked = !_liked),
+                  onLike: toggleLike,
                   onComment: () {},
                   onShare: () => shareFeedPreviewItem(
                     context,
@@ -171,6 +192,7 @@ class _PieceDetailPageState extends State<PieceDetailPage> with DetailSaveState 
                 PieceSeriesRow(
                   seriesName: item.seriesName,
                   thumbSeeds: item.seriesThumbs,
+                  thumbUrls: item.seriesThumbUrls,
                 ),
                 const SizedBox(height: 24),
                 const Divider(height: 1, color: Color(0xFFE8E5DF)),

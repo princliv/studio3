@@ -2,23 +2,32 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'api_client.dart';
+import 'api_exception.dart';
+
+/// Presign `purpose` values — see docs/api/flows/media.md.
+abstract final class MediaPurpose {
+  static const profile = 'profile';
+  static const cover = 'cover';
+  static const piece = 'piece';
+  static const post = 'post';
+}
 
 class PresignResult {
   const PresignResult({
-    required this.presignedPutUrl,
+    this.presignedPutUrl,
     required this.url,
     required this.key,
     this.devMode = false,
   });
 
-  final String presignedPutUrl;
+  final String? presignedPutUrl;
   final String url;
   final String key;
   final bool devMode;
 
   factory PresignResult.fromJson(Map<String, dynamic> json) {
     return PresignResult(
-      presignedPutUrl: json['presignedPutUrl'] as String? ?? '',
+      presignedPutUrl: json['presignedPutUrl'] as String?,
       url: json['url'] as String? ?? '',
       key: json['key'] as String? ?? '',
       devMode: json['devMode'] as bool? ?? false,
@@ -30,7 +39,37 @@ class MediaService {
   MediaService._();
   static final MediaService instance = MediaService._();
 
+  static const int maxImageBytes = 20 * 1024 * 1024;
+  static const int maxVideoBytes = 100 * 1024 * 1024;
+
   final _api = ApiClient.instance;
+
+  static String contentTypeForPath(String path) {
+    final ext = path.split('.').last.toLowerCase();
+    return switch (ext) {
+      'jpg' || 'jpeg' => 'image/jpeg',
+      'png' => 'image/png',
+      'webp' => 'image/webp',
+      'mp4' || 'm4v' => 'video/mp4',
+      _ => 'image/jpeg',
+    };
+  }
+
+  static bool isVideoContentType(String contentType) =>
+      contentType.startsWith('video/');
+
+  static void _validateSize(int byteLength, String contentType) {
+    final isVideo = isVideoContentType(contentType);
+    final maxBytes = isVideo ? maxVideoBytes : maxImageBytes;
+    if (byteLength > maxBytes) {
+      final maxMb = maxBytes ~/ (1024 * 1024);
+      throw ApiException(
+        isVideo
+            ? 'Video must be ${maxMb}MB or smaller'
+            : 'Image must be ${maxMb}MB or smaller',
+      );
+    }
+  }
 
   Future<PresignResult> presign({
     required String purpose,
@@ -56,24 +95,31 @@ class MediaService {
     String? pieceId,
     String? postId,
   }) async {
+    _validateSize(bytes.length, contentType);
     final presign = await this.presign(
       purpose: purpose,
       contentType: contentType,
       pieceId: pieceId,
       postId: postId,
     );
-    await _api.uploadToPresignedUrl(
-      presignedPutUrl: presign.presignedPutUrl,
-      bytes: bytes,
-      contentType: contentType,
-    );
+    if (presign.url.isEmpty) {
+      throw ApiException('Upload failed: server did not return a media URL');
+    }
+    final putUrl = presign.presignedPutUrl;
+    if (!presign.devMode && putUrl != null && putUrl.isNotEmpty) {
+      await _api.uploadToPresignedUrl(
+        presignedPutUrl: putUrl,
+        bytes: bytes,
+        contentType: contentType,
+      );
+    }
     return presign.url;
   }
 
   Future<String> uploadFile({
     required String purpose,
     required File file,
-    required String contentType,
+    String? contentType,
     String? pieceId,
     String? postId,
   }) async {
@@ -81,7 +127,7 @@ class MediaService {
     return uploadBytes(
       purpose: purpose,
       bytes: bytes,
-      contentType: contentType,
+      contentType: contentType ?? contentTypeForPath(file.path),
       pieceId: pieceId,
       postId: postId,
     );

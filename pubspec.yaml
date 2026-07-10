@@ -79,6 +79,7 @@ flutter:
     - assets/post/adjust/
     - assets/post/create/
     - assets/nav/
+    - assets/profile/default_cover.jpg
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

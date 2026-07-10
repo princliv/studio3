@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../models/feed_item.dart';
 import '../../services/saved_content_store.dart';
 import '../../services/social_service.dart';
+import '../../utils/profile_navigation.dart';
 import '../profile_avatar.dart';
 import 'scene_video_comment_sheet.dart';
 
@@ -128,6 +129,7 @@ class _ReelOverlayState extends State<ReelOverlay> {
   Widget build(BuildContext context) {
     final post = widget.item.post;
     final authorName = widget.item.authorName ?? 'Artist';
+    final authorUsername = widget.item.authorUsername;
     final caption = post?.caption ?? widget.item.title ?? '';
 
     return Padding(
@@ -142,10 +144,18 @@ class _ReelOverlayState extends State<ReelOverlay> {
               children: [
                 Row(
                   children: [
-                    ProfileAvatar(
-                      url: null,
-                      seed: authorName.hashCode.abs(),
-                      size: 36,
+                    GestureDetector(
+                      onTap: authorUsername != null
+                          ? () => openUserProfile(context, authorUsername)
+                          : null,
+                      behavior: authorUsername != null
+                          ? HitTestBehavior.opaque
+                          : HitTestBehavior.deferToChild,
+                      child: ProfileAvatar(
+                        url: null,
+                        seed: authorName.hashCode.abs(),
+                        size: 36,
+                      ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(

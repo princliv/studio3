@@ -24,6 +24,7 @@ class ProfileHeader extends StatelessWidget {
     this.isFollowing = false,
     this.onFollow,
     this.onMessage,
+    this.onAvatarTap,
   });
 
   final String name;
@@ -42,6 +43,7 @@ class ProfileHeader extends StatelessWidget {
   final bool isFollowing;
   final VoidCallback? onFollow;
   final VoidCallback? onMessage;
+  final VoidCallback? onAvatarTap;
 
   static const _avatarSize = 44.0;
 
@@ -89,10 +91,16 @@ class ProfileHeader extends StatelessWidget {
                 Expanded(
                   child: Row(
                     children: [
-                      ProfileAvatar(
-                        url: avatarUrl,
-                        seed: avatarSeed,
-                        size: _avatarSize,
+                      GestureDetector(
+                        onTap: onAvatarTap,
+                        behavior: onAvatarTap != null
+                            ? HitTestBehavior.opaque
+                            : HitTestBehavior.deferToChild,
+                        child: ProfileAvatar(
+                          url: avatarUrl,
+                          seed: avatarSeed,
+                          size: _avatarSize,
+                        ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(

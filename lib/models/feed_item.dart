@@ -37,6 +37,10 @@ class FeedItem {
   String? get authorName =>
       type == FeedItemType.piece ? piece!.authorName : post!.authorName;
 
+  String? get authorUsername => type == FeedItemType.piece
+      ? piece!.authorUsername
+      : post!.authorUsername;
+
   bool get isForSale =>
       type == FeedItemType.piece ? (piece?.isForSale ?? false) : false;
 

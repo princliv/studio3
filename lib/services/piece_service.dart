@@ -1,5 +1,7 @@
 import '../models/piece_summary.dart';
+import '../models/post_summary.dart';
 import 'api_client.dart';
+import 'auth_session.dart';
 
 class PieceService {
   PieceService._();
@@ -13,8 +15,11 @@ class PieceService {
     return PieceSummary.fromJson(data);
   }
 
-  Future<PieceSummary> getById(String id) async {
-    final json = await _api.get('/api/pieces/$id');
+  Future<PieceSummary> getById(String id, {bool? auth}) async {
+    final json = await _api.get(
+      '/api/pieces/$id',
+      auth: auth ?? AuthSession.instance.isLoggedIn,
+    );
     final data = _api.extractData(json) as Map<String, dynamic>;
     return PieceSummary.fromJson(data);
   }
@@ -35,8 +40,8 @@ class PieceService {
     return _api.extractList(json).map(PieceSummary.fromJson).toList();
   }
 
-  Future<List<dynamic>> getRelatedPosts(String pieceId) async {
+  Future<List<PostSummary>> getRelatedPosts(String pieceId) async {
     final json = await _api.get('/api/pieces/$pieceId/related-posts');
-    return _api.extractList(json);
+    return _api.extractList(json).map(PostSummary.fromJson).toList();
   }
 }

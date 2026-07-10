@@ -6,12 +6,24 @@ import '../models/profile_series_data.dart';
 import '../profile_constants.dart';
 
 class ProfileSeriesGrid extends StatelessWidget {
-  const ProfileSeriesGrid({super.key, required this.items});
+  const ProfileSeriesGrid({
+    super.key,
+    required this.items,
+    this.loading = false,
+  });
 
   final List<ProfileSeriesData> items;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
+    if (loading && items.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 40),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+
     if (items.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 8),
@@ -119,8 +131,9 @@ class _StackedSeriesCovers extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final urls = data.stackUrls;
     final seeds = data.stackSeeds;
-    final n = seeds.length;
+    final n = urls.isNotEmpty ? urls.length : seeds.length;
     final w = maxWidth.isFinite && maxWidth > 0 ? maxWidth : 180.0;
     final side = w * kSeriesCardSideFraction;
     final stackHeight = side + (n >= 2 ? 8.0 : 4.0);
@@ -146,7 +159,8 @@ class _StackedSeriesCovers extends StatelessWidget {
           width: side,
           height: side,
           child: _SeriesPaletteCard(
-            seed: seeds[0],
+            seed: seeds.isNotEmpty ? seeds[0] : 0,
+            imageUrl: urls.isNotEmpty ? urls[0] : null,
             borderRadius: radius,
             imagePx: imgPx,
             dropShadow: false,
@@ -163,7 +177,8 @@ class _StackedSeriesCovers extends StatelessWidget {
             width: side,
             height: side,
             child: _SeriesPaletteCard(
-              seed: seeds[i],
+              seed: i < seeds.length ? seeds[i] : i,
+              imageUrl: i < urls.length ? urls[i] : null,
               borderRadius: radius,
               imagePx: imgPx,
               dropShadow: i != 0,
@@ -187,12 +202,14 @@ class _StackedSeriesCovers extends StatelessWidget {
 class _SeriesPaletteCard extends StatelessWidget {
   const _SeriesPaletteCard({
     required this.seed,
+    this.imageUrl,
     required this.borderRadius,
     required this.imagePx,
     this.dropShadow = false,
   });
 
   final int seed;
+  final String? imageUrl;
   final BorderRadius borderRadius;
   final int imagePx;
   final bool dropShadow;
@@ -201,32 +218,47 @@ class _SeriesPaletteCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final image = ClipRRect(
       borderRadius: borderRadius,
-      child: Image.network(
-        picsumUrl(seed, imagePx, imagePx),
-        fit: BoxFit.cover,
-        width: double.infinity,
-        height: double.infinity,
-        loadingBuilder: (context, child, progress) {
-          if (progress == null) return child;
-          return ColoredBox(
-            color: Colors.grey.shade300,
-            child: Center(
-              child: SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: HomeFeedTokens.textPrimary.withValues(alpha: 0.35),
-                ),
+      child: imageUrl != null && imageUrl!.isNotEmpty
+          ? Image.network(
+              imageUrl!,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+              errorBuilder: (context, error, stackTrace) => Image.network(
+                picsumUrl(seed, imagePx, imagePx),
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: double.infinity,
+              ),
+            )
+          : Image.network(
+              picsumUrl(seed, imagePx, imagePx),
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+              loadingBuilder: (context, child, progress) {
+                if (progress == null) return child;
+                return ColoredBox(
+                  color: Colors.grey.shade300,
+                  child: Center(
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color:
+                            HomeFeedTokens.textPrimary.withValues(alpha: 0.35),
+                      ),
+                    ),
+                  ),
+                );
+              },
+              errorBuilder: (context, error, stackTrace) => ColoredBox(
+                color: Colors.grey.shade300,
+                child: Icon(Icons.broken_image_outlined,
+                    color: Colors.grey.shade500),
               ),
             ),
-          );
-        },
-        errorBuilder: (context, error, stackTrace) => ColoredBox(
-          color: Colors.grey.shade300,
-          child: Icon(Icons.broken_image_outlined, color: Colors.grey.shade500),
-        ),
-      ),
     );
 
     if (!dropShadow) return image;

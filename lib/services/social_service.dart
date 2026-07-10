@@ -1,3 +1,4 @@
+import '../models/comment_page.dart';
 import '../models/feed_item.dart';
 import 'api_client.dart';
 
@@ -65,5 +66,47 @@ class SocialService {
     );
     final data = _api.extractData(json) as Map<String, dynamic>;
     return CommentSummary.fromJson(data);
+  }
+
+  Future<CommentPage> getPieceComments(
+    String id, {
+    String? cursor,
+    int? limit,
+  }) async {
+    final json = await _api.get(
+      '/api/pieces/$id/comments',
+      query: _commentQuery(cursor: cursor, limit: limit),
+    );
+    return _parseCommentPage(json);
+  }
+
+  Future<CommentPage> getPostComments(
+    String id, {
+    String? cursor,
+    int? limit,
+  }) async {
+    final json = await _api.get(
+      '/api/posts/$id/comments',
+      query: _commentQuery(cursor: cursor, limit: limit),
+    );
+    return _parseCommentPage(json);
+  }
+
+  Map<String, String> _commentQuery({String? cursor, int? limit}) {
+    final query = <String, String>{};
+    if (cursor != null && cursor.isNotEmpty) query['cursor'] = cursor;
+    if (limit != null) query['limit'] = limit.toString();
+    return query;
+  }
+
+  CommentPage _parseCommentPage(Map<String, dynamic> json) {
+    final data = _api.extractData(json);
+    final nextCursor =
+        data is Map<String, dynamic> ? data['nextCursor'] as String? : null;
+    final items = _api
+        .extractList(json)
+        .map(CommentSummary.fromJson)
+        .toList(growable: false);
+    return CommentPage(items: items, nextCursor: nextCursor);
   }
 }

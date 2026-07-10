@@ -347,6 +347,7 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
                       avatarUrl: picsumAvatarUrl(item.id.hashCode),
                       name: item.authorName ?? 'Artist',
                       medium: item.piece?.medium,
+                      authorUsername: item.authorUsername,
                     ),
                 ],
               ),

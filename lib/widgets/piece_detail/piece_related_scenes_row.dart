@@ -4,7 +4,10 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../data/home_feed_dummy.dart';
 import '../../models/feed_preview_item.dart';
 import '../../theme/home_feed_tokens.dart';
+import '../../utils/explore_detail_route.dart';
 import '../home_feed/home_feed_widgets.dart';
+import '../../models/feed_item.dart';
+import '../../models/post_summary.dart';
 
 class PieceRelatedScenesRow extends StatelessWidget {
   const PieceRelatedScenesRow({
@@ -41,31 +44,73 @@ class PieceRelatedScenesRow extends StatelessWidget {
             separatorBuilder: (context, index) => const SizedBox(width: 12),
             itemBuilder: (context, index) {
               final scene = scenes[index];
-              return ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: SizedBox(
-                  width: 128,
-                  height: 227,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      FeedPicsumImage(
-                        url: picsumUrl(scene.imageSeed, 128, 227),
-                      ),
-                      if (scene.duration != null)
-                        Positioned(
-                          right: 8,
-                          bottom: 8,
-                          child: Text(
-                            scene.duration!,
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w400,
-                              color: Colors.white,
+              return GestureDetector(
+                onTap: scene.id == null
+                    ? null
+                    : () => openExploreDetail(
+                          context,
+                          FeedItem.post(
+                            PostSummary(
+                              id: scene.id!,
+                              mediaUrl: scene.mediaUrl,
+                              mediaType: scene.mediaType,
                             ),
                           ),
                         ),
-                    ],
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: SizedBox(
+                    width: 128,
+                    height: 227,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        if (scene.mediaUrl != null && scene.mediaUrl!.isNotEmpty)
+                          Image.network(
+                            scene.mediaUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                FeedPicsumImage(
+                              url: picsumUrl(scene.imageSeed, 128, 227),
+                            ),
+                          )
+                        else
+                          FeedPicsumImage(
+                            url: picsumUrl(scene.imageSeed, 128, 227),
+                          ),
+                        if (scene.isVideo)
+                          Container(
+                            color: Colors.black.withValues(alpha: 0.22),
+                            alignment: Alignment.center,
+                            child: Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.45),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.play_arrow_rounded,
+                                color: Colors.white,
+                                size: 22,
+                              ),
+                            ),
+                          ),
+                        if (scene.duration != null)
+                          Positioned(
+                            right: 8,
+                            bottom: 8,
+                            child: Text(
+                              scene.duration!,
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w400,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               );

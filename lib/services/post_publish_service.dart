@@ -5,9 +5,11 @@ import 'package:flutter/services.dart';
 import '../data/post_location_options.dart';
 import '../data/post_material_options.dart';
 import '../models/listing_details.dart';
+import '../services/api_exception.dart';
 import '../services/media_service.dart';
 import '../services/piece_service.dart';
 import '../services/post_service.dart';
+import '../services/series_service.dart';
 
 /// Draft state carried through the posting flow.
 class PostDraft {
@@ -23,6 +25,8 @@ class PostDraft {
     this.locations = const [],
     this.materials = const [],
     this.listingDetails,
+    this.selectedSeriesId,
+    this.newSeriesName,
   });
 
   final String postType;
@@ -36,6 +40,8 @@ class PostDraft {
   final List<PostLocationOption> locations;
   final List<PostMaterialOption> materials;
   final ListingDetails? listingDetails;
+  final String? selectedSeriesId;
+  final String? newSeriesName;
 
   bool get isVideo => mediaKind == 'video';
 
@@ -51,6 +57,8 @@ class PostDraft {
     List<PostLocationOption>? locations,
     List<PostMaterialOption>? materials,
     ListingDetails? listingDetails,
+    String? selectedSeriesId,
+    String? newSeriesName,
   }) {
     return PostDraft(
       postType: postType ?? this.postType,
@@ -64,6 +72,8 @@ class PostDraft {
       locations: locations ?? this.locations,
       materials: materials ?? this.materials,
       listingDetails: listingDetails ?? this.listingDetails,
+      selectedSeriesId: selectedSeriesId ?? this.selectedSeriesId,
+      newSeriesName: newSeriesName ?? this.newSeriesName,
     );
   }
 }
@@ -75,6 +85,7 @@ class PostPublishService {
   final _media = MediaService.instance;
   final _pieces = PieceService.instance;
   final _posts = PostService.instance;
+  final _series = SeriesService.instance;
 
   Future<void> publish(PostDraft draft) async {
     final isScene = draft.postType == 'scene';
@@ -92,7 +103,6 @@ class PostPublishService {
       final mediaUrl = await _media.uploadFile(
         purpose: purpose,
         file: File(draft.videoPath!),
-        contentType: 'video/mp4',
       );
       await _posts.create({
         'mediaUrl': mediaUrl,
@@ -106,11 +116,12 @@ class PostPublishService {
     if (draft.imagePaths.isEmpty) {
       throw Exception('No image selected');
     }
-    final bytes = await _loadImageBytes(draft.imagePaths.first);
+    final imagePath = draft.imagePaths.first;
+    final bytes = await _loadImageBytes(imagePath);
     final mediaUrl = await _media.uploadBytes(
       purpose: purpose,
       bytes: bytes,
-      contentType: 'image/jpeg',
+      contentType: MediaService.contentTypeForPath(imagePath),
     );
 
     if (isScene) {
@@ -123,11 +134,7 @@ class PostPublishService {
       return;
     }
 
-    final caption = isListing
-        ? draft.listingDetails?.buildCaptionExtras(
-                baseCaption: draft.description.trim()) ??
-            draft.description.trim()
-        : draft.description.trim();
+    final caption = draft.description.trim();
 
     final body = <String, dynamic>{
       'title': draft.title.trim().isNotEmpty ? draft.title.trim() : 'Untitled',
@@ -143,10 +150,43 @@ class PostPublishService {
           'dimensions': draft.listingDetails!.dimensionsString,
         if (draft.listingDetails?.location != null)
           'shippingRegion': draft.listingDetails!.location,
+        if (draft.listingDetails?.yearCreated != null)
+          'yearCreated': draft.listingDetails!.yearCreated,
+        if (draft.listingDetails?.framingMounting?.trim().isNotEmpty == true)
+          'framingMounting': draft.listingDetails!.framingMounting!.trim(),
+        if (draft.listingDetails?.provenance?.trim().isNotEmpty == true)
+          'provenance': draft.listingDetails!.provenance!.trim(),
+        if (draft.listingDetails?.handlingNotes?.trim().isNotEmpty == true)
+          'handlingNotes': draft.listingDetails!.handlingNotes!.trim(),
       },
     };
 
-    await _pieces.create(body);
+    final piece = await _pieces.create(body);
+    await _assignPieceToSeries(draft, piece.id);
+  }
+
+  Future<void> _assignPieceToSeries(PostDraft draft, String pieceId) async {
+    final newName = draft.newSeriesName?.trim();
+    if (newName != null && newName.isNotEmpty) {
+      await _series.create(name: newName, pieceIds: [pieceId]);
+      return;
+    }
+
+    final seriesId = draft.selectedSeriesId;
+    if (seriesId == null || seriesId.isEmpty) return;
+
+    try {
+      await _series.addPiece(seriesId, pieceId);
+    } on ApiException catch (e) {
+      if (e.statusCode == 400) {
+        throw ApiException(
+          e.message.isNotEmpty
+              ? e.message
+              : 'This piece is already in another series.',
+        );
+      }
+      rethrow;
+    }
   }
 
   Future<Uint8List> _loadImageBytes(String path) async {

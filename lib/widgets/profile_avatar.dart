@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../data/home_feed_dummy.dart';
-
-/// Circular profile photo with network URL or deterministic picsum fallback.
+/// Circular profile photo with network URL or Instagram-style empty placeholder.
 class ProfileAvatar extends StatelessWidget {
   const ProfileAvatar({
     super.key,
@@ -15,35 +13,35 @@ class ProfileAvatar extends StatelessWidget {
   final int seed;
   final double size;
 
+  static const _emptyBackground = Color(0xFFEFEFEF);
+  static const _emptyIconColor = Color(0xFF9E9E9E);
+
+  bool get _hasUrl => url != null && url!.isNotEmpty;
+
   @override
   Widget build(BuildContext context) {
-    final image = url != null && url!.isNotEmpty
+    final child = _hasUrl
         ? Image.network(
             url!,
             width: size,
             height: size,
             fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) => _fallbackImage(),
+            errorBuilder: (context, error, stackTrace) => _emptyAvatar(),
           )
-        : Image.network(
-            picsumAvatarUrl(seed),
-            width: size,
-            height: size,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) => _fallbackImage(),
-          );
+        : _emptyAvatar();
 
-    return ClipOval(child: image);
+    return ClipOval(child: child);
   }
 
-  Widget _fallbackImage() => Container(
+  Widget _emptyAvatar() => Container(
         width: size,
         height: size,
-        color: Colors.grey.shade300,
+        color: _emptyBackground,
+        alignment: Alignment.center,
         child: Icon(
           Icons.person_rounded,
-          color: Colors.grey.shade600,
-          size: size * 0.5,
+          color: _emptyIconColor,
+          size: size * 0.52,
         ),
       );
 }

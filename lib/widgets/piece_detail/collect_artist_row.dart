@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../data/home_feed_dummy.dart';
 import '../../models/feed_preview_item.dart';
 import '../../theme/collect_detail_tokens.dart';
+import '../../utils/profile_navigation.dart';
 
 /// Artist row for collect detail (Figma 2302-1554).
 class CollectArtistRow extends StatelessWidget {
@@ -29,16 +30,20 @@ class CollectArtistRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          ClipOval(
-            child: Image.network(
-              picsumAvatarUrl(item.artist.avatarSeed),
-              width: 28,
-              height: 28,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Container(
+          GestureDetector(
+            onTap: () => openUserProfile(context, item.handle),
+            behavior: HitTestBehavior.opaque,
+            child: ClipOval(
+              child: Image.network(
+                picsumAvatarUrl(item.artist.avatarSeed),
                 width: 28,
                 height: 28,
-                color: CollectDetailTokens.textSecondary.withValues(alpha: 0.3),
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  width: 28,
+                  height: 28,
+                  color: CollectDetailTokens.textSecondary.withValues(alpha: 0.3),
+                ),
               ),
             ),
           ),

@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../data/home_feed_dummy.dart';
 import '../../models/feed_preview_item.dart';
 import '../../theme/home_feed_tokens.dart';
+import '../../utils/profile_navigation.dart';
 
 class PieceArtistRow extends StatelessWidget {
   const PieceArtistRow({
@@ -23,16 +24,20 @@ class PieceArtistRow extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
       child: Row(
         children: [
-          ClipOval(
-            child: Image.network(
-              picsumAvatarUrl(item.artist.avatarSeed),
-              width: 28,
-              height: 28,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Container(
+          GestureDetector(
+            onTap: () => openUserProfile(context, item.handle),
+            behavior: HitTestBehavior.opaque,
+            child: ClipOval(
+              child: Image.network(
+                picsumAvatarUrl(item.artist.avatarSeed),
                 width: 28,
                 height: 28,
-                color: HomeFeedTokens.textSecondary.withValues(alpha: 0.3),
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  width: 28,
+                  height: 28,
+                  color: HomeFeedTokens.textSecondary.withValues(alpha: 0.3),
+                ),
               ),
             ),
           ),

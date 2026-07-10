@@ -1,23 +1,33 @@
 import 'package:flutter/material.dart';
 
-import '../data/home_feed_dummy.dart';
 import '../models/piece_summary.dart';
 import '../models/post_summary.dart';
 import '../models/user_profile.dart';
 import '../services/auth_session.dart';
 import '../services/piece_service.dart';
 import '../services/post_service.dart';
+import '../services/series_service.dart';
+import '../services/social_service.dart';
 import '../services/user_service.dart';
 import '../theme/home_feed_tokens.dart';
+import '../widgets/profile_avatar_preview_sheet.dart';
+import '../widgets/profile_cover_image.dart';
 import 'profile/models/profile_series_data.dart';
 import 'profile/profile_constants.dart';
 import 'profile/widgets/profile_header.dart';
 import 'profile/widgets/profile_tab_content.dart';
 import 'profile/widgets/profile_tabs.dart';
+import 'profile/widgets/profile_viewer_mode_capsule.dart';
 
-/// Artist profile — Studio 3 Discover mobile (Figma-aligned).
+/// Artist profile — own tab or pushed public profile by [username].
 class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key});
+  const ProfilePage({super.key, this.username, this.viewerMode = false});
+
+  /// When null, loads the signed-in user's profile (bottom-nav tab).
+  final String? username;
+
+  /// When true, loads public profile data and hides owner-only actions.
+  final bool viewerMode;
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
@@ -29,14 +39,15 @@ class _ProfilePageState extends State<ProfilePage> {
   List<PieceSummary> _pieces = [];
   List<PostSummary> _scenes = [];
   List<PieceSummary> _listedPieces = [];
+  List<ProfileSeriesData> _series = [];
   bool _tabContentLoading = false;
   bool? _lastKnownSeller;
   bool _piecesLoaded = false;
   bool _scenesLoaded = false;
   bool _listedPiecesLoaded = false;
+  bool _seriesLoaded = false;
   String _collectSegment = 'available';
 
-  static const _heroSeed = 901;
   static const _avatarSeed = 902;
   static const _name = 'Sarah Olson';
   static const _handle = '@sarahsunnyart';
@@ -60,27 +71,36 @@ class _ProfilePageState extends State<ProfilePage> {
     (seed: 315, h: 278),
   ];
 
-  static final List<ProfileSeriesData> _seriesEligible = [
-    ProfileSeriesData(name: 'Two Piece Series', pieceCount: 2, imageSeeds: const [602, 603]),
-    ProfileSeriesData(name: 'Three Piece Series', pieceCount: 3, imageSeeds: const [611, 612, 613]),
-    ProfileSeriesData(name: 'Riverwalk Dream', pieceCount: 3, imageSeeds: const [511, 512, 513]),
-  ];
+  bool get _isTabContext => widget.username == null;
+
+  bool get _isOwnProfile {
+    if (_isTabContext) return true;
+    final sessionUser = AuthSession.instance.user?.username;
+    return sessionUser != null && sessionUser == widget.username;
+  }
+
+  bool get _isPushedRoute => widget.username != null;
 
   @override
   void initState() {
     super.initState();
     _lastKnownSeller = AuthSession.instance.sellerEnabled;
-    AuthSession.instance.addListener(_onSessionChanged);
+    if (_isTabContext) {
+      AuthSession.instance.addListener(_onSessionChanged);
+    }
     _loadProfileShell();
   }
 
   @override
   void dispose() {
-    AuthSession.instance.removeListener(_onSessionChanged);
+    if (_isTabContext) {
+      AuthSession.instance.removeListener(_onSessionChanged);
+    }
     super.dispose();
   }
 
   void _onSessionChanged() {
+    if (!_isTabContext) return;
     final seller = AuthSession.instance.sellerEnabled;
     if (seller == _lastKnownSeller) return;
     _lastKnownSeller = seller;
@@ -99,9 +119,21 @@ class _ProfilePageState extends State<ProfilePage> {
     _loadActiveTab(force: true);
   }
 
+  void _resetTabCache() {
+    _piecesLoaded = false;
+    _scenesLoaded = false;
+    _listedPiecesLoaded = false;
+    _seriesLoaded = false;
+  }
+
   Future<void> _loadProfileShell({bool silent = false}) async {
     try {
-      final profile = await UserService.instance.getMe();
+      final UserProfile profile;
+      if (_isTabContext || (_isOwnProfile && !widget.viewerMode)) {
+        profile = await UserService.instance.getMe();
+      } else {
+        profile = await UserService.instance.getPublicProfile(widget.username!);
+      }
       if (!mounted) return;
       setState(() {
         _profile = profile;
@@ -115,6 +147,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _loadProfile() async {
+    _resetTabCache();
     await _loadProfileShell();
     await _loadActiveTab(force: true);
   }
@@ -127,13 +160,14 @@ class _ProfilePageState extends State<ProfilePage> {
     if (tab == 'pieces' && (_piecesLoaded && !force)) return;
     if (tab == 'scenes' && (_scenesLoaded && !force)) return;
     if (tab == 'collect' && (_listedPiecesLoaded && !force)) return;
-    if (tab == 'series') return;
+    if (tab == 'series' && (_seriesLoaded && !force)) return;
 
     setState(() => _tabContentLoading = true);
 
     try {
       if (tab == 'pieces') {
-        final pieces = await PieceService.instance.getUserPieces(profile.username);
+        final pieces =
+            await PieceService.instance.getUserPieces(profile.username);
         if (!mounted) return;
         setState(() {
           _pieces = pieces;
@@ -141,7 +175,8 @@ class _ProfilePageState extends State<ProfilePage> {
           _tabContentLoading = false;
         });
       } else if (tab == 'scenes') {
-        final scenes = await PostService.instance.getUserPosts(profile.username);
+        final scenes =
+            await PostService.instance.getUserPosts(profile.username);
         if (!mounted) return;
         setState(() {
           _scenes = scenes;
@@ -154,6 +189,15 @@ class _ProfilePageState extends State<ProfilePage> {
         setState(() {
           _listedPieces = listedPieces;
           _listedPiecesLoaded = true;
+          _tabContentLoading = false;
+        });
+      } else if (tab == 'series') {
+        final series =
+            await SeriesService.instance.getUserSeries(profile.username);
+        if (!mounted) return;
+        setState(() {
+          _series = series.map(ProfileSeriesData.fromSeries).toList();
+          _seriesLoaded = true;
           _tabContentLoading = false;
         });
       } else {
@@ -180,15 +224,98 @@ class _ProfilePageState extends State<ProfilePage> {
     setState(() => _collectSegment = segment);
   }
 
+  Future<void> _toggleFollow() async {
+    final profile = _profile;
+    if (profile == null) return;
+    final nextFollowing = !profile.isFollowing;
+    setState(() {
+      _profile = UserProfile(
+        username: profile.username,
+        name: profile.name,
+        email: profile.email,
+        bio: profile.bio,
+        location: profile.location,
+        profilePhotoUrl: profile.profilePhotoUrl,
+        coverPhotoUrl: profile.coverPhotoUrl,
+        role: profile.role,
+        onboardingComplete: profile.onboardingComplete,
+        sellerEnabled: profile.sellerEnabled,
+        canChangeUsername: profile.canChangeUsername,
+        followingCount: profile.followingCount,
+        followersCount:
+            profile.followersCount + (nextFollowing ? 1 : -1),
+        piecesCount: profile.piecesCount,
+        collectedCount: profile.collectedCount,
+        savesCount: profile.savesCount,
+        isFollowing: nextFollowing,
+        tastePreferences: profile.tastePreferences,
+        savedPieces: profile.savedPieces,
+      );
+    });
+    try {
+      if (nextFollowing) {
+        await SocialService.instance.follow(profile.username);
+      } else {
+        await SocialService.instance.unfollow(profile.username);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _profile = profile);
+    }
+  }
+
+  void _onAvatarTap(String? avatarUrl) {
+    showProfileAvatarPreview(
+      context,
+      avatarUrl: avatarUrl,
+      seed: _avatarSeed,
+      allowChange: _isOwnProfile && !widget.viewerMode,
+      onChanged: () async {
+        _resetTabCache();
+        await _loadProfileShell(silent: true);
+      },
+    );
+  }
+
+  void _onMessageTap() {
+    if (widget.viewerMode) {
+      _showViewerModePreviewSnackBar();
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Messaging coming soon')),
+    );
+  }
+
+  void _onFollowTap() {
+    if (widget.viewerMode) {
+      _showViewerModePreviewSnackBar();
+      return;
+    }
+    _toggleFollow();
+  }
+
+  void _showViewerModePreviewSnackBar() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('This is a preview of your public profile'),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final heroH = (width * 0.68).clamp(260.0, 340.0);
-    final bottomPad = MediaQuery.paddingOf(context).bottom + 100;
+    final safeBottom = MediaQuery.paddingOf(context).bottom;
+    final bottomPad = (_isPushedRoute ? safeBottom + 24 : safeBottom + 100) +
+        (widget.viewerMode ? 56 : 0);
     final profile = _profile;
     final sessionUser = AuthSession.instance.user;
     final sellerEnabled =
         profile?.sellerEnabled ?? AuthSession.instance.sellerEnabled;
+    final isOwnProfile = _isOwnProfile;
+    final showPublicActions = widget.viewerMode || !isOwnProfile;
 
     final name = profile?.name ?? sessionUser?.name ?? _name;
     final handle = profile?.handle ??
@@ -200,40 +327,46 @@ class _ProfilePageState extends State<ProfilePage> {
       backgroundColor: HomeFeedTokens.background,
       body: SafeArea(
         bottom: false,
-        child: RefreshIndicator(
-          onRefresh: () async {
-            _piecesLoaded = false;
-            _scenesLoaded = false;
-            _listedPiecesLoaded = false;
-            await _loadProfile();
-          },
-          child: CustomScrollView(
-            slivers: [
+        child: Stack(
+          children: [
+            RefreshIndicator(
+              onRefresh: _loadProfile,
+              child: CustomScrollView(
+                slivers: [
               SliverToBoxAdapter(
                 child: Stack(
                   children: [
-                    _ProfileHero(
-                      imageUrl: coverUrl,
-                      heroSeed: _heroSeed,
+                    ProfileCoverImage(
+                      url: coverUrl,
                       height: heroH,
                       width: width,
                     ),
-                    Positioned(
-                      top: 8,
-                      right: 12,
-                      child: _ProfileSettingsButton(
-                        onPressed: () async {
-                          await Navigator.pushNamed(context, '/profile-settings');
-                          if (mounted) {
-                            _piecesLoaded = false;
-                            _scenesLoaded = false;
-                            _listedPiecesLoaded = false;
-                            await _loadProfileShell(silent: true);
-                            await _loadActiveTab(force: true);
-                          }
-                        },
+                    if (_isPushedRoute)
+                      Positioned(
+                        top: 8,
+                        left: 12,
+                        child: _ProfileBackButton(
+                          onPressed: () => Navigator.pop(context),
+                        ),
                       ),
-                    ),
+                    if (isOwnProfile && _isTabContext)
+                      Positioned(
+                        top: 8,
+                        right: 12,
+                        child: _ProfileSettingsButton(
+                          onPressed: () async {
+                            await Navigator.pushNamed(
+                              context,
+                              '/profile-settings',
+                            );
+                            if (mounted) {
+                              _resetTabCache();
+                              await _loadProfileShell(silent: true);
+                              await _loadActiveTab(force: true);
+                            }
+                          },
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -256,7 +389,11 @@ class _ProfilePageState extends State<ProfilePage> {
                   savesCount: profile?.savesCount,
                   salesCount: profile?.collectedCount,
                   sellerMode: sellerEnabled,
-                  isOwnProfile: true,
+                  isOwnProfile: !showPublicActions,
+                  isFollowing: profile?.isFollowing ?? false,
+                  onFollow: showPublicActions ? _onFollowTap : null,
+                  onMessage: showPublicActions ? _onMessageTap : null,
+                  onAvatarTap: () => _onAvatarTap(avatarUrl),
                 ),
               ),
               SliverToBoxAdapter(
@@ -276,7 +413,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 sliver: SliverToBoxAdapter(
                   child: ProfileTabContent(
                     currentTab: _tab,
-                    seriesItems: _seriesEligible,
+                    seriesItems: _series,
                     pieces: _pieces,
                     scenes: _scenes,
                     listedPieces: _listedPieces,
@@ -289,48 +426,18 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ProfileHero extends StatelessWidget {
-  const _ProfileHero({
-    this.imageUrl,
-    required this.heroSeed,
-    required this.height,
-    required this.width,
-  });
-
-  final String? imageUrl;
-  final int heroSeed;
-  final double height;
-  final double width;
-
-  @override
-  Widget build(BuildContext context) {
-    final url = imageUrl?.isNotEmpty == true
-        ? imageUrl!
-        : picsumUrl(heroSeed, 800, (height * 2).round());
-
-    return SizedBox(
-      width: width,
-      height: height,
-      child: Image.network(
-        url,
-        fit: BoxFit.cover,
-        alignment: Alignment.topCenter,
-        gaplessPlayback: true,
-        errorBuilder: (context, error, stackTrace) => ColoredBox(
-          color: Colors.grey.shade400,
-          child: Icon(
-            Icons.image_not_supported_outlined,
-            size: 48,
-            color: Colors.grey.shade600,
-          ),
+                ],
+              ),
+            ),
+            if (widget.viewerMode)
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, safeBottom + 16),
+                  child: const ProfileViewerModeCapsule(),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -354,6 +461,29 @@ class _ProfileSettingsButton extends StatelessWidget {
           width: 40,
           height: 40,
           child: Icon(Icons.menu_rounded, color: Colors.white, size: 22),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileBackButton extends StatelessWidget {
+  const _ProfileBackButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black.withValues(alpha: 0.35),
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onPressed,
+        child: const SizedBox(
+          width: 40,
+          height: 40,
+          child: Icon(Icons.arrow_back_rounded, color: Colors.white, size: 22),
         ),
       ),
     );

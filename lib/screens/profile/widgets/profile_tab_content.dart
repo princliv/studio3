@@ -42,14 +42,15 @@ class ProfileTabContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (loading &&
-        currentTab != 'series' &&
         (currentTab == 'pieces'
             ? pieces.isEmpty
             : currentTab == 'scenes'
                 ? scenes.isEmpty
                 : currentTab == 'collect'
                     ? listedPieces.isEmpty
-                    : true)) {
+                    : currentTab == 'series'
+                        ? seriesItems.isEmpty
+                        : true)) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 8),
         child: ProfileGridSkeleton(),
@@ -57,12 +58,15 @@ class ProfileTabContent extends StatelessWidget {
     }
 
     if (currentTab == 'series') {
-      return ProfileSeriesGrid(items: seriesItems);
+      return ProfileSeriesGrid(items: seriesItems, loading: loading);
     }
 
     if (currentTab == 'pieces') {
       if (pieces.isNotEmpty) {
-        return ProfileContentGrid.fromPieces(pieces);
+        return ProfileContentGrid.fromPieces(
+          pieces,
+          onPieceTap: (piece) => openProfilePiece(context, piece),
+        );
       }
       return ProfileMasonryGrid(
         leftItems: leftMasonry,
@@ -105,6 +109,7 @@ class ProfileTabContent extends StatelessWidget {
           else
             ProfileContentGrid.fromPieces(
               listedPieces.where((p) => p.isForSale).toList(),
+              onPieceTap: (piece) => openProfilePiece(context, piece),
             ),
         ],
       );

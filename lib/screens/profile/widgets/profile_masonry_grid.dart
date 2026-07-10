@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 
 import '../../../models/feed_item.dart';
+import '../../../models/feed_preview_item.dart';
 import '../../../models/piece_summary.dart';
 import '../../../models/post_summary.dart';
 import '../../../theme/home_feed_tokens.dart';
 import '../../../utils/explore_detail_route.dart';
+import '../../../utils/slide_up_page_route.dart';
+import '../../available_piece_detail_page.dart';
+import '../../piece_detail_page.dart';
 import '../profile_constants.dart';
 
 class ProfileContentGrid extends StatelessWidget {
   const ProfileContentGrid._({
     required this.items,
     this.onPostTap,
+    this.onPieceTap,
   });
 
   final List<
@@ -21,10 +26,15 @@ class ProfileContentGrid extends StatelessWidget {
         String? price,
         bool isVideo,
         PostSummary? post,
+        PieceSummary? piece,
       })> items;
   final void Function(PostSummary post)? onPostTap;
+  final void Function(PieceSummary piece)? onPieceTap;
 
-  factory ProfileContentGrid.fromPieces(List<PieceSummary> pieces) {
+  factory ProfileContentGrid.fromPieces(
+    List<PieceSummary> pieces, {
+    void Function(PieceSummary piece)? onPieceTap,
+  }) {
     final heights = [292.0, 168.0, 174.0, 318.0, 182.0, 132.0, 302.0, 156.0];
     final mapped = <
         ({
@@ -34,6 +44,7 @@ class ProfileContentGrid extends StatelessWidget {
           String? price,
           bool isVideo,
           PostSummary? post,
+          PieceSummary? piece,
         })>[];
     for (var i = 0; i < pieces.length; i++) {
       final p = pieces[i];
@@ -44,9 +55,10 @@ class ProfileContentGrid extends StatelessWidget {
         price: p.priceDisplay,
         isVideo: false,
         post: null,
+        piece: p,
       ));
     }
-    return ProfileContentGrid._(items: mapped);
+    return ProfileContentGrid._(items: mapped, onPieceTap: onPieceTap);
   }
 
   factory ProfileContentGrid.fromPosts(
@@ -62,6 +74,7 @@ class ProfileContentGrid extends StatelessWidget {
           String? price,
           bool isVideo,
           PostSummary? post,
+          PieceSummary? piece,
         })>[];
     for (var i = 0; i < posts.length; i++) {
       final p = posts[i];
@@ -75,6 +88,7 @@ class ProfileContentGrid extends StatelessWidget {
         price: null,
         isVideo: isVideo,
         post: p,
+        piece: null,
       ));
     }
     return ProfileContentGrid._(items: mapped, onPostTap: onPostTap);
@@ -94,6 +108,7 @@ class ProfileContentGrid extends StatelessWidget {
           String? price,
           bool isVideo,
           PostSummary? post,
+          PieceSummary? piece,
         })>[];
     final right = <
         ({
@@ -103,6 +118,7 @@ class ProfileContentGrid extends StatelessWidget {
           String? price,
           bool isVideo,
           PostSummary? post,
+          PieceSummary? piece,
         })>[];
     for (var i = 0; i < items.length; i++) {
       if (i.isEven) {
@@ -115,9 +131,9 @@ class ProfileContentGrid extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(child: _MasonryColumn(items: left, onPostTap: onPostTap)),
+        Expanded(child: _MasonryColumn(items: left, onPostTap: onPostTap, onPieceTap: onPieceTap)),
         const SizedBox(width: kProfileGutter),
-        Expanded(child: _MasonryColumn(items: right, onPostTap: onPostTap)),
+        Expanded(child: _MasonryColumn(items: right, onPostTap: onPostTap, onPieceTap: onPieceTap)),
       ],
     );
   }
@@ -127,6 +143,7 @@ class _MasonryColumn extends StatelessWidget {
   const _MasonryColumn({
     required this.items,
     this.onPostTap,
+    this.onPieceTap,
   });
 
   final List<
@@ -137,8 +154,10 @@ class _MasonryColumn extends StatelessWidget {
         String? price,
         bool isVideo,
         PostSummary? post,
+        PieceSummary? piece,
       })> items;
   final void Function(PostSummary post)? onPostTap;
+  final void Function(PieceSummary piece)? onPieceTap;
 
   @override
   Widget build(BuildContext context) {
@@ -153,9 +172,11 @@ class _MasonryColumn extends StatelessWidget {
             forSale: items[i].forSale,
             price: items[i].price,
             isVideo: items[i].isVideo,
-            onTap: items[i].post == null
-                ? null
-                : () => onPostTap?.call(items[i].post!),
+            onTap: items[i].post != null
+                ? () => onPostTap?.call(items[i].post!)
+                : items[i].piece != null
+                    ? () => onPieceTap?.call(items[i].piece!)
+                    : null,
           ),
         ],
       ],
@@ -276,6 +297,7 @@ class ProfileMasonryGrid extends StatelessWidget {
             price: null as String?,
             isVideo: false,
             post: null as PostSummary?,
+            piece: null as PieceSummary?,
           ),
         ),
         ...rightItems.map(
@@ -286,6 +308,7 @@ class ProfileMasonryGrid extends StatelessWidget {
             price: null as String?,
             isVideo: false,
             post: null as PostSummary?,
+            piece: null as PieceSummary?,
           ),
         ),
       ],
@@ -300,4 +323,14 @@ void openProfileScene(
 ) {
   final item = FeedItem.post(post);
   openExploreDetail(context, item);
+}
+
+void openProfilePiece(BuildContext context, PieceSummary piece) {
+  final preview = FeedPreviewItem.fromPieceSummary(piece);
+  final page = preview.isAvailable
+      ? AvailablePieceDetailPage(item: preview)
+      : PieceDetailPage(item: preview);
+  Navigator.of(context).push<void>(
+    SlideUpPageRoute<void>(page: page),
+  );
 }

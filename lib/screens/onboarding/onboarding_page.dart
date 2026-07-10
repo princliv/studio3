@@ -1,11 +1,17 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../data/post_picker_options.dart';
 import '../../services/api_exception.dart';
+import '../../services/media_service.dart';
 import '../../services/user_service.dart';
 import '../../theme/home_feed_tokens.dart';
 import '../../widgets/auth_ui.dart';
+import '../../widgets/profile_avatar.dart';
+import '../../widgets/profile_cover_image.dart';
 import '../../widgets/studio_loading.dart';
 
 /// Multi-step onboarding: role → preferences → photos → complete.
@@ -23,6 +29,10 @@ class _OnboardingPageState extends State<OnboardingPage> {
   final Set<String> _mediums = {};
   final Set<String> _styles = {};
   final Set<String> _themes = {};
+  final _picker = ImagePicker();
+  String? _profilePhotoUrl;
+  String? _coverPhotoUrl;
+  bool _uploadingPhoto = false;
 
   static const _roles = [
     ('artist', 'Artist', 'Create and share your work'),
@@ -87,7 +97,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
     if (_step == 2) {
       setState(() => _loading = true);
       try {
-        await UserService.instance.setOnboardingPhotos(skip: true);
+        if (_profilePhotoUrl == null && _coverPhotoUrl == null) {
+          await UserService.instance.setOnboardingPhotos(skip: true);
+        } else {
+          await UserService.instance.setOnboardingPhotos(
+            profilePhotoUrl: _profilePhotoUrl,
+            coverPhotoUrl: _coverPhotoUrl,
+          );
+        }
         await UserService.instance.completeOnboarding();
         if (!mounted) return;
         Navigator.pushReplacementNamed(context, '/');
@@ -96,6 +113,31 @@ class _OnboardingPageState extends State<OnboardingPage> {
       } finally {
         if (mounted) setState(() => _loading = false);
       }
+    }
+  }
+
+  Future<void> _uploadPhoto(String purpose) async {
+    if (_uploadingPhoto || _loading) return;
+    setState(() => _uploadingPhoto = true);
+    try {
+      final picked = await _picker.pickImage(source: ImageSource.gallery);
+      if (picked == null) return;
+      final url = await MediaService.instance.uploadFile(
+        purpose: purpose,
+        file: File(picked.path),
+      );
+      if (!mounted) return;
+      setState(() {
+        if (purpose == MediaPurpose.profile) {
+          _profilePhotoUrl = url;
+        } else {
+          _coverPhotoUrl = url;
+        }
+      });
+    } catch (e) {
+      _showError(e);
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
     }
   }
 
@@ -109,7 +151,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   @override
   Widget build(BuildContext context) {
     return StudioLoadingGate(
-      loading: _loading,
+      loading: _loading || _uploadingPhoto,
       child: Scaffold(
         backgroundColor: HomeFeedTokens.background,
         appBar: AppBar(
@@ -291,19 +333,84 @@ class _OnboardingPageState extends State<OnboardingPage> {
         ),
         const SizedBox(height: 8),
         Text(
-          'You can add profile and cover photos later from settings. Tap Finish to continue.',
+          'Add a profile photo and cover image, or tap Finish to skip for now.',
           style: GoogleFonts.inter(
             fontSize: 14,
             color: HomeFeedTokens.textPrimary.withValues(alpha: 0.55),
             height: 1.5,
           ),
         ),
-        const SizedBox(height: 32),
-        Center(
-          child: Icon(
-            Icons.photo_camera_outlined,
-            size: 64,
-            color: HomeFeedTokens.textPrimary.withValues(alpha: 0.25),
+        const SizedBox(height: 28),
+        GestureDetector(
+          onTap: () => _uploadPhoto(MediaPurpose.profile),
+          child: Row(
+            children: [
+              ProfileAvatar(
+                url: _profilePhotoUrl,
+                seed: 902,
+                size: 72,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  _profilePhotoUrl == null
+                      ? 'Add profile photo'
+                      : 'Profile photo added',
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: HomeFeedTokens.textPrimary,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.chevron_right,
+                color: HomeFeedTokens.textPrimary.withValues(alpha: 0.35),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        GestureDetector(
+          onTap: () => _uploadPhoto(MediaPurpose.cover),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: ProfileCoverImage(
+                  url: _coverPhotoUrl,
+                  width: double.infinity,
+                  height: 120,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Icon(
+                    Icons.image_outlined,
+                    color: HomeFeedTokens.textPrimary.withValues(alpha: 0.55),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _coverPhotoUrl == null
+                          ? 'Add cover photo'
+                          : 'Cover photo added',
+                      style: GoogleFonts.inter(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                        color: HomeFeedTokens.textPrimary,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right,
+                    color: HomeFeedTokens.textPrimary.withValues(alpha: 0.35),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ],

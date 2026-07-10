@@ -85,6 +85,7 @@ class ExploreFeaturedCard extends StatelessWidget {
                       medium: item.type == FeedItemType.piece
                           ? item.piece?.medium
                           : 'Scene',
+                      authorUsername: item.authorUsername,
                     ),
                     const SizedBox(height: 4),
                     Text(

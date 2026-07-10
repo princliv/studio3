@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../models/feed_preview_item.dart';
 import '../theme/collect_detail_tokens.dart';
+import '../utils/content_detail_loader.dart';
 import '../widgets/piece_detail/available_collect_bar.dart';
 import '../widgets/piece_detail/collect_artist_row.dart';
 import '../widgets/piece_detail/collect_piece_sheet.dart';
@@ -37,14 +38,33 @@ class AvailablePieceDetailPage extends StatefulWidget {
 }
 
 class _AvailablePieceDetailPageState extends State<AvailablePieceDetailPage>
-    with DetailSaveState {
-  bool _liked = false;
+    with DetailSaveState, DetailLikeState {
+  late FeedPreviewItem _item;
   bool _following = false;
 
   @override
-  FeedPreviewItem get saveItem => widget.item;
+  FeedPreviewItem get saveItem => _item;
 
-  FeedPreviewItem get item => widget.item;
+  @override
+  FeedPreviewItem get likeItem => _item;
+
+  FeedPreviewItem get item => _item;
+
+  @override
+  void initState() {
+    _item = widget.item;
+    super.initState();
+    liked = _item.isLiked;
+    _loadDetail();
+  }
+
+  Future<void> _loadDetail() async {
+    final loaded = await ContentDetailLoader.loadPiece(_item);
+    if (!mounted) return;
+    setState(() => _item = loaded);
+    applySaveItem(loaded);
+    applyLikeItem(loaded);
+  }
 
   void _onCollect() {
     CollectPieceSheet.show(context, item: item);
@@ -96,9 +116,9 @@ class _AvailablePieceDetailPageState extends State<AvailablePieceDetailPage>
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     PieceActionBar(
-                      liked: _liked,
+                      liked: liked,
                       saved: saved,
-                      onLike: () => setState(() => _liked = !_liked),
+                      onLike: toggleLike,
                       onComment: () {},
                       onShare: () => shareFeedPreviewItem(
                         context,
@@ -222,6 +242,7 @@ class _AvailablePieceDetailPageState extends State<AvailablePieceDetailPage>
                     PieceSeriesRow(
                       seriesName: item.seriesName,
                       thumbSeeds: item.seriesThumbs,
+                      thumbUrls: item.seriesThumbUrls,
                     ),
                     const SizedBox(height: 24),
                     const Divider(
