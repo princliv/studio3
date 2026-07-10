@@ -28,7 +28,7 @@ class _ExplorePageState extends State<ExplorePage> {
   final _scrollController = ScrollController();
   final _searchController = TextEditingController();
 
-  ExploreCategory _category = ExploreCategory.pieces;
+  ExploreCategory _category = ExploreCategory.all;
   List<FeedItem> _allItems = [];
   UserProfile? _profile;
   FeedItem? _featured;
@@ -90,7 +90,6 @@ class _ExplorePageState extends State<ExplorePage> {
       _allItems.isNotEmpty ? _allItems : kExploreFeedDummyItems;
 
   FeedItem? get _effectiveFeatured {
-    if (_category == ExploreCategory.events) return null;
     return _featured ?? kExploreFeaturedDummy;
   }
 
@@ -170,9 +169,6 @@ class _ExplorePageState extends State<ExplorePage> {
   }
 
   String get _emptyMessage {
-    if (_category == ExploreCategory.events) {
-      return 'Events are coming soon.';
-    }
     if (_searchQuery.isNotEmpty) {
       return 'No results for "$_searchQuery".';
     }

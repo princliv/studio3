@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
 
@@ -15,6 +14,8 @@ class PostDraft {
   const PostDraft({
     required this.postType,
     required this.imagePaths,
+    this.mediaKind = 'image',
+    this.videoPath,
     this.title = '',
     this.description = '',
     this.mediumId,
@@ -26,6 +27,8 @@ class PostDraft {
 
   final String postType;
   final List<String> imagePaths;
+  final String mediaKind;
+  final String? videoPath;
   final String title;
   final String description;
   final String? mediumId;
@@ -34,9 +37,13 @@ class PostDraft {
   final List<PostMaterialOption> materials;
   final ListingDetails? listingDetails;
 
+  bool get isVideo => mediaKind == 'video';
+
   PostDraft copyWith({
     String? postType,
     List<String>? imagePaths,
+    String? mediaKind,
+    String? videoPath,
     String? title,
     String? description,
     String? mediumId,
@@ -48,6 +55,8 @@ class PostDraft {
     return PostDraft(
       postType: postType ?? this.postType,
       imagePaths: imagePaths ?? this.imagePaths,
+      mediaKind: mediaKind ?? this.mediaKind,
+      videoPath: videoPath ?? this.videoPath,
       title: title ?? this.title,
       description: description ?? this.description,
       mediumId: mediumId ?? this.mediumId,
@@ -68,13 +77,36 @@ class PostPublishService {
   final _posts = PostService.instance;
 
   Future<void> publish(PostDraft draft) async {
+    final isScene = draft.postType == 'scene';
+    final isVideo = draft.isVideo;
+    final isListing = draft.listingDetails != null;
+    final purpose = isScene ? 'post' : 'piece';
+
+    if (isVideo) {
+      if (draft.videoPath == null || draft.videoPath!.isEmpty) {
+        throw Exception('No video selected');
+      }
+      if (!isScene) {
+        throw Exception('Video upload is only supported for scenes');
+      }
+      final mediaUrl = await _media.uploadFile(
+        purpose: purpose,
+        file: File(draft.videoPath!),
+        contentType: 'video/mp4',
+      );
+      await _posts.create({
+        'mediaUrl': mediaUrl,
+        'mediaType': 'video',
+        if (draft.description.trim().isNotEmpty)
+          'caption': draft.description.trim(),
+      });
+      return;
+    }
+
     if (draft.imagePaths.isEmpty) {
       throw Exception('No image selected');
     }
     final bytes = await _loadImageBytes(draft.imagePaths.first);
-    final isListing = draft.postType == 'listing';
-    final isScene = draft.postType == 'scene';
-    final purpose = isScene ? 'post' : 'piece';
     final mediaUrl = await _media.uploadBytes(
       purpose: purpose,
       bytes: bytes,
@@ -85,13 +117,15 @@ class PostPublishService {
       await _posts.create({
         'mediaUrl': mediaUrl,
         'mediaType': 'image',
-        if (draft.description.trim().isNotEmpty) 'caption': draft.description.trim(),
+        if (draft.description.trim().isNotEmpty)
+          'caption': draft.description.trim(),
       });
       return;
     }
 
     final caption = isListing
-        ? draft.listingDetails?.buildCaptionExtras(baseCaption: draft.description.trim()) ??
+        ? draft.listingDetails?.buildCaptionExtras(
+                baseCaption: draft.description.trim()) ??
             draft.description.trim()
         : draft.description.trim();
 

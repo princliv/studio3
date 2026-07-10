@@ -49,13 +49,13 @@ class FeedHomeHeader extends StatelessWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _FilterTab(
+              FeedFilterTab(
                 label: 'All',
                 active: filter == FeedAvailabilityFilter.all,
                 onTap: () => onFilterChanged(FeedAvailabilityFilter.all),
               ),
               const SizedBox(width: 24),
-              _FilterTab(
+              FeedFilterTab(
                 label: 'Available',
                 active: filter == FeedAvailabilityFilter.available,
                 onTap: () =>
@@ -121,8 +121,9 @@ class FeedHomeHeader extends StatelessWidget {
   }
 }
 
-class _FilterTab extends StatelessWidget {
-  const _FilterTab({
+class FeedFilterTab extends StatelessWidget {
+  const FeedFilterTab({
+    super.key,
     required this.label,
     required this.active,
     required this.onTap,

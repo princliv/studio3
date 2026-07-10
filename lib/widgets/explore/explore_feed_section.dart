@@ -55,7 +55,30 @@ class _ExploreFeedTileViewState extends State<ExploreFeedTileView> {
             borderRadius: _radius,
             child: AspectRatio(
               aspectRatio: widget.tile.ratio.aspectValue,
-              child: ExploreFeedImage(url: widget.tile.item.mediaUrl),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ExploreFeedImage(url: widget.tile.item.mediaUrl),
+                  if (widget.tile.item.isVideo)
+                    Container(
+                      color: Colors.black.withValues(alpha: 0.18),
+                      alignment: Alignment.center,
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.45),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.play_arrow_rounded,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),

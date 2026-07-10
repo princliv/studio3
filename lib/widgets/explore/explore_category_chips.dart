@@ -14,9 +14,9 @@ class ExploreCategoryChips extends StatelessWidget {
   final ValueChanged<ExploreCategory> onSelected;
 
   static const _labels = {
+    ExploreCategory.all: 'All',
     ExploreCategory.pieces: 'Pieces',
     ExploreCategory.scenes: 'Scenes',
-    ExploreCategory.events: 'Events',
   };
 
   @override
@@ -26,7 +26,7 @@ class ExploreCategoryChips extends StatelessWidget {
         final isSelected = category == selected;
         return Padding(
           padding: EdgeInsets.only(
-            right: category != ExploreCategory.events ? 8 : 0,
+            right: category != ExploreCategory.scenes ? 8 : 0,
           ),
           child: GestureDetector(
             onTap: () => onSelected(category),

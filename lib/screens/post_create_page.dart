@@ -1,22 +1,27 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../data/post_material_options.dart';
 import '../data/post_location_options.dart';
 import '../data/post_picker_options.dart';
 import '../data/post_media_assets.dart';
+import '../models/listing_details.dart';
 import '../models/post_image_transform.dart';
+import '../services/auth_session.dart';
+import '../services/api_exception.dart';
+import '../services/post_publish_service.dart';
 import '../theme/home_feed_tokens.dart';
 import '../utils/image_adjust_math.dart';
 import '../widgets/choose_location_sheet.dart';
+import '../widgets/create_flow/create_flow_widgets.dart';
+import '../widgets/create_flow/listing_details_form.dart';
 import '../widgets/post_create_option_sheet.dart';
+import '../widgets/seller_mode_required_dialog.dart';
 import 'add_materials_page.dart';
-import '../services/api_exception.dart';
-import '../services/post_publish_service.dart';
-import 'listing_details_page.dart';
 
-/// Create post details — posting flow (Figma 1995:1486).
+/// Add Piece / Scene details — posting flow step (Figma 1995:1486).
 class PostCreatePage extends StatefulWidget {
   const PostCreatePage({
     super.key,
@@ -25,6 +30,10 @@ class PostCreatePage extends StatefulWidget {
     required this.imagePaths,
     required this.transforms,
     required this.previewImageIndex,
+    required this.onClose,
+    this.onEdit,
+    this.mediaKind = 'image',
+    this.videoPath,
   });
 
   final String postType;
@@ -32,27 +41,78 @@ class PostCreatePage extends StatefulWidget {
   final List<String> imagePaths;
   final List<PostImageTransform> transforms;
   final int previewImageIndex;
+  final VoidCallback onClose;
+  final VoidCallback? onEdit;
+  final String mediaKind;
+  final String? videoPath;
 
   @override
   State<PostCreatePage> createState() => _PostCreatePageState();
 }
 
 class _PostCreatePageState extends State<PostCreatePage> {
-  static const _textDisabled = Color(0xFFC8C5BC);
-  static const _textSecondary = Color(0xFF8C8880);
   static const _neutral700 = Color(0xFF4A4843);
   static const _neutral300 = Color(0xFFC8C5BC);
 
-  static const _horizontalInset = 15.0;
-
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _listingFormKey = GlobalKey<ListingDetailsFormState>();
   bool _aiToolsUsed = false;
   bool _publishing = false;
+  bool _listForSale = false;
   final List<PostLocationOption> _selectedLocations = [];
   String? _selectedMediumId;
   final Set<String> _selectedStyleIds = {};
   final List<PostMaterialOption> _selectedMaterials = [];
+
+  bool get _isPiece => widget.postType == 'piece';
+
+  @override
+  void initState() {
+    super.initState();
+    _listForSale = _isPiece && AuthSession.instance.sellerEnabled;
+    AuthSession.instance.addListener(_onSessionChanged);
+  }
+
+  @override
+  void dispose() {
+    AuthSession.instance.removeListener(_onSessionChanged);
+    _nameController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  void _onSessionChanged() {
+    if (!mounted) return;
+    if (_isPiece && AuthSession.instance.sellerEnabled && !_listForSale) {
+      setState(() => _listForSale = true);
+    }
+  }
+
+  Future<void> _onListForSaleChanged(bool value) async {
+    if (!value) {
+      setState(() {
+        _listForSale = false;
+        _listingFormKey.currentState?.clear();
+      });
+      return;
+    }
+
+    if (AuthSession.instance.sellerEnabled) {
+      setState(() => _listForSale = true);
+      return;
+    }
+
+    final switchToSeller = await showSellerModeRequiredDialog(context);
+    if (!mounted) return;
+    if (switchToSeller == true) {
+      await Navigator.pushNamed(context, '/profile-settings');
+      if (!mounted) return;
+      if (AuthSession.instance.sellerEnabled) {
+        setState(() => _listForSale = true);
+      }
+    }
+  }
 
   void _openLocationPicker() {
     ChooseLocationSheet.show(
@@ -135,28 +195,27 @@ class _PostCreatePageState extends State<PostCreatePage> {
     }
   }
 
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _descriptionController.dispose();
-    super.dispose();
-  }
-
-  String get _title {
-    if (widget.postType == 'listing') return 'Piece details';
-    return widget.postType == 'scene' ? 'Create scene' : 'Create piece';
-  }
+  String get _title =>
+      widget.postType == 'scene' ? 'Create scene' : 'Create piece';
 
   PostDraft _buildDraft() {
+    ListingDetails? listingDetails;
+    if (_isPiece && _listForSale) {
+      listingDetails = _listingFormKey.currentState?.buildListingDetails();
+    }
+
     return PostDraft(
       postType: widget.postType,
       imagePaths: widget.imagePaths,
+      mediaKind: widget.mediaKind,
+      videoPath: widget.videoPath,
       title: _nameController.text,
       description: _descriptionController.text,
       mediumId: _selectedMediumId,
       styleIds: _selectedStyleIds.toList(),
       locations: List<PostLocationOption>.from(_selectedLocations),
       materials: List<PostMaterialOption>.from(_selectedMaterials),
+      listingDetails: listingDetails,
     );
   }
 
@@ -166,9 +225,10 @@ class _PostCreatePageState extends State<PostCreatePage> {
       await PostPublishService.instance.publish(draft);
       if (!mounted) return;
       Navigator.of(context).popUntil((route) => route.isFirst);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Published successfully')),
-      );
+      final message = draft.listingDetails != null
+          ? 'Piece listed for sale'
+          : 'Published successfully';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     } catch (e) {
       if (!mounted) return;
       final message = e is ApiException ? e.message : e.toString();
@@ -180,17 +240,16 @@ class _PostCreatePageState extends State<PostCreatePage> {
   }
 
   void _onCreate() {
-    final draft = _buildDraft();
-    if (widget.postType == 'listing') {
-      Navigator.push(
-        context,
-        MaterialPageRoute<void>(
-          builder: (_) => ListingDetailsPage(draft: draft),
-        ),
-      );
-      return;
+    if (_isPiece && _listForSale) {
+      final form = _listingFormKey.currentState;
+      if (form == null || !form.isPriceValid) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Enter a valid price to list for sale')),
+        );
+        return;
+      }
     }
-    _publish(draft);
+    _publish(_buildDraft());
   }
 
   @override
@@ -202,10 +261,10 @@ class _PostCreatePageState extends State<PostCreatePage> {
       backgroundColor: Colors.black,
       body: Column(
         children: [
-          _CreateBanner(
+          CreateFlowBanner(
             topInset: topInset,
             title: _title,
-            onClose: () => Navigator.pop(context),
+            onClose: widget.onClose,
           ),
           Expanded(
             child: SingleChildScrollView(
@@ -215,84 +274,47 @@ class _PostCreatePageState extends State<PostCreatePage> {
                 children: [
                   const SizedBox(height: 13),
                   Center(
-                    child: _PreviewCard(
-                      imagePath: widget.imagePaths[widget.previewImageIndex],
-                      transform: widget.transforms[widget.previewImageIndex],
-                      onEdit: () => Navigator.pop(context, true),
-                    ),
+                    child: widget.mediaKind == 'video'
+                        ? _VideoPreviewCard(videoPath: widget.videoPath)
+                        : _PreviewCard(
+                            imagePath: widget.imagePaths[widget.previewImageIndex],
+                            transform: widget.transforms[widget.previewImageIndex],
+                            onEdit: widget.onEdit,
+                          ),
                   ),
                   const SizedBox(height: 24),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: TextField(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                    child: CreateFlowTextField(
                       controller: _nameController,
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: HomeFeedTokens.textInverse,
-                      ),
-                      cursorColor: HomeFeedTokens.textInverse,
-                      decoration: InputDecoration(
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 6,
-                        ),
-                        hintText: widget.postType == 'scene'
-                            ? 'Give this scene a name'
-                            : 'Give this piece a name',
-                        hintStyle: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: _textDisabled,
-                        ),
-                        border: InputBorder.none,
-                      ),
+                      hint: widget.postType == 'scene'
+                          ? 'Give this scene a name'
+                          : 'Give this piece a name',
                     ),
                   ),
                   const SizedBox(height: 8),
                   const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: _horizontalInset),
-                    child: _CreateDivider(),
+                    padding: EdgeInsets.symmetric(horizontal: createFlowHorizontalInset),
+                    child: CreateFlowDivider(),
                   ),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
-                    child: TextField(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                    child: CreateFlowTextField(
                       controller: _descriptionController,
+                      hint:
+                          'Tell us what was happening in the studio. The more you share,\nthe further it travels.',
+                      style: CreateFlowTextFieldStyle.body,
                       maxLines: 4,
                       minLines: 3,
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w400,
-                        color: HomeFeedTokens.textInverse,
-                        height: 1.35,
-                      ),
-                      cursorColor: HomeFeedTokens.textInverse,
-                      decoration: InputDecoration(
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 6,
-                        ),
-                        hintText:
-                            'Tell us what was happening in the studio. The more you share,\nthe further it travels.',
-                        hintStyle: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w400,
-                          color: _textSecondary,
-                          height: 1.35,
-                        ),
-                        border: InputBorder.none,
-                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
                   const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: _horizontalInset),
-                    child: _CreateDivider(),
+                    padding: EdgeInsets.symmetric(horizontal: createFlowHorizontalInset),
+                    child: CreateFlowDivider(),
                   ),
                   const SizedBox(height: 4),
-                  _MetadataRow(
+                  CreateFlowMetadataRow(
                     iconAsset: PostMediaAssets.createLocationIcon,
                     iconWidth: 12,
                     iconHeight: 16,
@@ -313,7 +335,7 @@ class _PostCreatePageState extends State<PostCreatePage> {
                             const SizedBox(width: 8),
                         itemBuilder: (context, index) {
                           final location = _selectedLocations[index];
-                          return _LocationChip(
+                          return CreateFlowLocationChip(
                             label: location.name,
                             onRemove: () => setState(
                               () => _selectedLocations.removeAt(index),
@@ -322,7 +344,7 @@ class _PostCreatePageState extends State<PostCreatePage> {
                         },
                       ),
                     ),
-                  _MetadataRow(
+                  CreateFlowMetadataRow(
                     iconAsset: PostMediaAssets.createMediumIcon,
                     iconWidth: 12,
                     iconHeight: 11,
@@ -330,7 +352,7 @@ class _PostCreatePageState extends State<PostCreatePage> {
                     trailing: _mediumTrailing,
                     onTap: _openMediumPicker,
                   ),
-                  _MetadataRow(
+                  CreateFlowMetadataRow(
                     iconAsset: PostMediaAssets.createStyleIcon,
                     iconWidth: 12,
                     iconHeight: 12,
@@ -338,7 +360,7 @@ class _PostCreatePageState extends State<PostCreatePage> {
                     trailing: _styleTrailing,
                     onTap: _openStylePicker,
                   ),
-                  _MetadataRow(
+                  CreateFlowMetadataRow(
                     iconAsset: PostMediaAssets.createMaterialsIcon,
                     iconWidth: 12,
                     iconHeight: 11,
@@ -348,24 +370,35 @@ class _PostCreatePageState extends State<PostCreatePage> {
                         : _selectedMaterials.length,
                     onTap: _openMaterialsPage,
                   ),
-                  _MetadataRow(
+                  CreateFlowMetadataRow(
                     iconAsset: PostMediaAssets.createSeriesIcon,
                     iconWidth: 13,
                     iconHeight: 13,
                     label: 'Series',
                     onTap: () {},
                   ),
-                  _MetadataRow(
+                  CreateFlowMetadataRow(
                     iconAsset: PostMediaAssets.createScenesIcon,
                     iconWidth: 12,
                     iconHeight: 11,
                     label: 'Related scenes',
                     onTap: () {},
                   ),
-                  _AiToolsRow(
+                  CreateFlowToggleRow(
+                    label: 'AI tools used',
+                    iconAsset: PostMediaAssets.createAiToolsIcon,
                     value: _aiToolsUsed,
                     onChanged: (value) => setState(() => _aiToolsUsed = value),
                   ),
+                  if (_isPiece) ...[
+                    CreateFlowToggleRow(
+                      label: 'List for sale',
+                      value: _listForSale,
+                      onChanged: _onListForSaleChanged,
+                    ),
+                    if (_listForSale)
+                      ListingDetailsForm(key: _listingFormKey),
+                  ],
                 ],
               ),
             ),
@@ -374,20 +407,27 @@ class _PostCreatePageState extends State<PostCreatePage> {
             padding: EdgeInsets.fromLTRB(16, 8, 16, bottomInset + 16),
             child: Row(
               children: [
-                _BottomButton(
+                CreateFlowBottomButton(
                   label: 'Save',
                   backgroundColor: _neutral700,
                   textColor: HomeFeedTokens.textInverse,
                   width: 68,
-                  onTap: _publishing ? null : () => _onCreate(),
+                  onTap: _publishing ? null : _onCreate,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: _BottomButton(
-                    label: widget.postType == 'listing' ? 'Next' : 'Create',
+                  child: CreateFlowBottomButton(
+                    label: 'Publish',
                     backgroundColor: _neutral300,
                     textColor: HomeFeedTokens.textPrimary,
-                    onTap: _publishing ? null : () => _onCreate(),
+                    onTap: _publishing ? null : _onCreate,
+                    child: _publishing
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : null,
                   ),
                 ),
               ],
@@ -399,52 +439,45 @@ class _PostCreatePageState extends State<PostCreatePage> {
   }
 }
 
-class _CreateBanner extends StatelessWidget {
-  const _CreateBanner({
-    required this.topInset,
-    required this.title,
-    required this.onClose,
-  });
+class _VideoPreviewCard extends StatelessWidget {
+  const _VideoPreviewCard({this.videoPath});
 
-  final double topInset;
-  final String title;
-  final VoidCallback onClose;
+  static const _cardWidth = 200.0;
+  static const _cardHeight = 266.0;
+  static const _cardRadius = 8.0;
+
+  final String? videoPath;
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: Colors.black,
-      child: Padding(
-        padding: EdgeInsets.only(top: topInset),
-        child: SizedBox(
-          height: 64,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: GestureDetector(
-                    onTap: onClose,
-                    behavior: HitTestBehavior.opaque,
-                    child: SvgPicture.asset(
-                      PostMediaAssets.createCloseIcon,
-                      width: 14,
-                      height: 14,
-                    ),
+    return SizedBox(
+      width: _cardWidth,
+      height: _cardHeight,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(_cardRadius),
+        child: ColoredBox(
+          color: const Color(0xFF4A4843),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              if (videoPath != null)
+                Opacity(
+                  opacity: 0.35,
+                  child: Image.file(
+                    File(videoPath!),
+                    width: _cardWidth,
+                    height: _cardHeight,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const SizedBox.shrink(),
                   ),
                 ),
-                Text(
-                  title,
-                  style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: HomeFeedTokens.textInverse,
-                  ),
-                ),
-              ],
-            ),
+              const Icon(
+                Icons.play_circle_fill,
+                color: Colors.white,
+                size: 56,
+              ),
+            ],
           ),
         ),
       ),
@@ -456,7 +489,7 @@ class _PreviewCard extends StatelessWidget {
   const _PreviewCard({
     required this.imagePath,
     required this.transform,
-    required this.onEdit,
+    this.onEdit,
   });
 
   static const _cardWidth = 200.0;
@@ -465,16 +498,26 @@ class _PreviewCard extends StatelessWidget {
 
   final String imagePath;
   final PostImageTransform transform;
-  final VoidCallback onEdit;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
-    Widget image = Image.asset(
-      imagePath,
-      width: _cardWidth,
-      height: _cardHeight,
-      fit: BoxFit.cover,
-    );
+    Widget image;
+    if (imagePath.startsWith('assets/')) {
+      image = Image.asset(
+        imagePath,
+        width: _cardWidth,
+        height: _cardHeight,
+        fit: BoxFit.cover,
+      );
+    } else {
+      image = Image.file(
+        File(imagePath),
+        width: _cardWidth,
+        height: _cardHeight,
+        fit: BoxFit.cover,
+      );
+    }
 
     if (!ImageAdjustMath.isNeutral(
       brightness: transform.brightness,
@@ -503,276 +546,30 @@ class _PreviewCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(_cardRadius),
             child: image,
           ),
-          Positioned(
-            top: 8,
-            right: 8,
-            child: GestureDetector(
-              onTap: onEdit,
-              behavior: HitTestBehavior.opaque,
-              child: Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                alignment: Alignment.center,
-                child: SvgPicture.asset(
-                  PostMediaAssets.createPencilIcon,
-                  width: 12,
-                  height: 12,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CreateDivider extends StatelessWidget {
-  const _CreateDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 0.5,
-      color: const Color(0xFF2E2C28),
-    );
-  }
-}
-
-class _MetadataRow extends StatelessWidget {
-  const _MetadataRow({
-    required this.iconAsset,
-    required this.iconWidth,
-    required this.iconHeight,
-    required this.label,
-    required this.onTap,
-    this.trailing,
-    this.countBadge,
-  });
-
-  final String iconAsset;
-  final double iconWidth;
-  final double iconHeight;
-  final String label;
-  final VoidCallback onTap;
-  final String? trailing;
-  final int? countBadge;
-
-  static const _textSecondary = Color(0xFF8C8880);
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-        child: Row(
-          children: [
-            SvgPicture.asset(
-              iconAsset,
-              width: iconWidth,
-              height: iconHeight,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                label,
-                style: GoogleFonts.inter(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: HomeFeedTokens.textInverse,
-                ),
-              ),
-            ),
-            if (trailing != null) ...[
-              Text(
-                trailing!,
-                style: GoogleFonts.inter(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w400,
-                  color: _textSecondary,
-                ),
-              ),
-              const SizedBox(width: 10),
-            ],
-            if (countBadge != null && countBadge! > 0) ...[
-              Container(
-                width: 20,
-                height: 20,
-                alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                ),
-                child: Text(
-                  '$countBadge',
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: HomeFeedTokens.textPrimary,
+          if (onEdit != null)
+            Positioned(
+              top: 8,
+              right: 8,
+              child: GestureDetector(
+                onTap: onEdit,
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  alignment: Alignment.center,
+                  child: SvgPicture.asset(
+                    PostMediaAssets.createPencilIcon,
+                    width: 12,
+                    height: 12,
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
-            ],
-            SvgPicture.asset(
-              PostMediaAssets.createChevronRight,
-              width: 8,
-              height: 13,
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _LocationChip extends StatelessWidget {
-  const _LocationChip({
-    required this.label,
-    this.onRemove,
-  });
-
-  static const _neutral700 = Color(0xFF4A4843);
-  static const _textSecondary = Color(0xFF8C8880);
-
-  final String label;
-  final VoidCallback? onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onRemove,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        height: 18,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: _neutral700,
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 9,
-            fontWeight: FontWeight.w400,
-            color: _textSecondary,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AiToolsRow extends StatelessWidget {
-  const _AiToolsRow({
-    required this.value,
-    required this.onChanged,
-  });
-
-  static const _neutral700 = Color(0xFF4A4843);
-  static const _neutral300 = Color(0xFFC8C5BC);
-
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      child: Row(
-        children: [
-          SvgPicture.asset(
-            PostMediaAssets.createAiToolsIcon,
-            width: 12,
-            height: 12,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'AI tools used',
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: HomeFeedTokens.textInverse,
-              ),
-            ),
-          ),
-          GestureDetector(
-            onTap: () => onChanged(!value),
-            behavior: HitTestBehavior.opaque,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              width: 30,
-              height: 14,
-              padding: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                color: _neutral700,
-                borderRadius: BorderRadius.circular(100),
-              ),
-              alignment: value ? Alignment.centerRight : Alignment.centerLeft,
-              child: Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: value ? HomeFeedTokens.textInverse : _neutral300,
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ),
-          ),
         ],
-      ),
-    );
-  }
-}
-
-class _BottomButton extends StatelessWidget {
-  const _BottomButton({
-    required this.label,
-    required this.backgroundColor,
-    required this.textColor,
-    required this.onTap,
-    this.width,
-  });
-
-  final String label;
-  final Color backgroundColor;
-  final Color textColor;
-  final VoidCallback? onTap;
-  final double? width;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Ink(
-          width: width,
-          height: 32,
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Center(
-            child: Text(
-              label,
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: textColor,
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }

@@ -2,6 +2,7 @@ import '../models/feed_item.dart';
 import '../models/piece_summary.dart';
 import '../models/post_summary.dart';
 import 'home_feed_dummy.dart';
+import 'scene_videos_dummy.dart';
 
 const _featuredId = 'explore-dummy-featured';
 
@@ -45,7 +46,9 @@ final List<FeedItem> kExploreFeedDummyItems = [
       PostSummary(
         id: 'explore-dummy-scene-$i',
         caption: kFeedStories[(i + 2) % kFeedStories.length],
-        mediaUrl: picsumUrl(700 + i, 780, 440),
+        mediaUrl: i % 3 == 0
+            ? kSceneVideoSampleUrls[i % kSceneVideoSampleUrls.length]
+            : picsumUrl(700 + i, 780, 440),
         mediaType: i % 3 == 0 ? 'video' : 'image',
         authorName: kHomeFeedArtists[(i + 5) % kHomeFeedArtists.length].name,
         authorUsername: artistHandle(

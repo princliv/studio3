@@ -16,7 +16,7 @@ class RelatedScene {
   final String? duration;
 }
 
-/// Local dummy piece/post shown in the For You feed when API data is unavailable.
+/// Local dummy Piece/Scene shown in the For You feed when API data is unavailable.
 class FeedPreviewItem {
   const FeedPreviewItem({
     required this.id,
@@ -74,6 +74,10 @@ class FeedPreviewItem {
     if (priceCents == null) return null;
     return '\$${(priceCents! / 100).toStringAsFixed(0)}';
   }
+
+  bool get isScene => medium == 'Scene' || medium == 'Video';
+
+  bool get isPiece => !isScene;
 
   /// Builds a preview-shaped item from an API [PieceSummary] for collect detail.
   factory FeedPreviewItem.fromPieceSummary(PieceSummary piece) {

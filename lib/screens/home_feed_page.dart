@@ -5,16 +5,17 @@ import '../models/feed_item.dart';
 import '../models/feed_pop_result.dart';
 import '../models/feed_preview_item.dart';
 import '../theme/home_feed_tokens.dart';
+import '../utils/explore_detail_route.dart';
 import '../utils/feed_layout_generator.dart';
 import '../utils/slide_up_page_route.dart';
 import '../widgets/home_feed/home_feed_widgets.dart';
 import '../widgets/studio_loading.dart';
 import '../services/feed_service.dart';
 import 'available_piece_detail_page.dart';
-import 'artwork_detail_page.dart';
 import 'piece_detail_page.dart';
 
 class HomeFeedPage extends StatefulWidget {
+  /// For You feed — mixed Pieces and Scenes with All / Available filters.
   const HomeFeedPage({super.key, this.onThemeToggle});
 
   final VoidCallback? onThemeToggle;
@@ -217,33 +218,7 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
   }
 
   void _openApiItem(FeedItem item) {
-    if (item.type == FeedItemType.piece &&
-        item.isForSale &&
-        item.piece != null) {
-      Navigator.of(context).push<void>(
-        MaterialPageRoute<void>(
-          builder: (context) => AvailablePieceDetailPage(
-            item: FeedPreviewItem.fromPieceSummary(item.piece!),
-          ),
-        ),
-      );
-      return;
-    }
-
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (context) => ArtworkDetailPage(
-          imageUrl: item.mediaUrl ?? '',
-          artistName: item.authorName,
-          medium: item.type == FeedItemType.piece ? item.piece?.medium : null,
-          pieceId: item.type == FeedItemType.piece ? item.piece?.id : null,
-          postId: item.type == FeedItemType.post ? item.post?.id : null,
-          title: item.title,
-          forSale: item.isForSale,
-          price: item.priceDisplay,
-        ),
-      ),
-    );
+    openExploreDetail(context, item);
   }
 
   @override

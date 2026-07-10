@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'services/auth_session.dart';
 import 'services/user_service.dart';
@@ -11,18 +12,25 @@ import 'screens/forgot_password_page.dart';
 import 'screens/welcome_page.dart';
 import 'screens/profile_settings_page.dart';
 import 'screens/home_feed_page.dart';
-import 'screens/discover_page.dart';
 import 'screens/explore_page.dart';
-import 'screens/chat_page.dart';
+import 'screens/reels_page.dart';
+import 'screens/saved_page.dart';
 import 'screens/profile_page.dart';
 import 'screens/post_page.dart';
 import 'screens/notifications_page.dart';
 import 'screens/onboarding/onboarding_page.dart';
 import 'screens/edit_profile_page.dart';
 import 'models/auth_user.dart';
+import 'theme/home_feed_tokens.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      systemNavigationBarColor: HomeFeedTokens.background,
+      systemNavigationBarIconBrightness: Brightness.dark,
+    ),
+  );
   await AuthSession.instance.initialize();
   runApp(const Studio3App());
 }
@@ -127,6 +135,8 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> {
+  static const _avatarSeed = 902;
+
   int _selectedNavIndex = BottomNavIndex.home;
 
   @override
@@ -151,6 +161,8 @@ class _MainShellState extends State<MainShell> {
       await UserService.instance.getMe();
     } catch (_) {
       // Keep placeholder avatar when profile cannot be loaded.
+    } finally {
+      if (mounted) setState(() {});
     }
   }
 
@@ -161,12 +173,6 @@ class _MainShellState extends State<MainShell> {
     }
   }
 
-  ImageProvider? get _navAvatar {
-    final url = AuthSession.instance.user?.profilePhotoUrl;
-    if (url == null || url.isEmpty) return null;
-    return NetworkImage(url);
-  }
-
   Widget _buildScreen() {
     switch (_selectedNavIndex) {
       case BottomNavIndex.home:
@@ -174,12 +180,9 @@ class _MainShellState extends State<MainShell> {
       case BottomNavIndex.discover:
         return const ExplorePage(key: ValueKey('explore'));
       case BottomNavIndex.reels:
-        return const DiscoverPage(
-          key: ValueKey('reels'),
-          reelsOnly: true,
-        );
+        return const ReelsPage(key: ValueKey('reels'));
       case BottomNavIndex.bookmark:
-        return const ChatPage();
+        return const SavedPage();
       case BottomNavIndex.profile:
         return const ProfilePage();
       default:
@@ -190,13 +193,17 @@ class _MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: HomeFeedTokens.background,
+      extendBody: true,
       body: Stack(
+        fit: StackFit.expand,
         children: [
           _buildScreen(),
           BottomNav(
             selectedNavIndex: _selectedNavIndex,
             onNavTap: _onNavTap,
-            avatar: _navAvatar,
+            avatarUrl: AuthSession.instance.user?.profilePhotoUrl,
+            avatarSeed: _avatarSeed,
           ),
         ],
       ),

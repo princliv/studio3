@@ -3,11 +3,14 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../models/feed_preview_item.dart';
 import '../theme/collect_detail_tokens.dart';
-import '../widgets/home_feed/home_feed_widgets.dart';
 import '../widgets/piece_detail/available_collect_bar.dart';
 import '../widgets/piece_detail/collect_artist_row.dart';
 import '../widgets/piece_detail/collect_piece_sheet.dart';
+import '../widgets/piece_detail/detail_hero_image.dart';
+import '../widgets/piece_detail/detail_save_state.dart';
 import '../widgets/piece_detail/detail_scroll_handoff.dart';
+import '../widgets/piece_detail/detail_share.dart';
+import '../widgets/piece_detail/piece_action_bar.dart';
 import '../widgets/piece_detail/piece_related_scenes_row.dart';
 import '../widgets/piece_detail/piece_series_row.dart';
 
@@ -33,32 +36,18 @@ class AvailablePieceDetailPage extends StatefulWidget {
       _AvailablePieceDetailPageState();
 }
 
-class _AvailablePieceDetailPageState extends State<AvailablePieceDetailPage> {
+class _AvailablePieceDetailPageState extends State<AvailablePieceDetailPage>
+    with DetailSaveState {
+  bool _liked = false;
   bool _following = false;
+
+  @override
+  FeedPreviewItem get saveItem => widget.item;
 
   FeedPreviewItem get item => widget.item;
 
   void _onCollect() {
     CollectPieceSheet.show(context, item: item);
-  }
-
-  Widget _heroImage() {
-    final url = item.heroImageUrl;
-    if (url != null && url.isNotEmpty) {
-      return Image.network(
-        url,
-        fit: BoxFit.cover,
-        width: double.infinity,
-        height: double.infinity,
-        errorBuilder: (context, error, stackTrace) => ColoredBox(
-          color: Colors.grey.shade300,
-          child: const Icon(Icons.broken_image_outlined, size: 48),
-        ),
-      );
-    }
-    return FeedPicsumImage(
-      url: feedPreviewImageUrl(item, imageIndex: widget.initialImageIndex),
-    );
   }
 
   @override
@@ -80,8 +69,11 @@ class _AvailablePieceDetailPageState extends State<AvailablePieceDetailPage> {
                 child: Stack(
                   children: [
                     AspectRatio(
-                      aspectRatio: CollectDetailTokens.heroAspectRatio,
-                      child: _heroImage(),
+                      aspectRatio: item.aspectRatioValue,
+                      child: DetailHeroImage(
+                        item: item,
+                        initialImageIndex: widget.initialImageIndex,
+                      ),
                     ),
                     Positioned(
                       top: MediaQuery.paddingOf(context).top + 8,
@@ -103,6 +95,18 @@ class _AvailablePieceDetailPageState extends State<AvailablePieceDetailPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    PieceActionBar(
+                      liked: _liked,
+                      saved: saved,
+                      onLike: () => setState(() => _liked = !_liked),
+                      onComment: () {},
+                      onShare: () => shareFeedPreviewItem(
+                        context,
+                        item,
+                        imageIndex: widget.initialImageIndex,
+                      ),
+                      onSave: toggleSave,
+                    ),
                     const Divider(
                       height: 1,
                       thickness: 1,

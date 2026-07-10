@@ -12,8 +12,6 @@ import '../models/post_image_transform.dart';
 import '../theme/home_feed_tokens.dart';
 import '../utils/crop_cover_math.dart' show CropAspectRatio;
 import '../utils/image_adjust_math.dart';
-import 'post_create_page.dart';
-
 /// Image edit step — posting flow (Figma 1961:1453 / 1973:1223 / 1986:1416).
 class PostEditPage extends StatefulWidget {
   const PostEditPage({
@@ -23,6 +21,8 @@ class PostEditPage extends StatefulWidget {
     this.customImagePaths,
     this.initialImageIndex = 0,
     this.initialTransforms,
+    this.onClose,
+    this.onNext,
   });
 
   final String postType;
@@ -30,6 +30,12 @@ class PostEditPage extends StatefulWidget {
   final List<String>? customImagePaths;
   final int initialImageIndex;
   final List<PostImageTransform>? initialTransforms;
+  final VoidCallback? onClose;
+  final void Function(
+    List<String> imagePaths,
+    List<PostImageTransform> transforms,
+    int previewImageIndex,
+  )? onNext;
 
   @override
   State<PostEditPage> createState() => _PostEditPageState();
@@ -183,22 +189,15 @@ class _PostEditPageState extends State<PostEditPage> {
     });
   }
 
-  Future<void> _openCreatePage() async {
+  void _openCreatePage() {
     _finishEditing();
-    final reopenEdit = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute<bool>(
-        builder: (_) => PostCreatePage(
-          postType: widget.postType,
-          selectedCellIndices: widget.selectedCellIndices,
-          imagePaths: List<String>.from(_imagePaths),
-          transforms: _transforms.map((t) => t.copy()).toList(),
-          previewImageIndex: _activeImageIndex,
-        ),
-      ),
-    );
-    if (reopenEdit == true && mounted) {
-      _finishEditing();
+    if (widget.onNext != null) {
+      widget.onNext!(
+        List<String>.from(_imagePaths),
+        _transforms.map((t) => t.copy()).toList(),
+        _activeImageIndex,
+      );
+      return;
     }
   }
 
@@ -256,7 +255,7 @@ class _PostEditPageState extends State<PostEditPage> {
         children: [
           _EditBanner(
             topInset: topInset,
-            onClose: () => Navigator.pop(context),
+            onClose: widget.onClose ?? () => Navigator.pop(context),
             onNext: _openCreatePage,
           ),
           const SizedBox(height: _previewGapBelowBanner),

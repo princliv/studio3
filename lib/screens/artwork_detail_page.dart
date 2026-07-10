@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/social_service.dart';
 import '../theme/home_feed_tokens.dart';
 
-/// Detail view for a piece or post from feeds.
+/// Legacy detail view — prefer [PieceDetailPage] / [AvailablePieceDetailPage].
 class ArtworkDetailPage extends StatefulWidget {
   const ArtworkDetailPage({
     super.key,

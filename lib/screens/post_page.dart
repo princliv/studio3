@@ -4,11 +4,14 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../data/post_media_assets.dart';
-import '../services/auth_session.dart';
+import '../models/post_image_transform.dart';
 import '../theme/home_feed_tokens.dart';
+import 'post_create_page.dart';
 import 'post_edit_page.dart';
 
-/// Media picker — first step of the posting flow (Figma 1609:1975 / 1953:1164).
+enum _PostFlowStep { gallery, edit, details }
+
+/// Single-route posting flow: gallery → edit → details (Figma 1609:1975).
 class PostPage extends StatefulWidget {
   const PostPage({super.key});
 
@@ -22,16 +25,26 @@ class _PostPageState extends State<PostPage> {
   static const _bottomControlsOffset = 42.0;
   static const _maxSelection = 10;
 
+  _PostFlowStep _step = _PostFlowStep.gallery;
   String _postType = 'piece';
   final List<int> _selectedIndices = [];
   List<String>? _pickedImagePaths;
+  String? _pickedVideoPath;
   final _picker = ImagePicker();
+
+  List<String> _editImagePaths = [];
+  List<PostImageTransform> _editTransforms = [];
+  int _previewImageIndex = 0;
+
+  void _exitFlow() => Navigator.pop(context);
 
   void _onPostTypeChanged(String type) {
     if (type == _postType) return;
     setState(() {
       _postType = type;
       _selectedIndices.clear();
+      _pickedImagePaths = null;
+      _pickedVideoPath = null;
     });
   }
 
@@ -85,6 +98,7 @@ class _PostPageState extends State<PostPage> {
     if (images.isEmpty || !mounted) return;
     setState(() {
       _pickedImagePaths = images.map((x) => x.path).toList();
+      _pickedVideoPath = null;
       _selectedIndices.clear();
       for (var i = 0; i < _pickedImagePaths!.length; i++) {
         _selectedIndices.add(i);
@@ -92,19 +106,72 @@ class _PostPageState extends State<PostPage> {
     });
   }
 
+  Future<void> _pickVideo() async {
+    final video = await _picker.pickVideo(source: ImageSource.gallery);
+    if (video == null || !mounted) return;
+    setState(() {
+      _pickedVideoPath = video.path;
+      _pickedImagePaths = null;
+      _selectedIndices.clear();
+    });
+  }
+
   void _goToEdit() {
+    if (_pickedVideoPath != null) {
+      _goToDetailsFromVideo();
+      return;
+    }
     final isPicked = _pickedImagePaths != null && _pickedImagePaths!.isNotEmpty;
     if (!isPicked && _selectedIndices.isEmpty) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute<void>(
-        builder: (_) => PostEditPage(
-          postType: _postType,
-          selectedCellIndices: List<int>.from(_selectedIndices),
-          customImagePaths: isPicked ? _pickedImagePaths : null,
-        ),
-      ),
-    );
+    setState(() => _step = _PostFlowStep.edit);
+  }
+
+  void _goToDetailsFromVideo() {
+    if (_pickedVideoPath == null) return;
+    setState(() {
+      _editImagePaths = [];
+      _editTransforms = [];
+      _previewImageIndex = 0;
+      _step = _PostFlowStep.details;
+    });
+  }
+
+  void _goToDetails(
+    List<String> imagePaths,
+    List<PostImageTransform> transforms,
+    int previewImageIndex,
+  ) {
+    setState(() {
+      _editImagePaths = imagePaths;
+      _editTransforms = transforms;
+      _previewImageIndex = previewImageIndex;
+      _step = _PostFlowStep.details;
+    });
+  }
+
+  void _backToEdit() {
+    setState(() => _step = _PostFlowStep.edit);
+  }
+
+  void _backToGallery() {
+    setState(() => _step = _PostFlowStep.gallery);
+  }
+
+  bool _handleBack() {
+    switch (_step) {
+      case _PostFlowStep.gallery:
+        return true;
+      case _PostFlowStep.edit:
+        _backToGallery();
+        return false;
+      case _PostFlowStep.details:
+        if (_pickedVideoPath != null) {
+          _backToGallery();
+        } else {
+          _backToEdit();
+        }
+        return false;
+    }
   }
 
   int? _selectionOrder(int cellIndex) {
@@ -114,10 +181,25 @@ class _PostPageState extends State<PostPage> {
 
   @override
   Widget build(BuildContext context) {
+    return PopScope(
+      canPop: _step == _PostFlowStep.gallery,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleBack();
+      },
+      child: switch (_step) {
+        _PostFlowStep.gallery => _buildGallery(),
+        _PostFlowStep.edit => _buildEdit(),
+        _PostFlowStep.details => _buildDetails(),
+      },
+    );
+  }
+
+  Widget _buildGallery() {
     final topInset = MediaQuery.paddingOf(context).top;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
-    final sellerEnabled = AuthSession.instance.sellerEnabled;
-    final hasSelection = _selectedIndices.isNotEmpty;
+    final hasSelection =
+        _selectedIndices.isNotEmpty || _pickedVideoPath != null;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -140,10 +222,11 @@ class _PostPageState extends State<PostPage> {
             right: 0,
             child: _PostingBanner(
               topInset: topInset,
-              onClose: () => Navigator.pop(context),
+              onClose: _exitFlow,
               hasSelection: hasSelection,
               onNext: hasSelection ? _goToEdit : null,
               onPickGallery: _pickFromGallery,
+              onPickVideo: _postType == 'scene' ? _pickVideo : null,
             ),
           ),
           Positioned(
@@ -155,7 +238,6 @@ class _PostPageState extends State<PostPage> {
               children: [
                 _PostingSelector(
                   postType: _postType,
-                  showListing: sellerEnabled,
                   onChanged: _onPostTypeChanged,
                 ),
                 const SizedBox(width: 12),
@@ -174,6 +256,36 @@ class _PostPageState extends State<PostPage> {
       ),
     );
   }
+
+  Widget _buildEdit() {
+    final isPicked = _pickedImagePaths != null && _pickedImagePaths!.isNotEmpty;
+    return PostEditPage(
+      key: ValueKey('edit-$_postType-${_selectedIndices.join(",")}'),
+      postType: _postType,
+      selectedCellIndices: List<int>.from(_selectedIndices),
+      customImagePaths: isPicked ? _pickedImagePaths : null,
+      initialImageIndex: _previewImageIndex,
+      initialTransforms:
+          _editTransforms.isNotEmpty ? _editTransforms : null,
+      onClose: _exitFlow,
+      onNext: _goToDetails,
+    );
+  }
+
+  Widget _buildDetails() {
+    return PostCreatePage(
+      key: const ValueKey('details'),
+      postType: _postType,
+      selectedCellIndices: List<int>.from(_selectedIndices),
+      imagePaths: _editImagePaths,
+      transforms: _editTransforms,
+      previewImageIndex: _previewImageIndex,
+      onClose: _exitFlow,
+      onEdit: _pickedVideoPath != null ? null : _backToEdit,
+      mediaKind: _pickedVideoPath != null ? 'video' : 'image',
+      videoPath: _pickedVideoPath,
+    );
+  }
 }
 
 class _PostingBanner extends StatelessWidget {
@@ -183,6 +295,7 @@ class _PostingBanner extends StatelessWidget {
     required this.hasSelection,
     required this.onNext,
     this.onPickGallery,
+    this.onPickVideo,
   });
 
   static const _neutral300 = Color(0xFFC8C5BC);
@@ -192,6 +305,7 @@ class _PostingBanner extends StatelessWidget {
   final bool hasSelection;
   final VoidCallback? onNext;
   final VoidCallback? onPickGallery;
+  final VoidCallback? onPickVideo;
 
   @override
   Widget build(BuildContext context) {
@@ -268,6 +382,26 @@ class _PostingBanner extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (onPickVideo != null) ...[
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: onPickVideo,
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.videocam_rounded,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -387,25 +521,21 @@ class _PostingSelector extends StatelessWidget {
   const _PostingSelector({
     required this.postType,
     required this.onChanged,
-    this.showListing = false,
   });
 
   static const _selectorBg = Color(0xE6231F1B);
 
   final String postType;
   final ValueChanged<String> onChanged;
-  final bool showListing;
 
   @override
   Widget build(BuildContext context) {
-    final options = showListing
-        ? const ['piece', 'scene', 'listing']
-        : const ['piece', 'scene'];
+    const options = ['piece', 'scene'];
 
     return Container(
-      width: showListing ? 220 : 160,
+      width: 160,
       height: 38,
-      padding: EdgeInsets.symmetric(horizontal: showListing ? 16 : 30),
+      padding: const EdgeInsets.symmetric(horizontal: 30),
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: _selectorBg,
@@ -416,11 +546,7 @@ class _PostingSelector extends StatelessWidget {
         children: [
           for (final type in options)
             _SelectorTab(
-              label: type == 'listing'
-                  ? 'Listing'
-                  : type == 'scene'
-                      ? 'Scene'
-                      : 'Piece',
+              label: type == 'scene' ? 'Scene' : 'Piece',
               selected: postType == type,
               onTap: () => onChanged(type),
             ),

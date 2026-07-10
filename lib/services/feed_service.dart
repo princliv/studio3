@@ -1,5 +1,6 @@
 import '../models/feed_item.dart';
 import 'api_client.dart';
+import '../data/scene_videos_dummy.dart';
 
 class FeedService {
   FeedService._();
@@ -33,5 +34,23 @@ class FeedService {
   Future<List<FeedItem>> getForYou() async {
     final json = await _api.get('/api/feed/for-you', auth: true);
     return _api.extractList(json).map(FeedItem.fromJson).toList();
+  }
+
+  /// Video scenes for the Scenes videos tab (`FeedItemType.post` + `isVideo`).
+  Future<List<FeedItem>> getVideoScenes() async {
+    try {
+      final json = await _api.get(
+        '/api/feed/explore',
+        query: const {'medium': 'video'},
+      );
+      final items = _api.extractList(json).map(FeedItem.fromJson).toList();
+      final videoScenes = items
+          .where((item) => item.type == FeedItemType.post && item.isVideo)
+          .toList();
+      if (videoScenes.isNotEmpty) return videoScenes;
+    } catch (_) {
+      // Fall through to scene video placeholders.
+    }
+    return List<FeedItem>.from(kSceneVideoDummyItems);
   }
 }

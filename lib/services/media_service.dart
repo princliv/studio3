@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'api_client.dart';
@@ -67,5 +68,22 @@ class MediaService {
       contentType: contentType,
     );
     return presign.url;
+  }
+
+  Future<String> uploadFile({
+    required String purpose,
+    required File file,
+    required String contentType,
+    String? pieceId,
+    String? postId,
+  }) async {
+    final bytes = await file.readAsBytes();
+    return uploadBytes(
+      purpose: purpose,
+      bytes: bytes,
+      contentType: contentType,
+      pieceId: pieceId,
+      postId: postId,
+    );
   }
 }

@@ -481,7 +481,7 @@ class _OrderSummaryCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            _SummaryLine(label: 'Artwork', value: artworkDisplay),
+            _SummaryLine(label: 'Piece', value: artworkDisplay),
             const SizedBox(height: 8),
             _SummaryLine(label: 'Shipping', value: shippingDisplay),
             const SizedBox(height: 8),

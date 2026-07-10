@@ -29,13 +29,14 @@ class _ProfilePageState extends State<ProfilePage> {
   UserProfile? _profile;
   List<PieceSummary> _pieces = [];
   List<PostSummary> _scenes = [];
-  List<PieceSummary> _collected = [];
+  List<PieceSummary> _listedPieces = [];
   bool _tabContentLoading = false;
   bool _profileLoading = true;
   bool? _lastKnownSeller;
   bool _piecesLoaded = false;
   bool _scenesLoaded = false;
-  bool _collectedLoaded = false;
+  bool _listedPiecesLoaded = false;
+  String _collectSegment = 'available';
 
   static const _heroSeed = 901;
   static const _avatarSeed = 902;
@@ -89,11 +90,11 @@ class _ProfilePageState extends State<ProfilePage> {
     setState(() {
       if (seller) {
         _tab = 'collect';
-        _collectedLoaded = false;
+        _listedPiecesLoaded = false;
       } else if (_tab == 'collect') {
         _tab = 'pieces';
-        _collected = [];
-        _collectedLoaded = false;
+        _listedPieces = [];
+        _listedPiecesLoaded = false;
       }
     });
     _loadProfileShell(silent: true);
@@ -129,7 +130,7 @@ class _ProfilePageState extends State<ProfilePage> {
     final tab = _tab;
     if (tab == 'pieces' && (_piecesLoaded && !force)) return;
     if (tab == 'scenes' && (_scenesLoaded && !force)) return;
-    if (tab == 'collect' && (_collectedLoaded && !force)) return;
+    if (tab == 'collect' && (_listedPiecesLoaded && !force)) return;
     if (tab == 'series') return;
 
     setState(() => _tabContentLoading = true);
@@ -152,11 +153,11 @@ class _ProfilePageState extends State<ProfilePage> {
           _tabContentLoading = false;
         });
       } else if (tab == 'collect' && profile.sellerEnabled) {
-        final collected = await _loadCollected(profile);
+        final listedPieces = await _loadListedPieces(profile);
         if (!mounted) return;
         setState(() {
-          _collected = collected;
-          _collectedLoaded = true;
+          _listedPieces = listedPieces;
+          _listedPiecesLoaded = true;
           _tabContentLoading = false;
         });
       } else {
@@ -167,22 +168,20 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  Future<List<PieceSummary>> _loadCollected(UserProfile profile) async {
-    if (profile.savedPieces.isNotEmpty) return profile.savedPieces;
-    try {
-      return await UserService.instance.getSavedPieces();
-    } catch (_) {
-      try {
-        return await PieceService.instance.getUserPiecesForSale(profile.username);
-      } catch (_) {
-        return const [];
-      }
-    }
+  Future<List<PieceSummary>> _loadListedPieces(UserProfile profile) async {
+    return PieceService.instance.getUserPiecesForSale(profile.username);
   }
 
   void _onTabChanged(String tab) {
-    setState(() => _tab = tab);
+    setState(() {
+      _tab = tab;
+      if (tab == 'collect') _collectSegment = 'available';
+    });
     _loadActiveTab();
+  }
+
+  void _onCollectSegmentChanged(String segment) {
+    setState(() => _collectSegment = segment);
   }
 
   @override
@@ -211,7 +210,7 @@ class _ProfilePageState extends State<ProfilePage> {
             onRefresh: () async {
               _piecesLoaded = false;
               _scenesLoaded = false;
-              _collectedLoaded = false;
+              _listedPiecesLoaded = false;
               await _loadProfile();
             },
             child: CustomScrollView(
@@ -234,7 +233,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           if (mounted) {
                             _piecesLoaded = false;
                             _scenesLoaded = false;
-                            _collectedLoaded = false;
+                            _listedPiecesLoaded = false;
                             await _loadProfileShell(silent: true);
                             await _loadActiveTab(force: true);
                           }
@@ -259,7 +258,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   avatarUrl: avatarUrl,
                   avatarSeed: _avatarSeed,
                   piecesCount: profile?.piecesCount ?? _pieces.length,
-                  collectedCount: profile?.collectedCount ?? _collected.length,
+                  collectedCount: profile?.collectedCount,
                   savesCount: profile?.savesCount,
                   salesCount: profile?.collectedCount,
                   sellerMode: sellerEnabled,
@@ -286,7 +285,9 @@ class _ProfilePageState extends State<ProfilePage> {
                     seriesItems: _seriesEligible,
                     pieces: _pieces,
                     scenes: _scenes,
-                    collected: _collected,
+                    listedPieces: _listedPieces,
+                    collectSegment: _collectSegment,
+                    onCollectSegmentChanged: _onCollectSegmentChanged,
                     sellerMode: sellerEnabled,
                     loading: _tabContentLoading,
                     leftMasonry: _leftMasonry,

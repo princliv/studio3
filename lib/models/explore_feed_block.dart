@@ -1,6 +1,6 @@
 import '../models/feed_item.dart';
 
-enum ExploreCategory { pieces, scenes, events }
+enum ExploreCategory { all, pieces, scenes }
 
 enum ExploreTileRatio {
   portrait3x4,

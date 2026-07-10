@@ -5,6 +5,8 @@ List<FeedItem> filterExploreItems(
   ExploreCategory category,
 ) {
   switch (category) {
+    case ExploreCategory.all:
+      return items;
     case ExploreCategory.pieces:
       return items
           .where(
@@ -17,7 +19,5 @@ List<FeedItem> filterExploreItems(
             (item) => item.type == FeedItemType.post || item.isVideo,
           )
           .toList();
-    case ExploreCategory.events:
-      return const [];
   }
 }

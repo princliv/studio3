@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../data/home_feed_dummy.dart';
 import '../../../theme/home_feed_tokens.dart';
+import '../../../widgets/profile_avatar.dart';
 import '../profile_constants.dart';
 
 class ProfileHeader extends StatelessWidget {
@@ -89,7 +89,7 @@ class ProfileHeader extends StatelessWidget {
                 Expanded(
                   child: Row(
                     children: [
-                      _ProfileAvatar(
+                      ProfileAvatar(
                         url: avatarUrl,
                         seed: avatarSeed,
                         size: _avatarSize,
@@ -204,46 +204,6 @@ class ProfileHeader extends StatelessWidget {
       ),
     );
   }
-}
-
-class _ProfileAvatar extends StatelessWidget {
-  const _ProfileAvatar({
-    this.url,
-    required this.seed,
-    required this.size,
-  });
-
-  final String? url;
-  final int seed;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    final image = url != null && url!.isNotEmpty
-        ? Image.network(
-            url!,
-            width: size,
-            height: size,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) => _fallback(),
-          )
-        : Image.network(
-            picsumAvatarUrl(seed),
-            width: size,
-            height: size,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) => _fallback(),
-          );
-
-    return ClipOval(child: image);
-  }
-
-  Widget _fallback() => Container(
-        width: size,
-        height: size,
-        color: Colors.grey.shade300,
-        child: Icon(Icons.person_rounded, color: Colors.grey.shade600, size: 22),
-      );
 }
 
 class _StatBlock extends StatelessWidget {

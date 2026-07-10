@@ -4,9 +4,14 @@ import '../models/feed_item.dart';
 import '../models/feed_preview_item.dart';
 import '../screens/available_piece_detail_page.dart';
 import '../screens/piece_detail_page.dart';
+import 'reels_route.dart';
 import 'slide_up_page_route.dart';
 
 Future<void> openExploreDetail(BuildContext context, FeedItem item) {
+  if (item.type == FeedItemType.post && item.isVideo) {
+    return openReelsForItem(context, item);
+  }
+
   final preview = FeedPreviewItem.fromFeedItem(item);
   final page = preview.isAvailable
       ? AvailablePieceDetailPage(item: preview)

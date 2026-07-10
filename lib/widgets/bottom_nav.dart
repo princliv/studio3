@@ -2,6 +2,8 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../widgets/profile_avatar.dart';
+
 /// Bottom nav — Figma Nav/Bottom (4-icon pill + profile avatar).
 abstract final class BottomNavIndex {
   static const int home = 0;
@@ -21,6 +23,7 @@ const double _kAvatarSize = 44;
 const double _kPillAvatarGap = 8;
 const double _kIconSize = 22;
 const double _kIconHit = 44;
+const double _kBottomLift = 12;
 const double _kInactiveWhite = 0.4;
 
 class BottomNav extends StatelessWidget {
@@ -28,21 +31,24 @@ class BottomNav extends StatelessWidget {
     super.key,
     required this.selectedNavIndex,
     required this.onNavTap,
-    this.avatar,
+    this.avatarUrl,
+    this.avatarSeed = 902,
   });
 
   final int selectedNavIndex;
   final ValueChanged<int> onNavTap;
-  final ImageProvider? avatar;
+  final String? avatarUrl;
+  final int avatarSeed;
 
   @override
   Widget build(BuildContext context) {
     return Positioned(
       left: 10,
       right: 10,
-      bottom: 16,
+      bottom: _kBottomLift,
       child: SafeArea(
         top: false,
+        minimum: const EdgeInsets.only(bottom: 8),
         child: Center(
           child: FittedBox(
             fit: BoxFit.scaleDown,
@@ -57,7 +63,8 @@ class BottomNav extends StatelessWidget {
                 const SizedBox(width: _kPillAvatarGap),
                 _ProfileAvatar(
                   selected: selectedNavIndex == BottomNavIndex.profile,
-                  avatar: avatar,
+                  avatarUrl: avatarUrl,
+                  avatarSeed: avatarSeed,
                   onTap: () => onNavTap(BottomNavIndex.profile),
                 ),
               ],
@@ -195,12 +202,14 @@ class _ProfileAvatar extends StatelessWidget {
   const _ProfileAvatar({
     required this.selected,
     required this.onTap,
-    this.avatar,
+    this.avatarUrl,
+    this.avatarSeed = 902,
   });
 
   final bool selected;
   final VoidCallback onTap;
-  final ImageProvider? avatar;
+  final String? avatarUrl;
+  final int avatarSeed;
 
   @override
   Widget build(BuildContext context) {
@@ -226,15 +235,11 @@ class _ProfileAvatar extends StatelessWidget {
               ),
             ),
             clipBehavior: Clip.antiAlias,
-            child: avatar != null
-                ? Image(image: avatar!, fit: BoxFit.cover)
-                : Icon(
-                    Icons.person_outline_rounded,
-                    size: 22,
-                    color: selected
-                        ? Colors.white
-                        : Colors.white.withValues(alpha: _kInactiveWhite),
-                  ),
+            child: ProfileAvatar(
+              url: avatarUrl,
+              seed: avatarSeed,
+              size: _kAvatarSize,
+            ),
           ),
         ),
       ),
