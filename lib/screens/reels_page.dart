@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../models/feed_item.dart';
 import '../services/feed_service.dart';
 import '../widgets/reels/reel_player_page.dart';
-import '../widgets/studio_loading.dart';
 
 class ReelsPage extends StatefulWidget {
   const ReelsPage({
@@ -23,6 +22,8 @@ class _ReelsPageState extends State<ReelsPage> {
   late final PageController _pageController;
   List<FeedItem> _items = [];
   bool _loading = true;
+  bool _loadingMore = false;
+  String? _nextCursor;
   int _currentIndex = 0;
 
   @override
@@ -39,33 +40,53 @@ class _ReelsPageState extends State<ReelsPage> {
     super.dispose();
   }
 
-  Future<void> _loadItems() async {
-    if (widget.initialItems != null && widget.initialItems!.isNotEmpty) {
+  Future<void> _loadItems({bool append = false, bool refresh = false}) async {
+    if (widget.initialItems != null && widget.initialItems!.isNotEmpty && !append) {
       setState(() {
         _items = List<FeedItem>.from(widget.initialItems!);
         _loading = false;
       });
       return;
     }
-    setState(() => _loading = true);
+    if (append) {
+      if (_loadingMore || _nextCursor == null || _nextCursor!.isEmpty) return;
+      setState(() => _loadingMore = true);
+    } else if (_items.isEmpty || refresh) {
+      setState(() => _loading = _items.isEmpty);
+    }
     try {
-      final items = await FeedService.instance.getVideoScenes();
+      final page = await FeedService.instance.getVideoScenes(
+        cursor: append ? _nextCursor : null,
+      );
       if (!mounted) return;
       setState(() {
-        _items = items;
+        if (append) {
+          _items.addAll(page.items);
+        } else {
+          _items = page.items;
+        }
+        _nextCursor = page.nextCursor;
         _loading = false;
+        _loadingMore = false;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _items = [];
+        if (!append) _items = [];
         _loading = false;
+        _loadingMore = false;
       });
     }
   }
 
+  void _maybeLoadMore(int index) {
+    if (_loadingMore || _nextCursor == null || _nextCursor!.isEmpty) return;
+    if (index < _items.length - 2) return;
+    _loadItems(append: true);
+  }
+
   Future<void> _onRefresh() async {
-    await _loadItems();
+    await _loadItems(refresh: true);
     if (!mounted || _items.isEmpty) return;
     final nextIndex = _currentIndex.clamp(0, _items.length - 1);
     if (_pageController.hasClients) {
@@ -78,11 +99,20 @@ class _ReelsPageState extends State<ReelsPage> {
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.paddingOf(context).bottom + 72;
 
-    return StudioLoadingGate(
-      loading: _loading,
-      child: Scaffold(
-        backgroundColor: Colors.black,
-        body: _items.isEmpty
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: _loading && _items.isEmpty
+          ? const Center(
+              child: SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white70,
+                ),
+              ),
+            )
+          : _items.isEmpty
             ? RefreshIndicator(
                 color: Colors.white,
                 backgroundColor: Colors.black,
@@ -111,7 +141,10 @@ class _ReelsPageState extends State<ReelsPage> {
                     parent: AlwaysScrollableScrollPhysics(),
                   ),
                   itemCount: _items.length,
-                  onPageChanged: (index) => setState(() => _currentIndex = index),
+                  onPageChanged: (index) {
+                    setState(() => _currentIndex = index);
+                    _maybeLoadMore(index);
+                  },
                   itemBuilder: (context, index) {
                     return ReelPlayerPage(
                       key: ValueKey(_items[index].id),
@@ -122,7 +155,6 @@ class _ReelsPageState extends State<ReelsPage> {
                   },
                 ),
               ),
-      ),
     );
   }
 }

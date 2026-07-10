@@ -12,8 +12,15 @@ class FeedItem {
   final PostSummary? post;
 
   factory FeedItem.fromJson(Map<String, dynamic> json) {
-    final kind = json['type'] as String? ?? json['contentType'] as String?;
-    if (kind == 'post' || json.containsKey('pieceId')) {
+    final kind = json['type'] as String?;
+    if (kind == 'post') {
+      return FeedItem.post(PostSummary.fromJson(json));
+    }
+    if (kind == 'piece') {
+      return FeedItem.piece(PieceSummary.fromJson(json));
+    }
+    if (json.containsKey('linkedPieceId') ||
+        (json['title'] == null && json['caption'] != null)) {
       return FeedItem.post(PostSummary.fromJson(json));
     }
     return FeedItem.piece(PieceSummary.fromJson(json));

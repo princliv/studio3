@@ -1,6 +1,8 @@
-import '../models/feed_item.dart';
-import 'api_client.dart';
 import '../data/scene_videos_dummy.dart';
+import '../models/feed_item.dart';
+import '../models/feed_page.dart';
+import 'api_client.dart';
+import 'auth_session.dart';
 
 class FeedService {
   FeedService._();
@@ -8,49 +10,94 @@ class FeedService {
 
   final _api = ApiClient.instance;
 
-  Future<List<FeedItem>> getFollowing() async {
-    final json = await _api.get('/api/feed/following', auth: true);
-    return _api.extractList(json).map(FeedItem.fromJson).toList();
+  Future<FeedPage> getFollowing({String? cursor, int? limit}) async {
+    final json = await _api.get(
+      '/api/feed/following',
+      query: _query(cursor: cursor, limit: limit),
+      auth: true,
+    );
+    return _parseFeedPage(json);
   }
 
-  Future<List<FeedItem>> getExplore({String? medium, bool videoOnly = false}) async {
-    final query = <String, String>{};
+  Future<FeedPage> getExplore({
+    String? medium,
+    bool videoOnly = false,
+    String? cursor,
+    int? limit,
+  }) async {
+    final query = _query(cursor: cursor, limit: limit);
     if (videoOnly) {
       query['medium'] = 'video';
     } else if (medium != null && medium.isNotEmpty && medium != 'All') {
       query['medium'] = medium.toLowerCase();
     }
+
     final json = await _api.get(
       '/api/feed/explore',
       query: query.isEmpty ? null : query,
+      auth: AuthSession.instance.isLoggedIn,
     );
-    final items = _api.extractList(json).map(FeedItem.fromJson).toList();
-    if (videoOnly) {
-      return items.where((item) => item.isVideo).toList();
-    }
-    return items;
+    return _parseFeedPage(
+      json,
+      videoOnly: videoOnly,
+    );
   }
 
-  Future<List<FeedItem>> getForYou() async {
-    final json = await _api.get('/api/feed/for-you', auth: true);
-    return _api.extractList(json).map(FeedItem.fromJson).toList();
+  Future<FeedPage> getForYou({String? cursor, int? limit}) async {
+    final json = await _api.get(
+      '/api/feed/for-you',
+      query: _query(cursor: cursor, limit: limit),
+      auth: true,
+    );
+    return _parseFeedPage(json);
   }
 
-  /// Video scenes for the Scenes videos tab (`FeedItemType.post` + `isVideo`).
-  Future<List<FeedItem>> getVideoScenes() async {
+  /// Video scenes for Reels (`type: post` + `mediaType: video`).
+  Future<FeedPage> getVideoScenes({String? cursor, int? limit}) async {
     try {
-      final json = await _api.get(
-        '/api/feed/explore',
-        query: const {'medium': 'video'},
+      final page = await getExplore(
+        videoOnly: true,
+        cursor: cursor,
+        limit: limit,
       );
-      final items = _api.extractList(json).map(FeedItem.fromJson).toList();
-      final videoScenes = items
-          .where((item) => item.type == FeedItemType.post && item.isVideo)
-          .toList();
-      if (videoScenes.isNotEmpty) return videoScenes;
+      if (page.items.isNotEmpty || cursor != null) return page;
     } catch (_) {
-      // Fall through to scene video placeholders.
+      if (cursor != null) rethrow;
     }
-    return List<FeedItem>.from(kSceneVideoDummyItems);
+    return FeedPage(items: List<FeedItem>.from(kSceneVideoDummyItems));
+  }
+
+  Map<String, String> _query({String? cursor, int? limit}) {
+    final query = <String, String>{};
+    if (cursor != null && cursor.isNotEmpty) query['cursor'] = cursor;
+    if (limit != null) query['limit'] = limit.toString();
+    return query;
+  }
+
+  FeedPage _parseFeedPage(
+    Map<String, dynamic> json, {
+    bool videoOnly = false,
+  }) {
+    final data = _api.extractData(json);
+    final rawItems = data is Map<String, dynamic> ? data['items'] : data;
+    final nextCursor =
+        data is Map<String, dynamic> ? data['nextCursor'] as String? : null;
+
+    var items = _api
+        .extractList(json)
+        .map(FeedItem.fromJson)
+        .toList(growable: false);
+
+    if (rawItems is! List && items.isEmpty) {
+      items = const [];
+    }
+
+    if (videoOnly) {
+      items = items
+          .where((item) => item.type == FeedItemType.post && item.isVideo)
+          .toList(growable: false);
+    }
+
+    return FeedPage(items: items, nextCursor: nextCursor);
   }
 }

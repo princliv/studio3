@@ -138,10 +138,18 @@ class _MainShellState extends State<MainShell> {
   static const _avatarSeed = 902;
 
   int _selectedNavIndex = BottomNavIndex.home;
+  late final List<Widget> _tabs;
 
   @override
   void initState() {
     super.initState();
+    _tabs = [
+      HomeFeedPage(onThemeToggle: widget.onThemeToggle),
+      const ExplorePage(),
+      const ReelsPage(),
+      const SavedPage(),
+      const ProfilePage(),
+    ];
     AuthSession.instance.addListener(_onSessionChanged);
     _loadProfilePhoto();
   }
@@ -173,23 +181,6 @@ class _MainShellState extends State<MainShell> {
     }
   }
 
-  Widget _buildScreen() {
-    switch (_selectedNavIndex) {
-      case BottomNavIndex.home:
-        return HomeFeedPage(onThemeToggle: widget.onThemeToggle);
-      case BottomNavIndex.discover:
-        return const ExplorePage(key: ValueKey('explore'));
-      case BottomNavIndex.reels:
-        return const ReelsPage(key: ValueKey('reels'));
-      case BottomNavIndex.bookmark:
-        return const SavedPage();
-      case BottomNavIndex.profile:
-        return const ProfilePage();
-      default:
-        return HomeFeedPage(onThemeToggle: widget.onThemeToggle);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -198,7 +189,10 @@ class _MainShellState extends State<MainShell> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          _buildScreen(),
+          IndexedStack(
+            index: _selectedNavIndex,
+            children: _tabs,
+          ),
           BottomNav(
             selectedNavIndex: _selectedNavIndex,
             onNavTap: _onNavTap,

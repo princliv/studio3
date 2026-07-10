@@ -4,7 +4,7 @@ import '../../../models/feed_item.dart';
 import '../../../models/piece_summary.dart';
 import '../../../models/post_summary.dart';
 import '../../../theme/home_feed_tokens.dart';
-import '../../../utils/reels_route.dart';
+import '../../../utils/explore_detail_route.dart';
 import '../profile_constants.dart';
 
 class ProfileContentGrid extends StatelessWidget {
@@ -298,10 +298,6 @@ void openProfileScene(
   List<PostSummary> scenes,
   PostSummary post,
 ) {
-  final mediaType = post.mediaType?.toLowerCase();
-  final isVideo =
-      mediaType == 'video' || mediaType == 'reel' || mediaType == 'reels';
-  if (!isVideo) return;
-  final feedItems = scenes.map(FeedItem.post).toList();
-  openReelsForPosts(context, feedItems, FeedItem.post(post));
+  final item = FeedItem.post(post);
+  openExploreDetail(context, item);
 }

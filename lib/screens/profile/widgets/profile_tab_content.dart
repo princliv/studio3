@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../models/piece_summary.dart';
 import '../../../models/post_summary.dart';
 import '../../../theme/home_feed_tokens.dart';
+import '../../../widgets/feed_skeleton.dart';
 import '../profile_constants.dart';
 import 'profile_masonry_grid.dart';
 import 'profile_series_grid.dart';
@@ -40,6 +41,21 @@ class ProfileTabContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (loading &&
+        currentTab != 'series' &&
+        (currentTab == 'pieces'
+            ? pieces.isEmpty
+            : currentTab == 'scenes'
+                ? scenes.isEmpty
+                : currentTab == 'collect'
+                    ? listedPieces.isEmpty
+                    : true)) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: ProfileGridSkeleton(),
+      );
+    }
+
     if (currentTab == 'series') {
       return ProfileSeriesGrid(items: seriesItems);
     }

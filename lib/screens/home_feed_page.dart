@@ -9,7 +9,6 @@ import '../utils/explore_detail_route.dart';
 import '../utils/feed_layout_generator.dart';
 import '../utils/slide_up_page_route.dart';
 import '../widgets/home_feed/home_feed_widgets.dart';
-import '../widgets/studio_loading.dart';
 import '../services/feed_service.dart';
 import 'available_piece_detail_page.dart';
 import 'piece_detail_page.dart';
@@ -35,9 +34,11 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
   final List<FeedItem> _apiItems = [];
   FeedAvailabilityFilter _filter = FeedAvailabilityFilter.all;
   bool _loadingMore = false;
+  bool _loadingMoreApi = false;
   bool _useApi = false;
-  bool _refreshingApi = false;
   bool _didJumpForAdvance = false;
+  String? _nextCursor;
+  final ScrollController _apiScrollController = ScrollController();
 
   List<FeedPreviewItem> get _visiblePreviewItems {
     if (_filter == FeedAvailabilityFilter.all) return _previewItems;
@@ -54,6 +55,7 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
     super.initState();
     _previewItems.addAll(_generator.nextBatch(_initialBatch));
     _scrollController.addListener(_onScroll);
+    _apiScrollController.addListener(_onApiScroll);
     _loadFeed();
   }
 
@@ -61,28 +63,53 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
   void dispose() {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    _apiScrollController.removeListener(_onApiScroll);
+    _apiScrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadFeed() async {
-    if (_refreshingApi) return;
-    setState(() => _refreshingApi = true);
+  Future<void> _loadFeed({bool append = false, bool refresh = false}) async {
+    if (_loadingMoreApi) return;
+    if (append && (_nextCursor == null || _nextCursor!.isEmpty)) return;
+
+    setState(() {
+      if (append) {
+        _loadingMoreApi = true;
+      }
+    });
     try {
-      final items = await FeedService.instance.getForYou();
+      final page = await FeedService.instance.getForYou(
+        cursor: append ? _nextCursor : null,
+      );
       if (!mounted) return;
       setState(() {
-        _apiItems
-          ..clear()
-          ..addAll(items);
-        _useApi = items.isNotEmpty;
-        _refreshingApi = false;
+        if (append) {
+          _apiItems.addAll(page.items);
+        } else {
+          _apiItems
+            ..clear()
+            ..addAll(page.items);
+        }
+        _nextCursor = page.nextCursor;
+        _useApi = _apiItems.isNotEmpty;
+        _loadingMoreApi = false;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _useApi = false;
-        _refreshingApi = false;
+        if (!append) _useApi = false;
+        _loadingMoreApi = false;
       });
+    }
+  }
+
+  void _onApiScroll() {
+    if (!_useApi || _loadingMoreApi) return;
+    if (_nextCursor == null || _nextCursor!.isEmpty) return;
+    final pos = _apiScrollController.position;
+    if (!pos.hasPixels || !pos.hasViewportDimension) return;
+    if (pos.pixels >= pos.maxScrollExtent - _loadMoreThreshold) {
+      _loadFeed(append: true);
     }
   }
 
@@ -225,31 +252,28 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.paddingOf(context).bottom + 100;
 
-    return StudioLoadingGate(
-      loading: _refreshingApi,
-      child: Scaffold(
-        backgroundColor: HomeFeedTokens.background,
-        body: SafeArea(
-          bottom: false,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
-                child: FeedHomeHeader(
-                  filter: _filter,
-                  onFilterChanged: _onFilterChanged,
-                  onAddTap: () => Navigator.pushNamed(context, '/post'),
-                  onMoonTap: widget.onThemeToggle,
-                ),
+    return Scaffold(
+      backgroundColor: HomeFeedTokens.background,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
+              child: FeedHomeHeader(
+                filter: _filter,
+                onFilterChanged: _onFilterChanged,
+                onAddTap: () => Navigator.pushNamed(context, '/post'),
+                onMoonTap: widget.onThemeToggle,
               ),
-              Expanded(
-                child: _useApi
-                    ? _buildApiFeed(bottomInset)
-                    : _buildPreviewFeed(bottomInset),
-              ),
-            ],
-          ),
+            ),
+            Expanded(
+              child: _useApi
+                  ? _buildApiFeed(bottomInset)
+                  : _buildPreviewFeed(bottomInset),
+            ),
+          ],
         ),
       ),
     );
@@ -272,8 +296,9 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
     }
 
     return RefreshIndicator(
-      onRefresh: _loadFeed,
+      onRefresh: () => _loadFeed(refresh: true),
       child: GridView.builder(
+        controller: _apiScrollController,
         padding: EdgeInsets.fromLTRB(
           HomeFeedTokens.sideMargin,
           0,
@@ -286,8 +311,20 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
           mainAxisSpacing: 8,
           childAspectRatio: 0.75,
         ),
-        itemCount: visible.length,
+        itemCount: visible.length + (_loadingMoreApi ? 1 : 0),
         itemBuilder: (context, index) {
+          if (index >= visible.length) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            );
+          }
           final item = visible[index];
           final url = item.mediaUrl;
           return GestureDetector(

@@ -11,7 +11,8 @@ Future<void> openReels(
 }) async {
   List<FeedItem> reelsItems = items ?? const [];
   if (reelsItems.isEmpty) {
-    reelsItems = await FeedService.instance.getVideoScenes();
+    final page = await FeedService.instance.getVideoScenes();
+    reelsItems = page.items;
   }
 
   var index = initialIndex;
@@ -32,8 +33,9 @@ Future<void> openReels(
 }
 
 Future<void> openReelsForItem(BuildContext context, FeedItem item) async {
-  final reelsItems = await FeedService.instance.getVideoScenes();
+  final page = await FeedService.instance.getVideoScenes();
   if (!context.mounted) return;
+  final reelsItems = page.items;
   final index = reelsItems.indexWhere((entry) => entry.id == item.id);
   await openReels(
     context,

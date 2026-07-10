@@ -25,7 +25,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   void initState() {
     super.initState();
-    final remembered = AuthSession.instance.rememberedUsername;
+    final remembered = AuthSession.instance.rememberedLoginIdentifier;
     if (remembered != null) {
       _usernameController.text = remembered;
       _rememberMe = true;
@@ -56,11 +56,13 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => _loading = true);
     try {
       await AuthService.instance.login(
-        username: _usernameController.text.trim(),
+        identifier: _usernameController.text.trim(),
         password: _passwordController.text,
       );
       if (_rememberMe) {
-        await AuthSession.instance.saveRememberedUsername(_usernameController.text.trim());
+        await AuthSession.instance.saveRememberedLoginIdentifier(
+          _usernameController.text.trim(),
+        );
       } else {
         await AuthSession.instance.clearRememberedUsername();
       }
@@ -88,10 +90,11 @@ class _LoginPageState extends State<LoginPage> {
               const SizedBox(height: 28),
               AuthIconInput(
                 controller: _usernameController,
-                placeholder: 'Username',
+                placeholder: 'Username or email',
                 prefixIcon: Icons.person_outline_rounded,
                 errorText: _usernameError,
                 textInputAction: TextInputAction.next,
+                keyboardType: TextInputType.emailAddress,
                 onChanged: (_) => setState(() {}),
               ),
               const SizedBox(height: 14),

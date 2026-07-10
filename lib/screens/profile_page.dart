@@ -9,7 +9,6 @@ import '../services/piece_service.dart';
 import '../services/post_service.dart';
 import '../services/user_service.dart';
 import '../theme/home_feed_tokens.dart';
-import '../widgets/studio_loading.dart';
 import 'profile/models/profile_series_data.dart';
 import 'profile/profile_constants.dart';
 import 'profile/widgets/profile_header.dart';
@@ -31,7 +30,6 @@ class _ProfilePageState extends State<ProfilePage> {
   List<PostSummary> _scenes = [];
   List<PieceSummary> _listedPieces = [];
   bool _tabContentLoading = false;
-  bool _profileLoading = true;
   bool? _lastKnownSeller;
   bool _piecesLoaded = false;
   bool _scenesLoaded = false;
@@ -102,19 +100,17 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _loadProfileShell({bool silent = false}) async {
-    if (!silent) setState(() => _profileLoading = true);
     try {
       final profile = await UserService.instance.getMe();
       if (!mounted) return;
       setState(() {
         _profile = profile;
         _lastKnownSeller = profile.sellerEnabled;
-        _profileLoading = false;
         if (!profile.sellerEnabled && _tab == 'collect') _tab = 'pieces';
       });
       if (!silent) _loadActiveTab();
     } catch (_) {
-      if (mounted) setState(() => _profileLoading = false);
+      // Keep session-backed shell visible when profile cannot be loaded.
     }
   }
 
@@ -200,21 +196,19 @@ class _ProfilePageState extends State<ProfilePage> {
     final coverUrl = profile?.coverPhotoUrl;
     final avatarUrl = profile?.profilePhotoUrl;
 
-    return StudioLoadingGate(
-      loading: _profileLoading || _tabContentLoading,
-      child: Scaffold(
-        backgroundColor: HomeFeedTokens.background,
-        body: SafeArea(
-          bottom: false,
-          child: RefreshIndicator(
-            onRefresh: () async {
-              _piecesLoaded = false;
-              _scenesLoaded = false;
-              _listedPiecesLoaded = false;
-              await _loadProfile();
-            },
-            child: CustomScrollView(
-              slivers: [
+    return Scaffold(
+      backgroundColor: HomeFeedTokens.background,
+      body: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          onRefresh: () async {
+            _piecesLoaded = false;
+            _scenesLoaded = false;
+            _listedPiecesLoaded = false;
+            await _loadProfile();
+          },
+          child: CustomScrollView(
+            slivers: [
               SliverToBoxAdapter(
                 child: Stack(
                   children: [
@@ -299,7 +293,6 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ),
       ),
-    ),
     );
   }
 }

@@ -31,7 +31,7 @@ class PostSummary {
       caption: json['caption'] as String? ?? json['body'] as String?,
       mediaUrl: json['mediaUrl'] as String?,
       mediaType: json['mediaType'] as String?,
-      pieceId: json['pieceId'] as String?,
+      pieceId: json['linkedPieceId'] as String? ?? json['pieceId'] as String?,
       likeCount: _intFrom(json['likeCount'] ?? json['likes']),
       isLiked: json['isLiked'] as bool? ?? false,
       isSaved: json['isSaved'] as bool? ?? false,

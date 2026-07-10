@@ -39,23 +39,29 @@ class AuthService {
     required String email,
     required String password,
     required String otp,
+    String? phone,
   }) async {
-    final json = await _api.post('/api/auth/register', body: {
+    final body = <String, dynamic>{
       'username': username.trim(),
       'name': name.trim(),
       'email': email.trim(),
       'password': password,
       'otp': otp,
-    });
+    };
+    final trimmedPhone = phone?.trim();
+    if (trimmedPhone != null && trimmedPhone.isNotEmpty) {
+      body['phone'] = trimmedPhone;
+    }
+    final json = await _api.post('/api/auth/register', body: body);
     return _persistAuthResponse(json);
   }
 
   Future<AuthUser> login({
-    required String username,
+    required String identifier,
     required String password,
   }) async {
     final json = await _api.post('/api/auth/login', body: {
-      'username': username.trim(),
+      'username': identifier.trim(),
       'password': password,
     });
     return _persistAuthResponse(json);

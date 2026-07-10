@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../models/feed_item.dart';
 import '../models/feed_preview_item.dart';
+import '../services/post_service.dart';
+import '../services/social_service.dart';
+import '../services/user_service.dart';
 import '../screens/available_piece_detail_page.dart';
 import '../screens/piece_detail_page.dart';
 import '../services/saved_content_store.dart';
@@ -24,6 +28,22 @@ class _SavedPageState extends State<SavedPage> {
   void initState() {
     super.initState();
     _store.addListener(_onStoreChanged);
+    _loadSavedFromApi();
+  }
+
+  Future<void> _loadSavedFromApi() async {
+    try {
+      final pieces = await UserService.instance.getSavedPieces();
+      for (final piece in pieces) {
+        _store.savePreview(FeedPreviewItem.fromPieceSummary(piece));
+      }
+      final posts = await PostService.instance.getSavedPosts();
+      for (final post in posts) {
+        _store.saveFeedItem(FeedItem.post(post));
+      }
+    } catch (_) {
+      // Keep local saved entries when API is unavailable.
+    }
   }
 
   @override
@@ -54,6 +74,17 @@ class _SavedPageState extends State<SavedPage> {
       Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
           builder: (_) => page,
+        ),
+      );
+      return;
+    }
+
+    final feedItem = entry.feedItem;
+    if (feedItem != null && feedItem.type == FeedItemType.post) {
+      final scenePreview = FeedPreviewItem.fromFeedItem(feedItem);
+      Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => PieceDetailPage(item: scenePreview),
         ),
       );
     }
@@ -89,6 +120,15 @@ class _SavedPageState extends State<SavedPage> {
       ),
     );
     if (remove == true) {
+      try {
+        if (entry.kind == SavedContentKind.scene) {
+          await SocialService.instance.unsavePost(entry.id);
+        } else {
+          await SocialService.instance.unsavePiece(entry.id);
+        }
+      } catch (_) {
+        // Keep local removal even if API call fails.
+      }
       _store.unsave(entry.id);
     }
   }

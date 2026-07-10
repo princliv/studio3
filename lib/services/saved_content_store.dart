@@ -90,9 +90,14 @@ class SavedContentStore extends ChangeNotifier {
   }
 
   void saveFeedItem(FeedItem item) {
+    FeedPreviewItem? preview;
+    if (item.type == FeedItemType.post) {
+      preview = FeedPreviewItem.fromFeedItem(item);
+    }
     _entries[item.id] = SavedEntry(
       id: item.id,
       kind: SavedContentKind.scene,
+      preview: preview,
       feedItem: item,
     );
     notifyListeners();

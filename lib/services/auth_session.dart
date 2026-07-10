@@ -43,6 +43,9 @@ class AuthSession {
 
   String? get rememberedUsername => _prefs?.getString(_rememberedUsernameKey);
 
+  /// Login identifier saved by "Remember me" (username or email).
+  String? get rememberedLoginIdentifier => rememberedUsername;
+
   Future<void> saveSession({
     required String token,
     required AuthUser authUser,
@@ -50,10 +53,10 @@ class AuthSession {
   }) async {
     accessToken = token;
     user = authUser;
-    if (seller != null) sellerEnabled = seller;
+    sellerEnabled = seller ?? authUser.sellerEnabled;
     await _prefs?.setString(_tokenKey, token);
     await _prefs?.setString(_userKey, jsonEncode(authUser.toJson()));
-    if (seller != null) await _prefs?.setBool(_sellerKey, seller);
+    await _prefs?.setBool(_sellerKey, sellerEnabled);
     notifyListeners();
   }
 
@@ -101,9 +104,12 @@ class AuthSession {
     }
   }
 
-  Future<void> saveRememberedUsername(String username) async {
-    await _prefs?.setString(_rememberedUsernameKey, username);
+  Future<void> saveRememberedUsername(String identifier) async {
+    await _prefs?.setString(_rememberedUsernameKey, identifier);
   }
+
+  Future<void> saveRememberedLoginIdentifier(String identifier) =>
+      saveRememberedUsername(identifier);
 
   Future<void> clearRememberedUsername() async {
     await _prefs?.remove(_rememberedUsernameKey);

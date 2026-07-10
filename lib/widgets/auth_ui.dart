@@ -1,7 +1,10 @@
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+
+import '../services/api_exception.dart';
 import '../theme/app_theme.dart';
 import '../widgets/studio_logo.dart';
 
@@ -705,6 +708,9 @@ void showAuthSnackBar(BuildContext context, String message, {bool isError = fals
 }
 
 void showAuthError(BuildContext context, Object error) {
-  final message = error is Exception ? error.toString().replaceFirst('ApiException: ', '') : 'Something went wrong';
+  final message = switch (error) {
+    ApiException(:final message) => message,
+    _ => 'Something went wrong',
+  };
   showAuthSnackBar(context, message, isError: true);
 }

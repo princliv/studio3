@@ -5,7 +5,9 @@ abstract final class AuthValidators {
   static const _reservedUsernames = {'admin', 'studio3', 'support', 'root'};
 
   static String? loginIdentifier(String? value) {
-    if (value == null || value.trim().isEmpty) return 'Username is required';
+    if (value == null || value.trim().isEmpty) {
+      return 'Username or email is required';
+    }
     return null;
   }
 

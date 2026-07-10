@@ -15,7 +15,7 @@ import '../widgets/explore/explore_featured_card.dart';
 import '../widgets/explore/explore_feed_section.dart';
 import '../widgets/explore/explore_near_you_placeholder.dart';
 import '../widgets/explore/explore_sticky_header.dart';
-import '../widgets/studio_loading.dart';
+import '../widgets/feed_skeleton.dart';
 
 class ExplorePage extends StatefulWidget {
   const ExplorePage({super.key});
@@ -33,9 +33,10 @@ class _ExplorePageState extends State<ExplorePage> {
   UserProfile? _profile;
   FeedItem? _featured;
   bool _loading = true;
+  bool _loadingMore = false;
+  String? _nextCursor;
   String _searchQuery = '';
   int _visibleCycleCount = 2;
-  bool _loadingMore = false;
 
   @override
   void initState() {
@@ -52,38 +53,64 @@ class _ExplorePageState extends State<ExplorePage> {
     super.dispose();
   }
 
-  Future<void> _loadData() async {
-    setState(() => _loading = true);
+  Future<void> _loadData({bool append = false, bool refresh = false}) async {
+    if (append) {
+      if (_loadingMore || _nextCursor == null || _nextCursor!.isEmpty) return;
+      setState(() => _loadingMore = true);
+    } else if (refresh) {
+      setState(() => _loading = true);
+    } else if (_allItems.isEmpty) {
+      setState(() => _loading = true);
+    }
+
     try {
-      final items = await FeedService.instance.getExplore();
-      UserProfile? profile;
-      try {
-        profile = await UserService.instance.getMe();
-      } catch (_) {
-        profile = null;
+      final page = await FeedService.instance.getExplore(
+        cursor: append ? _nextCursor : null,
+      );
+      UserProfile? profile = _profile;
+      if (!append) {
+        try {
+          profile = await UserService.instance.getMe();
+        } catch (_) {
+          profile = null;
+        }
       }
       if (!mounted) return;
-      _applyItems(items, profile);
+      setState(() {
+        if (append) {
+          _allItems.addAll(page.items);
+        } else {
+          _allItems = page.items;
+        }
+        _nextCursor = page.nextCursor;
+        _profile = profile;
+        _loading = false;
+        _loadingMore = false;
+      });
+      if (!append) {
+        final filtered = _filterItems(_allItems, _category, _searchQuery);
+        final featured = ExploreFeaturedRanker.pickFeatured(
+          filtered,
+          profile: profile,
+        );
+        if (!mounted) return;
+        setState(() {
+          _featured = featured;
+          _visibleCycleCount = 2;
+        });
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _allItems = [];
-        _featured = null;
+        if (!append) {
+          _allItems = [];
+          _featured = null;
+          _nextCursor = null;
+        }
         _loading = false;
+        _loadingMore = false;
       });
     }
-  }
-
-  void _applyItems(List<FeedItem> items, UserProfile? profile) {
-    final filtered = _filterItems(items, _category, _searchQuery);
-    final featured = ExploreFeaturedRanker.pickFeatured(filtered, profile: profile);
-    setState(() {
-      _allItems = items;
-      _profile = profile;
-      _featured = featured;
-      _loading = false;
-      _visibleCycleCount = 2;
-    });
   }
 
   List<FeedItem> get _sourceItems =>
@@ -152,20 +179,23 @@ class _ExplorePageState extends State<ExplorePage> {
   }
 
   void _onScroll() {
-    if (!_scrollController.hasClients || _loadingMore) return;
+    if (!_scrollController.hasClients || _loadingMore || _loading) return;
     final position = _scrollController.position;
     if (position.pixels < position.maxScrollExtent - 300) return;
 
     final maxCycles = ExploreLayoutEngine.cycleCountForItems(_feedItems.length);
-    if (_visibleCycleCount >= maxCycles) return;
-    if (_visibleCycleCount >= ExploreLayoutEngine.maxCycles) return;
+    if (_visibleCycleCount < maxCycles &&
+        _visibleCycleCount < ExploreLayoutEngine.maxCycles) {
+      setState(() {
+        _visibleCycleCount =
+            (_visibleCycleCount + 2).clamp(0, maxCycles);
+      });
+      return;
+    }
 
-    setState(() {
-      _loadingMore = true;
-      _visibleCycleCount =
-          (_visibleCycleCount + 2).clamp(0, maxCycles);
-      _loadingMore = false;
-    });
+    if (_nextCursor != null && _nextCursor!.isNotEmpty) {
+      _loadData(append: true);
+    }
   }
 
   String get _emptyMessage {
@@ -177,52 +207,60 @@ class _ExplorePageState extends State<ExplorePage> {
 
   @override
   Widget build(BuildContext context) {
+    final showSkeleton = _loading && _allItems.isEmpty;
+
     return Scaffold(
       backgroundColor: ExploreTokens.background,
       body: SafeArea(
         bottom: false,
-        child: _loading
-            ? const Center(child: StudioLoadingAnimation())
-            : RefreshIndicator(
-                color: ExploreTokens.textPrimary,
-                onRefresh: _loadData,
-                child: CustomScrollView(
-                  controller: _scrollController,
-                  physics: const AlwaysScrollableScrollPhysics(
-                    parent: BouncingScrollPhysics(),
-                  ),
-                  slivers: [
-                    SliverPersistentHeader(
-                      pinned: true,
-                      delegate: ExploreStickyHeader(
-                        searchController: _searchController,
-                        onSearchChanged: _onSearchChanged,
-                        selectedCategory: _category,
-                        onCategorySelected: _onCategoryChanged,
-                        onFilterTap: () {},
-                      ),
-                    ),
-                    if (_effectiveFeatured != null)
-                      SliverToBoxAdapter(
-                        child: ExploreFeaturedCard(
-                          item: _effectiveFeatured!,
-                          onTap: () =>
-                              openExploreDetail(context, _effectiveFeatured!),
-                        ),
-                      ),
-                    const SliverToBoxAdapter(
-                      child: ExploreNearYouPlaceholder(),
-                    ),
-                    SliverToBoxAdapter(
-                      child: ExploreFeedSection(
-                        blocks: _visibleBlocks,
-                        emptyMessage: _emptyMessage,
-                      ),
-                    ),
-                    const SliverToBoxAdapter(child: SizedBox(height: 120)),
-                  ],
+        child: RefreshIndicator(
+          color: ExploreTokens.textPrimary,
+          onRefresh: () => _loadData(refresh: true),
+          child: CustomScrollView(
+            controller: _scrollController,
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
+            slivers: [
+              SliverPersistentHeader(
+                pinned: true,
+                delegate: ExploreStickyHeader(
+                  searchController: _searchController,
+                  onSearchChanged: _onSearchChanged,
+                  selectedCategory: _category,
+                  onCategorySelected: _onCategoryChanged,
+                  onFilterTap: () {},
                 ),
               ),
+              if (!showSkeleton && _effectiveFeatured != null)
+                SliverToBoxAdapter(
+                  child: ExploreFeaturedCard(
+                    item: _effectiveFeatured!,
+                    onTap: () =>
+                        openExploreDetail(context, _effectiveFeatured!),
+                  ),
+                ),
+              const SliverToBoxAdapter(
+                child: ExploreNearYouPlaceholder(),
+              ),
+              if (showSkeleton)
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 12, bottom: 48),
+                    child: ExploreFeedSkeleton(),
+                  ),
+                )
+              else
+                SliverToBoxAdapter(
+                  child: ExploreFeedSection(
+                    blocks: _visibleBlocks,
+                    emptyMessage: _emptyMessage,
+                  ),
+                ),
+              const SliverToBoxAdapter(child: SizedBox(height: 120)),
+            ],
+          ),
+        ),
       ),
     );
   }

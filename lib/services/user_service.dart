@@ -143,10 +143,6 @@ class UserService {
     }
   }
 
-  Future<void> logoutAllDevices() async {
-    await _api.post('/api/auth/logout-all', auth: true);
-  }
-
   Future<void> _syncSessionFromProfile(
     UserProfile profile,
     Map<String, dynamic> data,

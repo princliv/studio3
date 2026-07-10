@@ -20,6 +20,8 @@ class _DiscoverPageState extends State<DiscoverPage> {
   late final List<String> _filters;
   List<FeedItem> _items = [];
   bool _loading = true;
+  bool _loadingMore = false;
+  String? _nextCursor;
 
   @override
   void initState() {
@@ -40,24 +42,40 @@ class _DiscoverPageState extends State<DiscoverPage> {
     _loadExplore();
   }
 
-  Future<void> _loadExplore() async {
-    setState(() => _loading = true);
+  Future<void> _loadExplore({bool append = false}) async {
+    if (append) {
+      if (_loadingMore || _nextCursor == null || _nextCursor!.isEmpty) return;
+      setState(() => _loadingMore = true);
+    } else {
+      setState(() => _loading = true);
+    }
     try {
-      final items = widget.reelsOnly
-          ? await FeedService.instance.getExplore(videoOnly: true)
+      final page = widget.reelsOnly
+          ? await FeedService.instance.getExplore(
+              videoOnly: true,
+              cursor: append ? _nextCursor : null,
+            )
           : await FeedService.instance.getExplore(
               medium: _filter == 'All' ? null : _filter.toLowerCase(),
+              cursor: append ? _nextCursor : null,
             );
       if (!mounted) return;
       setState(() {
-        _items = items;
+        if (append) {
+          _items.addAll(page.items);
+        } else {
+          _items = page.items;
+        }
+        _nextCursor = page.nextCursor;
         _loading = false;
+        _loadingMore = false;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _items = [];
+        if (!append) _items = [];
         _loading = false;
+        _loadingMore = false;
       });
     }
   }
@@ -87,7 +105,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
         backgroundColor: AppColors.slate50,
         body: SafeArea(
           child: RefreshIndicator(
-            onRefresh: _loadExplore,
+            onRefresh: () => _loadExplore(),
             child: CustomScrollView(
               slivers: [
               SliverToBoxAdapter(

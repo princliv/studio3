@@ -72,12 +72,14 @@ class UsernameCheckResult {
   const UsernameCheckResult({
     required this.available,
     this.normalized,
+    this.reason,
     this.message,
     this.suggestions = const [],
   });
 
   final bool available;
   final String? normalized;
+  final String? reason;
   final String? message;
   final List<String> suggestions;
 
@@ -85,6 +87,7 @@ class UsernameCheckResult {
     return UsernameCheckResult(
       available: json['available'] as bool? ?? false,
       normalized: json['normalized'] as String?,
+      reason: json['reason'] as String?,
       message: json['message'] as String?,
       suggestions: (json['suggestions'] as List<dynamic>?)
               ?.map((e) => e.toString())

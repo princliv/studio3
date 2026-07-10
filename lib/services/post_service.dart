@@ -29,4 +29,9 @@ class PostService {
     final json = await _api.get('/api/users/$username/posts');
     return _api.extractList(json).map(PostSummary.fromJson).toList();
   }
+
+  Future<List<PostSummary>> getSavedPosts() async {
+    final json = await _api.get('/api/user/me/saved/posts', auth: true);
+    return _api.extractList(json).map(PostSummary.fromJson).toList();
+  }
 }

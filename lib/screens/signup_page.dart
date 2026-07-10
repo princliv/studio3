@@ -254,6 +254,9 @@ class _SignUpPageState extends State<SignUpPage> {
         email: _emailController.text.trim(),
         password: _passwordController.text,
         otp: _otp,
+        phone: _phoneController.text.trim().isEmpty
+            ? null
+            : _phoneController.text.trim(),
       );
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/welcome', arguments: user);
