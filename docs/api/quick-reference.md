@@ -1,0 +1,57 @@
+# Quick reference
+
+Single-table endpoint index. See flow docs for request/response examples.
+
+| Method | URL | Auth | Body |
+|--------|-----|------|------|
+| GET | `{{baseUrl}}/` | — | — |
+| GET | `{{baseUrl}}/api/auth/username/check` | Optional | Query: `username`, `for_user_id=me` |
+| POST | `{{baseUrl}}/api/auth/otp/generate` | — | `{ "email" }` |
+| POST | `{{baseUrl}}/api/auth/otp/resend` | — | `{ "email" }` |
+| POST | `{{baseUrl}}/api/auth/register` | — | `{ "username", "name", "email", "password", "otp", "phone"? }` |
+| POST | `{{baseUrl}}/api/auth/login` | — | `{ "username", "password" }` — `username` is username or email |
+| POST | `{{baseUrl}}/api/auth/refresh` | Cookie | — |
+| POST | `{{baseUrl}}/api/auth/logout` | Cookie | — |
+| POST | `{{baseUrl}}/api/auth/logout-all` | Bearer | — |
+| POST | `{{baseUrl}}/api/auth/forget-password` | — | `{ "email" }` |
+| POST | `{{baseUrl}}/api/auth/reset-password` | — | `{ "token", "newPassword" }` |
+| GET | `{{baseUrl}}/api/user/me` | Bearer | — |
+| PATCH | `{{baseUrl}}/api/user/me` | Bearer | Profile fields |
+| PATCH | `{{baseUrl}}/api/user/me/username` | Bearer | `{ "username" }` |
+| GET | `{{baseUrl}}/api/user/:username` | Optional Bearer | — |
+| PATCH | `{{baseUrl}}/api/user/me/role` | Bearer | `{ "role" }` |
+| POST | `{{baseUrl}}/api/user/me/onboarding/*` | Bearer | See [user-profile flow](./flows/user-profile.md) |
+| POST | `{{baseUrl}}/api/user/me/seller/*` | Bearer | See [user-profile flow](./flows/user-profile.md) |
+| GET | `{{baseUrl}}/api/user/me/seller/analytics` | Bearer | — |
+| GET | `{{baseUrl}}/api/user/me/saved/pieces` | Bearer | — |
+| GET | `{{baseUrl}}/api/user/me/saved/posts` | Bearer | Saved scenes |
+| POST | `{{baseUrl}}/api/media/presign` | Bearer | `{ "purpose", "contentType" }` |
+| POST/PATCH/GET | `{{baseUrl}}/api/pieces/*` | Varies | See [pieces-scenes flow](./flows/pieces-scenes.md) |
+| GET | `{{baseUrl}}/api/pieces/:id/comments` | — | Query: `cursor?`, `limit?` |
+| POST/PATCH/GET | `{{baseUrl}}/api/posts/*` | Varies | Scenes — see [pieces-scenes flow](./flows/pieces-scenes.md) |
+| GET | `{{baseUrl}}/api/posts/:id/comments` | — | Query: `cursor?`, `limit?` |
+| GET | `{{baseUrl}}/api/users/:username/pieces` | — | — |
+| GET | `{{baseUrl}}/api/users/:username/posts` | — | Profile Scenes tab |
+| GET | `{{baseUrl}}/api/users/:username/series` | — | Public profile (pieceCount > 1) |
+| GET | `{{baseUrl}}/api/user/me/series` | Bearer | Owner management (all series) |
+| POST/PATCH/GET/DELETE | `{{baseUrl}}/api/series/*` | Varies | See [series flow](./flows/series.md) |
+| POST/DELETE | `{{baseUrl}}/api/users/:username/follow` | Bearer | — |
+| POST/DELETE | `{{baseUrl}}/api/pieces/:id/like` | Bearer | — |
+| GET | `{{baseUrl}}/api/feed/following` | Bearer | Query: `cursor?`, `limit?` |
+| GET | `{{baseUrl}}/api/feed/explore` | Optional Bearer | Query: `medium?`, `cursor?`, `limit?` |
+| GET | `{{baseUrl}}/api/feed/for-you` | Bearer | Query: `cursor?`, `limit?` |
+
+**Auth column:** See [setup.md](./setup.md) for Bearer / Optional Bearer / Cookie definitions.
+
+## Flow index
+
+| Flow | Doc |
+|------|-----|
+| Setup & conventions | [setup.md](./setup.md) |
+| Auth | [flows/auth.md](./flows/auth.md) |
+| User & profile | [flows/user-profile.md](./flows/user-profile.md) |
+| Media | [flows/media.md](./flows/media.md) |
+| Pieces & scenes | [flows/pieces-scenes.md](./flows/pieces-scenes.md) |
+| Social | [flows/social.md](./flows/social.md) |
+| Feeds | [flows/feeds.md](./flows/feeds.md) |
+| Series | [flows/series.md](./flows/series.md) |

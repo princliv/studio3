@@ -62,6 +62,7 @@ class _Studio3AppState extends State<Studio3App> {
       darkTheme: AppTheme.dark,
       themeMode: _themeMode,
       initialRoute: resolveInitialRoute(),
+      navigatorObservers: [routeObserver],
       routes: {
         '/': (context) => AuthGate(
               child: MainShell(onThemeToggle: _toggleTheme),
@@ -151,18 +152,18 @@ class _MainShellState extends State<MainShell> {
   static const _avatarSeed = 902;
 
   int _selectedNavIndex = BottomNavIndex.home;
-  late final List<Widget> _tabs;
+
+  List<Widget> _buildTabs() => [
+        HomeFeedPage(onThemeToggle: widget.onThemeToggle),
+        const ExplorePage(),
+        ReelsPage(active: _selectedNavIndex == BottomNavIndex.reels),
+        const SavedPage(),
+        const ProfilePage(),
+      ];
 
   @override
   void initState() {
     super.initState();
-    _tabs = [
-      HomeFeedPage(onThemeToggle: widget.onThemeToggle),
-      const ExplorePage(),
-      const ReelsPage(),
-      const SavedPage(),
-      const ProfilePage(),
-    ];
     AuthSession.instance.addListener(_onSessionChanged);
     _loadProfilePhoto();
   }
@@ -204,7 +205,7 @@ class _MainShellState extends State<MainShell> {
         children: [
           IndexedStack(
             index: _selectedNavIndex,
-            children: _tabs,
+            children: _buildTabs(),
           ),
           BottomNav(
             selectedNavIndex: _selectedNavIndex,

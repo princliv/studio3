@@ -400,6 +400,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 child: ProfileTabs(
                   currentTab: _tab,
                   showCollect: sellerEnabled,
+                  collectSegment: _collectSegment,
+                  onCollectSegmentChanged: _onCollectSegmentChanged,
                   onTabChanged: _onTabChanged,
                 ),
               ),
@@ -418,7 +420,6 @@ class _ProfilePageState extends State<ProfilePage> {
                     scenes: _scenes,
                     listedPieces: _listedPieces,
                     collectSegment: _collectSegment,
-                    onCollectSegmentChanged: _onCollectSegmentChanged,
                     sellerMode: sellerEnabled,
                     loading: _tabContentLoading,
                     leftMasonry: _leftMasonry,

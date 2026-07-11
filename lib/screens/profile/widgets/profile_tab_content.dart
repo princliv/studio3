@@ -4,7 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../models/piece_summary.dart';
 import '../../../models/post_summary.dart';
-import '../../../theme/home_feed_tokens.dart';
 import '../../../widgets/feed_skeleton.dart';
 import '../profile_constants.dart';
 import 'profile_masonry_grid.dart';
@@ -20,7 +19,6 @@ class ProfileTabContent extends StatelessWidget {
     this.scenes = const [],
     this.listedPieces = const [],
     this.collectSegment = 'available',
-    this.onCollectSegmentChanged,
     this.sellerMode = false,
     this.loading = false,
     this.leftMasonry = const [],
@@ -33,7 +31,6 @@ class ProfileTabContent extends StatelessWidget {
   final List<PostSummary> scenes;
   final List<PieceSummary> listedPieces;
   final String collectSegment;
-  final ValueChanged<String>? onCollectSegmentChanged;
   final bool sellerMode;
   final bool loading;
   final List<({int seed, double h})> leftMasonry;
@@ -94,95 +91,23 @@ class ProfileTabContent extends StatelessWidget {
         );
       }
 
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _CollectSegmentControl(
-            segment: collectSegment,
-            onChanged: onCollectSegmentChanged,
-          ),
-          const SizedBox(height: 12),
-          if (collectSegment == 'sold')
-            const _EmptyState(label: 'No sold pieces yet')
-          else if (listedPieces.where((p) => p.isForSale).isEmpty)
-            const _EmptyState(label: 'No pieces listed for sale yet')
-          else
-            ProfileContentGrid.fromPieces(
-              listedPieces.where((p) => p.isForSale).toList(),
-              onPieceTap: (piece) => openProfilePiece(context, piece),
-            ),
-        ],
+      if (collectSegment == 'sold') {
+        return const _EmptyState(label: 'No sold pieces yet');
+      }
+
+      final available = listedPieces.where((p) => p.isForSale).toList();
+      if (available.isEmpty) {
+        return const _EmptyState(label: 'No pieces listed for sale yet');
+      }
+
+      return ProfileContentGrid.fromPieces(
+        available,
+        forSaleListing: true,
+        onPieceTap: (piece) => openProfilePiece(context, piece),
       );
     }
 
     return const _EmptyState(label: 'Coming soon');
-  }
-}
-
-class _CollectSegmentControl extends StatelessWidget {
-  const _CollectSegmentControl({
-    required this.segment,
-    this.onChanged,
-  });
-
-  final String segment;
-  final ValueChanged<String>? onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        _SegmentChip(
-          label: 'Available',
-          selected: segment == 'available',
-          onTap: () => onChanged?.call('available'),
-        ),
-        const SizedBox(width: 8),
-        _SegmentChip(
-          label: 'Sold',
-          selected: segment == 'sold',
-          onTap: () => onChanged?.call('sold'),
-        ),
-      ],
-    );
-  }
-}
-
-class _SegmentChip extends StatelessWidget {
-  const _SegmentChip({
-    required this.label,
-    required this.selected,
-    this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected
-              ? HomeFeedTokens.textPrimary
-              : HomeFeedTokens.textPrimary.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: selected
-                ? HomeFeedTokens.textInverse
-                : HomeFeedTokens.textPrimary,
-          ),
-        ),
-      ),
-    );
   }
 }
 

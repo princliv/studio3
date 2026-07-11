@@ -117,3 +117,29 @@ class SellerStatus {
     );
   }
 }
+
+class SellerAnalytics {
+  const SellerAnalytics({
+    this.savesCount,
+    this.likesCount,
+    this.inquiriesCount,
+    this.salesCount,
+    this.period,
+  });
+
+  final int? savesCount;
+  final int? likesCount;
+  final int? inquiriesCount;
+  final int? salesCount;
+  final String? period;
+
+  factory SellerAnalytics.fromJson(Map<String, dynamic> json) {
+    return SellerAnalytics(
+      savesCount: json['savesCount'] as int?,
+      likesCount: json['likesCount'] as int?,
+      inquiriesCount: json['inquiriesCount'] as int?,
+      salesCount: json['salesCount'] as int?,
+      period: json['period'] as String?,
+    );
+  }
+}

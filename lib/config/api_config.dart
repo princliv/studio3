@@ -7,7 +7,7 @@ abstract final class ApiConfig {
 
   static String get baseUrl {
     if (kIsWeb) return 'http://localhost:$port';
-    if (Platform.isAndroid) return 'http://10.0.2.2:$port';
+    if (Platform.isAndroid) return 'http://127.0.0.1:$port';
     return 'http://localhost:$port';
   }
 }

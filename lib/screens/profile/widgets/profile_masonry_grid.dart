@@ -34,6 +34,7 @@ class ProfileContentGrid extends StatelessWidget {
   factory ProfileContentGrid.fromPieces(
     List<PieceSummary> pieces, {
     void Function(PieceSummary piece)? onPieceTap,
+    bool forSaleListing = false,
   }) {
     final heights = [292.0, 168.0, 174.0, 318.0, 182.0, 132.0, 302.0, 156.0];
     final mapped = <
@@ -51,7 +52,7 @@ class ProfileContentGrid extends StatelessWidget {
       mapped.add((
         url: p.mediaUrl,
         height: heights[i % heights.length],
-        forSale: p.isForSale,
+        forSale: forSaleListing || p.isForSale,
         price: p.priceDisplay,
         isVideo: false,
         post: null,

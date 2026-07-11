@@ -130,6 +130,12 @@ class UserService {
     await _session.setSellerEnabled(false);
   }
 
+  Future<SellerAnalytics> getSellerAnalytics() async {
+    final json = await _api.get('/api/user/me/seller/analytics', auth: true);
+    final data = _api.extractData(json) as Map<String, dynamic>;
+    return SellerAnalytics.fromJson(data);
+  }
+
   Future<List<PieceSummary>> getSavedPieces() async {
     try {
       final json = await _api.get('/api/user/me/saved/pieces', auth: true);

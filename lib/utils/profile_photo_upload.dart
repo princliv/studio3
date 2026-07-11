@@ -17,10 +17,14 @@ Future<String?> pickAndUploadPhoto(
   try {
     final picked = await _picker.pickImage(source: ImageSource.gallery);
     if (picked == null) return null;
-    return MediaService.instance.uploadFile(
+    final url = await MediaService.instance.uploadFile(
       purpose: purpose,
       file: File(picked.path),
     );
+    // Profile/cover uploads reuse a stable per-user URL, so the new bytes
+    // must be evicted from the image cache or the old photo keeps showing.
+    PaintingBinding.instance.imageCache.evict(NetworkImage(url));
+    return url;
   } catch (e) {
     if (!context.mounted) return null;
     final message = e is ApiException ? e.message : e.toString();

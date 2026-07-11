@@ -4,27 +4,40 @@ import '../models/feed_item.dart';
 import '../services/feed_service.dart';
 import '../widgets/reels/reel_player_page.dart';
 
+/// App-wide observer so ReelsPage can pause playback when another route is
+/// pushed on top of it (e.g. opening a reel author's profile).
+final routeObserver = RouteObserver<PageRoute>();
+
 class ReelsPage extends StatefulWidget {
   const ReelsPage({
     super.key,
     this.initialIndex = 0,
     this.initialItems,
+    this.active = true,
   });
 
   final int initialIndex;
   final List<FeedItem>? initialItems;
 
+  /// Whether this Reels instance is the currently visible bottom-nav tab.
+  /// Pass `false` when another tab is selected so playback pauses even
+  /// though an IndexedStack keeps this widget mounted.
+  final bool active;
+
   @override
   State<ReelsPage> createState() => _ReelsPageState();
 }
 
-class _ReelsPageState extends State<ReelsPage> {
+class _ReelsPageState extends State<ReelsPage> with RouteAware {
   late final PageController _pageController;
   List<FeedItem> _items = [];
   bool _loading = true;
   bool _loadingMore = false;
   String? _nextCursor;
   int _currentIndex = 0;
+  bool _routePaused = false;
+
+  bool get _playbackActive => widget.active && !_routePaused;
 
   @override
   void initState() {
@@ -35,7 +48,30 @@ class _ReelsPageState extends State<ReelsPage> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    routeObserver.subscribe(this, ModalRoute.of(context) as PageRoute);
+  }
+
+  @override
+  void didUpdateWidget(covariant ReelsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.active != widget.active) setState(() {});
+  }
+
+  @override
+  void didPushNext() {
+    setState(() => _routePaused = true);
+  }
+
+  @override
+  void didPopNext() {
+    setState(() => _routePaused = false);
+  }
+
+  @override
   void dispose() {
+    routeObserver.unsubscribe(this);
     _pageController.dispose();
     super.dispose();
   }
@@ -149,7 +185,7 @@ class _ReelsPageState extends State<ReelsPage> {
                     return ReelPlayerPage(
                       key: ValueKey(_items[index].id),
                       item: _items[index],
-                      isActive: index == _currentIndex,
+                      isActive: index == _currentIndex && _playbackActive,
                       bottomOverlayPadding: bottomPadding,
                     );
                   },

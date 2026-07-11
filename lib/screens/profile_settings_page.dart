@@ -23,8 +23,7 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
   bool _loadingSeller = true;
   bool _togglingSeller = false;
   String? _profileLocation;
-  int? _savesCount;
-  int? _salesCount;
+  SellerAnalytics? _analytics;
 
   @override
   void initState() {
@@ -44,16 +43,25 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
       setState(() {
         _sellerEnabled = status.enabled;
         _profileLocation = profile.location;
-        _savesCount = profile.savesCount;
-        _salesCount = profile.collectedCount;
         _loadingSeller = false;
       });
+      if (status.enabled) _loadAnalytics();
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _sellerEnabled = AuthSession.instance.sellerEnabled;
         _loadingSeller = false;
       });
+    }
+  }
+
+  Future<void> _loadAnalytics() async {
+    try {
+      final analytics = await UserService.instance.getSellerAnalytics();
+      if (!mounted) return;
+      setState(() => _analytics = analytics);
+    } catch (_) {
+      // Seller mode still works if analytics fails to load.
     }
   }
 
@@ -70,6 +78,7 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
       _togglingSeller = false;
       if (result != null) _sellerEnabled = result;
     });
+    if (result == true) _loadAnalytics();
   }
 
   @override
@@ -114,8 +123,10 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                   context,
                   MaterialPageRoute<void>(
                     builder: (_) => SellerAnalyticsPage(
-                      savesCount: _savesCount,
-                      salesCount: _salesCount,
+                      savesCount: _analytics?.savesCount,
+                      likesCount: _analytics?.likesCount,
+                      inquiriesCount: _analytics?.inquiriesCount,
+                      salesCount: _analytics?.salesCount,
                     ),
                   ),
                 );
