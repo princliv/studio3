@@ -1,6 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 
 import '../models/feed_item.dart';
 import '../models/feed_preview_item.dart' show FeedAvailabilityFilter;
@@ -155,17 +154,9 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
 
     return RefreshIndicator(
       onRefresh: () => _loadFeed(refresh: true),
-      child: MasonryGridView.count(
+      child: ListView.builder(
         controller: _scrollController,
-        padding: EdgeInsets.fromLTRB(
-          HomeFeedTokens.sideMargin,
-          0,
-          HomeFeedTokens.sideMargin,
-          bottomInset,
-        ),
-        crossAxisCount: 2,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
+        padding: EdgeInsets.only(bottom: bottomInset),
         itemCount: visible.length + (_loadingMore ? 1 : 0),
         itemBuilder: (context, index) {
           if (index >= visible.length) {
@@ -181,14 +172,19 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
             );
           }
           final item = visible[index];
-          return _ApiFeedTile(item: item, onTap: () => _openApiItem(item));
+          return Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: HomeFeedTokens.sideMargin,
+            ).copyWith(bottom: HomeFeedTokens.rowGap),
+            child: _ApiFeedTile(item: item, onTap: () => _openApiItem(item)),
+          );
         },
       ),
     );
   }
 }
 
-/// A "For You" grid tile that sizes itself to the item's real posted
+/// A "For You" feed card that sizes itself to the item's real posted
 /// aspect ratio (3:4 or 16:9) instead of a fixed shape, so the image shows
 /// fully instead of being cropped to a mismatched box.
 class _ApiFeedTile extends StatefulWidget {
@@ -249,7 +245,9 @@ class _ApiFeedTileState extends State<_ApiFeedTile> {
                 CachedNetworkImage(
                   imageUrl: url,
                   fit: BoxFit.cover,
-                  memCacheWidth: 480,
+                  memCacheWidth: (MediaQuery.sizeOf(context).width *
+                          MediaQuery.devicePixelRatioOf(context))
+                      .round(),
                   errorWidget: (context, error, stackTrace) =>
                       ColoredBox(color: Colors.grey.shade300),
                 )
