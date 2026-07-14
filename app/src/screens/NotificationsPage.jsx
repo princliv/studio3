@@ -1,20 +1,14 @@
 import React from 'react';
+import { GlassCard } from '../components/design/GlassCard';
 import { SafeArea } from '../components/layout/SafeArea';
 
 const rowStyle = {
   display: 'flex',
   alignItems: 'center',
   gap: 12,
-  padding: '12px 0',
-  borderBottom: '1px solid var(--slate-100)',
-};
-
-const types = {
-  save: '💾',
-  comment: '💬',
-  follow: '👤',
-  inquiry: '📩',
-  purchase: '🛍',
+  padding: 12,
+  marginBottom: 8,
+  boxShadow: 'var(--shadow-card)',
 };
 
 const mockActivity = [
@@ -62,7 +56,7 @@ export function NotificationsPage() {
 
 function ActivityRow({ item }) {
   return (
-    <div style={rowStyle}>
+    <GlassCard style={rowStyle}>
       <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--slate-200)', flexShrink: 0 }} />
       <div style={{ flex: 1, minWidth: 0, fontSize: 14, color: 'var(--slate-700)' }}>
         <span style={{ fontWeight: 600, color: 'var(--slate-900)' }}>{item.name}</span>
@@ -81,6 +75,6 @@ function ActivityRow({ item }) {
           <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--slate-100)' }} />
         )}
       </div>
-    </div>
+    </GlassCard>
   );
 }

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Bell, MessageCircle } from 'lucide-react';
 import { PieceCard } from '../components/feed/PieceCard';
 import { SafeArea } from '../components/layout/SafeArea';
 
@@ -38,14 +39,55 @@ const feedItems = [
 
 export function HomeFeedPage() {
   const [tab, setTab] = useState('foryou');
+  const [inboxOpen, setInboxOpen] = useState(false);
 
   return (
     <SafeArea style={{ paddingTop: 0 }}>
       <header style={headerStyle}>
         <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--slate-900)' }}>Studio 3</h1>
-        <div style={{ display: 'flex', gap: 16 }}>
-          <Link to="/notifications" aria-label="Notifications" style={{ color: 'var(--slate-700)' }}>🔔</Link>
-          <Link to="/chat" aria-label="Chat" style={{ color: 'var(--slate-700)' }}>💬</Link>
+        <div style={{ position: 'relative' }}>
+          <button
+            aria-label="Notifications and chats"
+            onClick={() => setInboxOpen((open) => !open)}
+            style={{ display: 'flex', alignItems: 'center', color: 'var(--slate-700)', padding: 4 }}
+          >
+            <Bell size={22} strokeWidth={1.75} />
+          </button>
+
+          {inboxOpen && (
+            <>
+              <div
+                style={{ position: 'fixed', inset: 0, zIndex: 20 }}
+                onClick={() => setInboxOpen(false)}
+              />
+              <div
+                className="glass-light"
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: 8,
+                  minWidth: 180,
+                  padding: 6,
+                  boxShadow: 'var(--shadow-float)',
+                  zIndex: 21,
+                }}
+              >
+                <InboxMenuLink
+                  to="/notifications"
+                  icon={<Bell size={17} strokeWidth={1.75} />}
+                  label="Notifications"
+                  onClick={() => setInboxOpen(false)}
+                />
+                <InboxMenuLink
+                  to="/chat"
+                  icon={<MessageCircle size={17} strokeWidth={1.75} />}
+                  label="Chats"
+                  onClick={() => setInboxOpen(false)}
+                />
+              </div>
+            </>
+          )}
         </div>
       </header>
 
@@ -60,5 +102,27 @@ export function HomeFeedPage() {
         ))}
       </div>
     </SafeArea>
+  );
+}
+
+function InboxMenuLink({ to, icon, label, onClick }) {
+  return (
+    <Link
+      to={to}
+      onClick={onClick}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '10px 12px',
+        borderRadius: 'var(--radius-md)',
+        fontSize: 14,
+        fontWeight: 500,
+        color: 'var(--slate-900)',
+      }}
+    >
+      {icon}
+      {label}
+    </Link>
   );
 }

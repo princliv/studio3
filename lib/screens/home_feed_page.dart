@@ -15,9 +15,7 @@ import 'piece_detail_page.dart';
 
 class HomeFeedPage extends StatefulWidget {
   /// For You feed — mixed Pieces and Scenes with All / Available filters.
-  const HomeFeedPage({super.key, this.onThemeToggle});
-
-  final VoidCallback? onThemeToggle;
+  const HomeFeedPage({super.key});
 
   @override
   State<HomeFeedPage> createState() => _HomeFeedPageState();
@@ -265,7 +263,6 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
                 filter: _filter,
                 onFilterChanged: _onFilterChanged,
                 onAddTap: () => Navigator.pushNamed(context, '/post'),
-                onMoonTap: widget.onThemeToggle,
               ),
             ),
             Expanded(

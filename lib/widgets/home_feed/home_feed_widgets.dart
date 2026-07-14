@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../data/home_feed_dummy.dart';
 import '../../data/nav_assets.dart';
 import '../../models/feed_preview_item.dart';
+import '../../theme/app_theme.dart';
 import '../../theme/home_feed_tokens.dart';
 import '../../utils/profile_navigation.dart';
 import '../studio_logo.dart';
@@ -17,13 +18,11 @@ class FeedHomeHeader extends StatelessWidget {
     required this.filter,
     required this.onFilterChanged,
     required this.onAddTap,
-    this.onMoonTap,
   });
 
   final FeedAvailabilityFilter filter;
   final ValueChanged<FeedAvailabilityFilter> onFilterChanged;
   final VoidCallback onAddTap;
-  final VoidCallback? onMoonTap;
 
   static const _headerHeight = 52.0;
 
@@ -84,40 +83,109 @@ class FeedHomeHeader extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 4),
-                GestureDetector(
-                  onTap: onMoonTap,
-                  behavior: HitTestBehavior.opaque,
-                  child: Padding(
-                    padding: const EdgeInsets.all(6),
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        SvgPicture.asset(
-                          NavAssets.moonIcon,
-                          width: 19,
-                          height: 19,
-                        ),
-                        Positioned(
-                          right: -1,
-                          top: -1,
-                          child: Container(
-                            width: 4,
-                            height: 4,
-                            decoration: const BoxDecoration(
-                              color: HomeFeedTokens.textPrimary,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                const _InboxMenuButton(),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Right-side header icon that opens a small popup with
+/// "Notifications" and "Chats" entries.
+class _InboxMenuButton extends StatelessWidget {
+  const _InboxMenuButton();
+
+  Future<void> _openMenu(BuildContext context) async {
+    final box = context.findRenderObject() as RenderBox;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox;
+    final position = RelativeRect.fromRect(
+      Rect.fromPoints(
+        box.localToGlobal(Offset(0, box.size.height), ancestor: overlay),
+        box.localToGlobal(
+          box.size.bottomRight(Offset.zero),
+          ancestor: overlay,
+        ),
+      ),
+      Offset.zero & overlay.size,
+    );
+
+    final selection = await showMenu<String>(
+      context: context,
+      position: position,
+      color: HomeFeedTokens.background,
+      surfaceTintColor: Colors.transparent,
+      elevation: 8,
+      shadowColor: Colors.black.withValues(alpha: 0.16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppDims.radiusMd),
+      ),
+      items: const [
+        PopupMenuItem(
+          value: '/notifications',
+          child: _InboxMenuRow(
+            icon: Icons.notifications_none_rounded,
+            label: 'Notifications',
+          ),
+        ),
+        PopupMenuItem(
+          value: '/chat',
+          child: _InboxMenuRow(
+            icon: Icons.chat_bubble_outline_rounded,
+            label: 'Chats',
+          ),
+        ),
+      ],
+    );
+
+    if (selection != null && context.mounted) {
+      Navigator.pushNamed(context, selection);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Builder(
+      builder: (context) => GestureDetector(
+        onTap: () => _openMenu(context),
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: SvgPicture.asset(
+            NavAssets.bellIcon,
+            width: 18,
+            height: 18,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InboxMenuRow extends StatelessWidget {
+  const _InboxMenuRow({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: HomeFeedTokens.textPrimary),
+        const SizedBox(width: 12),
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: HomeFeedTokens.textPrimary,
+          ),
+        ),
+      ],
     );
   }
 }

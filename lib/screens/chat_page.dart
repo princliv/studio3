@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+
 import '../theme/app_theme.dart';
+import '../theme/home_feed_tokens.dart';
 import '../widgets/glass_card.dart';
 
 class ChatPage extends StatefulWidget {
@@ -26,14 +29,21 @@ class _ChatPageState extends State<ChatPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.slate50,
+      backgroundColor: HomeFeedTokens.background,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Text('Inquiries', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.slate900)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Text(
+                'Inquiries',
+                style: GoogleFonts.inter(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: HomeFeedTokens.textPrimary,
+                ),
+              ),
             ),
             Expanded(
               child: _inquiries.isEmpty
@@ -42,8 +52,11 @@ class _ChatPageState extends State<ChatPage> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(Icons.mail_outline, size: 48, color: AppColors.slate200),
-                          const SizedBox(height: 16),
-                          const Text('No inquiries yet', style: TextStyle(fontSize: 14, color: AppColors.slate500)),
+                          const SizedBox(height: AppDims.spaceMd),
+                          Text(
+                            'No inquiries yet',
+                            style: GoogleFonts.inter(fontSize: 14, color: AppColors.slate500),
+                          ),
                         ],
                       ),
                     )
@@ -53,49 +66,57 @@ class _ChatPageState extends State<ChatPage> {
                       itemBuilder: (context, i) {
                         final inq = _inquiries[i];
                         return Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.only(bottom: AppDims.spaceSm),
                           child: Material(
                             color: Colors.transparent,
                             child: InkWell(
                               onTap: () => setState(() => _selectedIndex = i),
-                              borderRadius: BorderRadius.circular(16),
-                              child: Container(
+                              borderRadius: BorderRadius.circular(AppDims.radiusMd),
+                              child: GlassCard(
                                 padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.72),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: Colors.white.withOpacity(0.45)),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: AppColors.slate900.withOpacity(0.08),
-                                      blurRadius: 16,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
                                 child: Row(
                                   children: [
                                     Container(
                                       width: 48,
                                       height: 48,
-                                      decoration: BoxDecoration(color: AppColors.slate100, borderRadius: BorderRadius.circular(8)),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.slate100,
+                                        borderRadius: BorderRadius.circular(AppDims.radiusSm),
+                                      ),
                                     ),
-                                    const SizedBox(width: 12),
+                                    const SizedBox(width: AppDims.spaceSm + 4),
                                     Expanded(
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Text(inq.pieceTitle, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                                          Text('${inq.subject} — ${inq.preview}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: AppColors.slate500)),
+                                          Text(
+                                            inq.pieceTitle,
+                                            style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.slate900),
+                                          ),
+                                          Text(
+                                            '${inq.subject} — ${inq.preview}',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: GoogleFonts.inter(fontSize: 13, color: AppColors.slate500),
+                                          ),
                                         ],
                                       ),
                                     ),
                                     Column(
                                       crossAxisAlignment: CrossAxisAlignment.end,
                                       children: [
-                                        Text(inq.time, style: const TextStyle(fontSize: 11, color: AppColors.slate400)),
-                                        if (inq.unread) const SizedBox(height: 4),
-                                        if (inq.unread) Container(width: 8, height: 8, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.slate900)),
+                                        Text(
+                                          inq.time,
+                                          style: GoogleFonts.inter(fontSize: 11, color: AppColors.slate400),
+                                        ),
+                                        if (inq.unread) ...[
+                                          const SizedBox(height: 4),
+                                          Container(
+                                            width: 8,
+                                            height: 8,
+                                            decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.slate900),
+                                          ),
+                                        ],
                                       ],
                                     ),
                                   ],
@@ -135,11 +156,11 @@ class _InquiryBottomSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(AppDims.spaceLg),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.72),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        border: Border.all(color: Colors.white.withOpacity(0.45)),
+        color: Colors.white.withValues(alpha: 0.72),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppDims.radiusXl)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.45)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -150,19 +171,28 @@ class _InquiryBottomSheet extends StatelessWidget {
               Container(
                 width: 48,
                 height: 48,
-                decoration: BoxDecoration(color: AppColors.slate100, borderRadius: BorderRadius.circular(8)),
+                decoration: BoxDecoration(
+                  color: AppColors.slate100,
+                  borderRadius: BorderRadius.circular(AppDims.radiusSm),
+                ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppDims.spaceSm + 4),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(inquiry.pieceTitle, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                    Text(
+                      inquiry.pieceTitle,
+                      style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.slate900),
+                    ),
                     const SizedBox(height: 4),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(color: AppColors.slate100, borderRadius: BorderRadius.circular(9999)),
-                      child: Text(inquiry.subject, style: const TextStyle(fontSize: 12, color: AppColors.slate600)),
+                      child: Text(
+                        inquiry.subject,
+                        style: GoogleFonts.inter(fontSize: 12, color: AppColors.slate600),
+                      ),
                     ),
                   ],
                 ),
@@ -170,24 +200,29 @@ class _InquiryBottomSheet extends StatelessWidget {
               IconButton(onPressed: onClose, icon: const Icon(Icons.close)),
             ],
           ),
-          const SizedBox(height: 16),
-          Text(inquiry.preview, style: const TextStyle(fontSize: 14, color: AppColors.slate700)),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppDims.spaceMd),
+          Text(
+            inquiry.preview,
+            style: GoogleFonts.inter(fontSize: 14, color: AppColors.slate700),
+          ),
+          const SizedBox(height: AppDims.spaceMd),
           TextField(
             controller: replyController,
             maxLines: 3,
+            style: GoogleFonts.inter(fontSize: 14, color: AppColors.slate900),
             decoration: InputDecoration(
               hintText: 'Reply...',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppDims.radiusMd)),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppDims.spaceSm + 4),
           FilledButton(
             onPressed: () {},
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.slate900,
-              minimumSize: const Size.fromHeight(52),
+              minimumSize: const Size.fromHeight(AppDims.primaryButtonHeight),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9999)),
+              textStyle: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600),
             ),
             child: const Text('Send Reply'),
           ),

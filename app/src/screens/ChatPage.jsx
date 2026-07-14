@@ -8,11 +8,7 @@ const inboxCardStyle = {
   alignItems: 'center',
   gap: 12,
   marginBottom: 8,
-  borderRadius: 16,
-  boxShadow: '0 2px 16px rgba(15,23,42,0.08)',
-  background: 'rgba(255,255,255,0.72)',
-  backdropFilter: 'blur(16px)',
-  border: '1px solid rgba(255,255,255,0.45)',
+  boxShadow: 'var(--shadow-card)',
 };
 
 const emptyStateStyle = {
@@ -49,6 +45,7 @@ export function ChatPage() {
           {mockInquiries.map((inq) => (
             <button
               key={inq.id}
+              className="glass-light"
               style={{ ...inboxCardStyle, width: '100%', textAlign: 'left' }}
               onClick={() => setSelected(inq)}
             >
@@ -97,9 +94,9 @@ export function ChatPage() {
               transform: 'translateX(-50%)',
               width: '100%',
               maxWidth: 375,
-              borderTopLeftRadius: 28,
-              borderTopRightRadius: 28,
-              padding: 24,
+              borderTopLeftRadius: 'var(--radius-xl)',
+              borderTopRightRadius: 'var(--radius-xl)',
+              padding: 'var(--space-lg)',
               background: 'rgba(255,255,255,0.72)',
               backdropFilter: 'blur(16px)',
               border: '1px solid rgba(255,255,255,0.45)',

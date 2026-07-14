@@ -19,6 +19,7 @@ import 'screens/saved_page.dart';
 import 'screens/profile_page.dart';
 import 'screens/post_page.dart';
 import 'screens/notifications_page.dart';
+import 'screens/chat_page.dart';
 import 'screens/onboarding/onboarding_page.dart';
 import 'screens/edit_profile_page.dart';
 import 'screens/manage_series_page.dart';
@@ -37,22 +38,8 @@ Future<void> main() async {
   runApp(const Studio3App());
 }
 
-class Studio3App extends StatefulWidget {
+class Studio3App extends StatelessWidget {
   const Studio3App({super.key});
-
-  @override
-  State<Studio3App> createState() => _Studio3AppState();
-}
-
-class _Studio3AppState extends State<Studio3App> {
-  ThemeMode _themeMode = ThemeMode.light;
-
-  void _toggleTheme() {
-    setState(() {
-      _themeMode =
-          _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -60,12 +47,12 @@ class _Studio3AppState extends State<Studio3App> {
       title: 'Studio 3 Discover',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: _themeMode,
+      themeMode: ThemeMode.light,
       initialRoute: resolveInitialRoute(),
       navigatorObservers: [routeObserver],
       routes: {
-        '/': (context) => AuthGate(
-              child: MainShell(onThemeToggle: _toggleTheme),
+        '/': (context) => const AuthGate(
+              child: MainShell(),
             ),
         '/login': (context) => const LoginPage(),
         '/signup': (context) => const SignUpPage(),
@@ -92,6 +79,7 @@ class _Studio3AppState extends State<Studio3App> {
         },
         '/post': (context) => const PostPage(),
         '/notifications': (context) => const NotificationsPage(),
+        '/chat': (context) => const ChatPage(),
       },
     );
   }
@@ -140,9 +128,7 @@ class _AuthGateState extends State<AuthGate> {
 }
 
 class MainShell extends StatefulWidget {
-  const MainShell({super.key, required this.onThemeToggle});
-
-  final VoidCallback onThemeToggle;
+  const MainShell({super.key});
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -154,7 +140,7 @@ class _MainShellState extends State<MainShell> {
   int _selectedNavIndex = BottomNavIndex.home;
 
   List<Widget> _buildTabs() => [
-        HomeFeedPage(onThemeToggle: widget.onThemeToggle),
+        const HomeFeedPage(),
         const ExplorePage(),
         ReelsPage(active: _selectedNavIndex == BottomNavIndex.reels),
         const SavedPage(),
