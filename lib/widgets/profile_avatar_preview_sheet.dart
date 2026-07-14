@@ -10,7 +10,6 @@ import 'profile_avatar.dart';
 Future<void> showProfileAvatarPreview(
   BuildContext context, {
   required String? avatarUrl,
-  required int seed,
   required bool allowChange,
   VoidCallback? onChanged,
 }) {
@@ -21,7 +20,6 @@ Future<void> showProfileAvatarPreview(
     builder: (sheetContext) {
       return _ProfileAvatarPreviewSheet(
         avatarUrl: avatarUrl,
-        seed: seed,
         allowChange: allowChange,
         onChanged: onChanged,
       );
@@ -32,13 +30,11 @@ Future<void> showProfileAvatarPreview(
 class _ProfileAvatarPreviewSheet extends StatefulWidget {
   const _ProfileAvatarPreviewSheet({
     required this.avatarUrl,
-    required this.seed,
     required this.allowChange,
     this.onChanged,
   });
 
   final String? avatarUrl;
-  final int seed;
   final bool allowChange;
   final VoidCallback? onChanged;
 
@@ -84,7 +80,6 @@ class _ProfileAvatarPreviewSheetState extends State<_ProfileAvatarPreviewSheet> 
             children: [
               ProfileAvatar(
                 url: _avatarUrl,
-                seed: widget.seed,
                 size: _previewSize,
               ),
               if (widget.allowChange) ...[

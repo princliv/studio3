@@ -1,16 +1,14 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../data/home_feed_dummy.dart';
 import '../../data/nav_assets.dart';
 import '../../models/feed_preview_item.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/home_feed_tokens.dart';
 import '../../utils/profile_navigation.dart';
 import '../studio_logo.dart';
-
-typedef OnFeedPreviewTap = void Function(FeedPreviewItem item, {int imageIndex});
 
 class FeedHomeHeader extends StatelessWidget {
   const FeedHomeHeader({
@@ -258,6 +256,71 @@ class FeedDotIndicators extends StatelessWidget {
   }
 }
 
+/// Shows a real avatar photo when a URL is available, otherwise an
+/// initials circle — avoids ever showing a fake stranger's photo.
+class UserAvatar extends StatelessWidget {
+  const UserAvatar({
+    super.key,
+    required this.url,
+    required this.name,
+    this.size = HomeFeedTokens.avatarSize,
+  });
+
+  final String? url;
+  final String name;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    if (url != null && url!.isNotEmpty) {
+      final px = (size * MediaQuery.devicePixelRatioOf(context)).round();
+      return ClipOval(
+        child: CachedNetworkImage(
+          imageUrl: url!,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          memCacheWidth: px,
+          memCacheHeight: px,
+          errorWidget: (context, error, stackTrace) =>
+              _InitialsAvatar(name: name, size: size),
+        ),
+      );
+    }
+    return _InitialsAvatar(name: name, size: size);
+  }
+}
+
+class _InitialsAvatar extends StatelessWidget {
+  const _InitialsAvatar({required this.name, required this.size});
+
+  final String name;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final trimmed = name.trim();
+    final initial = trimmed.isNotEmpty ? trimmed[0].toUpperCase() : '?';
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(
+        color: HomeFeedTokens.neutral800,
+        shape: BoxShape.circle,
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        initial,
+        style: GoogleFonts.inter(
+          fontSize: size * 0.42,
+          fontWeight: FontWeight.w600,
+          color: HomeFeedTokens.textInverse,
+        ),
+      ),
+    );
+  }
+}
+
 class FeedCardArtistStrip extends StatelessWidget {
   const FeedCardArtistStrip({
     super.key,
@@ -267,7 +330,7 @@ class FeedCardArtistStrip extends StatelessWidget {
     this.authorUsername,
   });
 
-  final String avatarUrl;
+  final String? avatarUrl;
   final String name;
   final String? medium;
   final String? authorUsername;
@@ -288,18 +351,10 @@ class FeedCardArtistStrip extends StatelessWidget {
           onTap: canNavigate ? () => _onAvatarTap(context) : null,
           behavior:
               canNavigate ? HitTestBehavior.opaque : HitTestBehavior.deferToChild,
-          child: ClipOval(
-            child: Image.network(
-              avatarUrl,
-              width: HomeFeedTokens.avatarSize,
-              height: HomeFeedTokens.avatarSize,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Container(
-                width: HomeFeedTokens.avatarSize,
-                height: HomeFeedTokens.avatarSize,
-                color: Colors.white24,
-              ),
-            ),
+          child: UserAvatar(
+            url: avatarUrl,
+            name: name,
+            size: HomeFeedTokens.avatarSize,
           ),
         ),
         const SizedBox(width: 8),
@@ -337,27 +392,6 @@ class FeedCardArtistStrip extends StatelessWidget {
   }
 }
 
-class FeedArtistOverlay extends StatelessWidget {
-  const FeedArtistOverlay({super.key, required this.item});
-
-  final FeedPreviewItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned(
-      left: 8,
-      right: 48,
-      bottom: 8,
-      child: FeedCardArtistStrip(
-        avatarUrl: picsumAvatarUrl(item.artist.avatarSeed),
-        name: item.artist.name,
-        medium: item.medium,
-        authorUsername: item.handle,
-      ),
-    );
-  }
-}
-
 /// Bottom scrim + artist strip for API grid cards.
 class FeedApiCardOverlay extends StatelessWidget {
   const FeedApiCardOverlay({
@@ -368,7 +402,7 @@ class FeedApiCardOverlay extends StatelessWidget {
     this.authorUsername,
   });
 
-  final String avatarUrl;
+  final String? avatarUrl;
   final String name;
   final String? medium;
   final String? authorUsername;
@@ -407,31 +441,38 @@ class FeedPicsumImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Image.network(
-      url,
-      fit: fit,
-      width: double.infinity,
-      height: double.infinity,
-      loadingBuilder: (context, child, progress) {
-        if (progress == null) return child;
-        return Container(
-          color: Colors.grey.shade300,
-          alignment: Alignment.center,
-          child: const SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(strokeWidth: 2),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final dpr = MediaQuery.devicePixelRatioOf(context);
+        final maxWidth = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width;
+        final cacheWidth = (maxWidth * dpr).round().clamp(1, 2048);
+        return CachedNetworkImage(
+          imageUrl: url,
+          fit: fit,
+          width: double.infinity,
+          height: double.infinity,
+          memCacheWidth: cacheWidth,
+          progressIndicatorBuilder: (context, child, progress) => Container(
+            color: Colors.grey.shade300,
+            alignment: Alignment.center,
+            child: const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+          errorWidget: (context, error, stackTrace) => Container(
+            color: Colors.grey.shade400,
+            alignment: Alignment.center,
+            child: Icon(
+              Icons.image_not_supported_outlined,
+              color: Colors.grey.shade600,
+            ),
           ),
         );
       },
-      errorBuilder: (context, error, stackTrace) => Container(
-        color: Colors.grey.shade400,
-        alignment: Alignment.center,
-        child: Icon(
-          Icons.image_not_supported_outlined,
-          color: Colors.grey.shade600,
-        ),
-      ),
     );
   }
 }
@@ -462,99 +503,3 @@ class FeedCardBottomScrim extends StatelessWidget {
   }
 }
 
-class FeedItemCard extends StatefulWidget {
-  const FeedItemCard({
-    super.key,
-    required this.item,
-    required this.onTap,
-  });
-
-  final FeedPreviewItem item;
-  final OnFeedPreviewTap onTap;
-
-  @override
-  State<FeedItemCard> createState() => _FeedItemCardState();
-}
-
-class _FeedItemCardState extends State<FeedItemCard> {
-  late final PageController _pageController;
-  double _page = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _pageController = PageController();
-    _pageController.addListener(_onPageTick);
-  }
-
-  void _onPageTick() {
-    final p = _pageController.page;
-    if (p != null && mounted) {
-      setState(() => _page = p);
-    }
-  }
-
-  @override
-  void dispose() {
-    _pageController.removeListener(_onPageTick);
-    _pageController.dispose();
-    super.dispose();
-  }
-
-  int get _resolvedIndex {
-    if (!_pageController.hasClients) return 0;
-    final p = _pageController.page;
-    if (p == null) return 0;
-    return p.round().clamp(0, widget.item.imageCount - 1);
-  }
-
-  void _onCardTap() {
-    widget.onTap(widget.item, imageIndex: _resolvedIndex);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final item = widget.item;
-    final n = item.imageCount;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: HomeFeedTokens.sideMargin),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: _onCardTap,
-          borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
-            child: AspectRatio(
-              aspectRatio: item.aspectRatioValue,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  PageView.builder(
-                    controller: _pageController,
-                    physics: const BouncingScrollPhysics(),
-                    itemCount: n,
-                    itemBuilder: (context, index) {
-                      return FeedPicsumImage(
-                        url: feedPreviewImageUrl(item, imageIndex: index),
-                      );
-                    },
-                  ),
-                  const FeedCardBottomScrim(),
-                  FeedArtistOverlay(item: item),
-                  if (n > 1)
-                    Positioned(
-                      right: HomeFeedTokens.dotInset,
-                      bottom: HomeFeedTokens.dotInset,
-                      child: FeedDotIndicators(count: n, page: _page),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}

@@ -5,12 +5,10 @@ class ProfileAvatar extends StatelessWidget {
   const ProfileAvatar({
     super.key,
     this.url,
-    required this.seed,
     required this.size,
   });
 
   final String? url;
-  final int seed;
   final double size;
 
   static const _emptyBackground = Color(0xFFEFEFEF);

@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../models/feed_item.dart';
@@ -16,6 +17,9 @@ class ProfileContentGrid extends StatelessWidget {
     required this.items,
     this.onPostTap,
     this.onPieceTap,
+    this.onDeletePost,
+    this.onDeletePiece,
+    this.showOwnerActions = false,
   });
 
   final List<
@@ -30,10 +34,15 @@ class ProfileContentGrid extends StatelessWidget {
       })> items;
   final void Function(PostSummary post)? onPostTap;
   final void Function(PieceSummary piece)? onPieceTap;
+  final void Function(PostSummary post)? onDeletePost;
+  final void Function(PieceSummary piece)? onDeletePiece;
+  final bool showOwnerActions;
 
   factory ProfileContentGrid.fromPieces(
     List<PieceSummary> pieces, {
     void Function(PieceSummary piece)? onPieceTap,
+    void Function(PieceSummary piece)? onDeletePiece,
+    bool showOwnerActions = false,
     bool forSaleListing = false,
   }) {
     final heights = [292.0, 168.0, 174.0, 318.0, 182.0, 132.0, 302.0, 156.0];
@@ -59,12 +68,19 @@ class ProfileContentGrid extends StatelessWidget {
         piece: p,
       ));
     }
-    return ProfileContentGrid._(items: mapped, onPieceTap: onPieceTap);
+    return ProfileContentGrid._(
+      items: mapped,
+      onPieceTap: onPieceTap,
+      onDeletePiece: onDeletePiece,
+      showOwnerActions: showOwnerActions,
+    );
   }
 
   factory ProfileContentGrid.fromPosts(
     List<PostSummary> posts, {
     void Function(PostSummary post)? onPostTap,
+    void Function(PostSummary post)? onDeletePost,
+    bool showOwnerActions = false,
   }) {
     final heights = [292.0, 168.0, 174.0, 318.0, 182.0, 132.0, 302.0, 156.0];
     final mapped = <
@@ -92,7 +108,12 @@ class ProfileContentGrid extends StatelessWidget {
         piece: null,
       ));
     }
-    return ProfileContentGrid._(items: mapped, onPostTap: onPostTap);
+    return ProfileContentGrid._(
+      items: mapped,
+      onPostTap: onPostTap,
+      onDeletePost: onDeletePost,
+      showOwnerActions: showOwnerActions,
+    );
   }
 
   @override
@@ -132,9 +153,27 @@ class ProfileContentGrid extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(child: _MasonryColumn(items: left, onPostTap: onPostTap, onPieceTap: onPieceTap)),
+        Expanded(
+          child: _MasonryColumn(
+            items: left,
+            onPostTap: onPostTap,
+            onPieceTap: onPieceTap,
+            onDeletePost: onDeletePost,
+            onDeletePiece: onDeletePiece,
+            showOwnerActions: showOwnerActions,
+          ),
+        ),
         const SizedBox(width: kProfileGutter),
-        Expanded(child: _MasonryColumn(items: right, onPostTap: onPostTap, onPieceTap: onPieceTap)),
+        Expanded(
+          child: _MasonryColumn(
+            items: right,
+            onPostTap: onPostTap,
+            onPieceTap: onPieceTap,
+            onDeletePost: onDeletePost,
+            onDeletePiece: onDeletePiece,
+            showOwnerActions: showOwnerActions,
+          ),
+        ),
       ],
     );
   }
@@ -145,6 +184,9 @@ class _MasonryColumn extends StatelessWidget {
     required this.items,
     this.onPostTap,
     this.onPieceTap,
+    this.onDeletePost,
+    this.onDeletePiece,
+    this.showOwnerActions = false,
   });
 
   final List<
@@ -159,6 +201,9 @@ class _MasonryColumn extends StatelessWidget {
       })> items;
   final void Function(PostSummary post)? onPostTap;
   final void Function(PieceSummary piece)? onPieceTap;
+  final void Function(PostSummary post)? onDeletePost;
+  final void Function(PieceSummary piece)? onDeletePiece;
+  final bool showOwnerActions;
 
   @override
   Widget build(BuildContext context) {
@@ -178,6 +223,13 @@ class _MasonryColumn extends StatelessWidget {
                 : items[i].piece != null
                     ? () => onPieceTap?.call(items[i].piece!)
                     : null,
+            onDelete: !showOwnerActions
+                ? null
+                : items[i].post != null
+                    ? () => onDeletePost?.call(items[i].post!)
+                    : items[i].piece != null
+                        ? () => onDeletePiece?.call(items[i].piece!)
+                        : null,
           ),
         ],
       ],
@@ -193,6 +245,7 @@ class _MasonryTile extends StatelessWidget {
     this.price,
     this.isVideo = false,
     this.onTap,
+    this.onDelete,
   });
 
   final String? url;
@@ -201,11 +254,38 @@ class _MasonryTile extends StatelessWidget {
   final String? price;
   final bool isVideo;
   final VoidCallback? onTap;
+  final VoidCallback? onDelete;
+
+  void _showActions(BuildContext context) {
+    final delete = onDelete;
+    if (delete == null) return;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF1A1A1A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: ListTile(
+          leading: const Icon(Icons.delete_outline, color: Color(0xFFE05252)),
+          title: const Text(
+            'Delete',
+            style: TextStyle(color: Color(0xFFE05252), fontWeight: FontWeight.w600),
+          ),
+          onTap: () {
+            Navigator.pop(sheetContext);
+            delete();
+          },
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
+      onLongPress: onDelete != null ? () => _showActions(context) : null,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
         child: SizedBox(
@@ -215,10 +295,13 @@ class _MasonryTile extends StatelessWidget {
             fit: StackFit.expand,
             children: [
               if (url != null && url!.isNotEmpty && !isVideo)
-                Image.network(
-                  url!,
+                CachedNetworkImage(
+                  imageUrl: url!,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => ColoredBox(
+                  memCacheWidth: ((MediaQuery.sizeOf(context).width / 2) *
+                          MediaQuery.devicePixelRatioOf(context))
+                      .round(),
+                  errorWidget: (context, error, stackTrace) => ColoredBox(
                     color: Colors.grey.shade300,
                     child: Icon(Icons.broken_image_outlined,
                         color: Colors.grey.shade500),
@@ -267,52 +350,33 @@ class _MasonryTile extends StatelessWidget {
                     ),
                   ),
                 ),
+              if (onDelete != null)
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: GestureDetector(
+                    onTap: () => _showActions(context),
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      width: 26,
+                      height: 26,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.more_horiz,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
       ),
-    );
-  }
-}
-
-/// Legacy seed-based grid kept for compatibility.
-class ProfileMasonryGrid extends StatelessWidget {
-  const ProfileMasonryGrid({
-    super.key,
-    required this.leftItems,
-    required this.rightItems,
-  });
-
-  final List<({int seed, double h})> leftItems;
-  final List<({int seed, double h})> rightItems;
-
-  @override
-  Widget build(BuildContext context) {
-    return ProfileContentGrid._(
-      items: [
-        ...leftItems.map(
-          (e) => (
-            url: null as String?,
-            height: e.h,
-            forSale: false,
-            price: null as String?,
-            isVideo: false,
-            post: null as PostSummary?,
-            piece: null as PieceSummary?,
-          ),
-        ),
-        ...rightItems.map(
-          (e) => (
-            url: null as String?,
-            height: e.h,
-            forSale: false,
-            price: null as String?,
-            isVideo: false,
-            post: null as PostSummary?,
-            piece: null as PieceSummary?,
-          ),
-        ),
-      ],
     );
   }
 }

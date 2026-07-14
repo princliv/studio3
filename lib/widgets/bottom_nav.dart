@@ -32,13 +32,11 @@ class BottomNav extends StatelessWidget {
     required this.selectedNavIndex,
     required this.onNavTap,
     this.avatarUrl,
-    this.avatarSeed = 902,
   });
 
   final int selectedNavIndex;
   final ValueChanged<int> onNavTap;
   final String? avatarUrl;
-  final int avatarSeed;
 
   @override
   Widget build(BuildContext context) {
@@ -64,7 +62,6 @@ class BottomNav extends StatelessWidget {
                 _ProfileAvatar(
                   selected: selectedNavIndex == BottomNavIndex.profile,
                   avatarUrl: avatarUrl,
-                  avatarSeed: avatarSeed,
                   onTap: () => onNavTap(BottomNavIndex.profile),
                 ),
               ],
@@ -203,13 +200,11 @@ class _ProfileAvatar extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.avatarUrl,
-    this.avatarSeed = 902,
   });
 
   final bool selected;
   final VoidCallback onTap;
   final String? avatarUrl;
-  final int avatarSeed;
 
   @override
   Widget build(BuildContext context) {
@@ -237,7 +232,6 @@ class _ProfileAvatar extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             child: ProfileAvatar(
               url: avatarUrl,
-              seed: avatarSeed,
               size: _kAvatarSize,
             ),
           ),

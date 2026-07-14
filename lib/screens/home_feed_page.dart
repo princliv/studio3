@@ -1,17 +1,14 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 
-import '../data/home_feed_dummy.dart';
 import '../models/feed_item.dart';
-import '../models/feed_pop_result.dart';
-import '../models/feed_preview_item.dart';
+import '../models/feed_preview_item.dart' show FeedAvailabilityFilter;
 import '../theme/home_feed_tokens.dart';
 import '../utils/explore_detail_route.dart';
-import '../utils/feed_layout_generator.dart';
-import '../utils/slide_up_page_route.dart';
+import '../utils/image_aspect_ratio_resolver.dart';
 import '../widgets/home_feed/home_feed_widgets.dart';
 import '../services/feed_service.dart';
-import 'available_piece_detail_page.dart';
-import 'piece_detail_page.dart';
 
 class HomeFeedPage extends StatefulWidget {
   /// For You feed — mixed Pieces and Scenes with All / Available filters.
@@ -22,28 +19,16 @@ class HomeFeedPage extends StatefulWidget {
 }
 
 class _HomeFeedPageState extends State<HomeFeedPage> {
-  static const int _initialBatch = 16;
-  static const int _loadMoreCount = 10;
   static const double _loadMoreThreshold = 200;
 
-  final FeedLayoutGenerator _generator = FeedLayoutGenerator();
-  final ScrollController _scrollController = ScrollController();
-  final List<FeedPreviewItem> _previewItems = [];
   final List<FeedItem> _apiItems = [];
   FeedAvailabilityFilter _filter = FeedAvailabilityFilter.all;
+  bool _loading = true;
   bool _loadingMore = false;
-  bool _loadingMoreApi = false;
-  bool _useApi = false;
-  bool _didJumpForAdvance = false;
   String? _nextCursor;
-  final ScrollController _apiScrollController = ScrollController();
+  final ScrollController _scrollController = ScrollController();
 
-  List<FeedPreviewItem> get _visiblePreviewItems {
-    if (_filter == FeedAvailabilityFilter.all) return _previewItems;
-    return _previewItems.where((item) => item.isAvailable).toList();
-  }
-
-  List<FeedItem> get _visibleApiItems {
+  List<FeedItem> get _visibleItems {
     if (_filter == FeedAvailabilityFilter.all) return _apiItems;
     return _apiItems.where((item) => item.isForSale).toList();
   }
@@ -51,9 +36,7 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
   @override
   void initState() {
     super.initState();
-    _previewItems.addAll(_generator.nextBatch(_initialBatch));
     _scrollController.addListener(_onScroll);
-    _apiScrollController.addListener(_onApiScroll);
     _loadFeed();
   }
 
@@ -61,18 +44,18 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
   void dispose() {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
-    _apiScrollController.removeListener(_onApiScroll);
-    _apiScrollController.dispose();
     super.dispose();
   }
 
   Future<void> _loadFeed({bool append = false, bool refresh = false}) async {
-    if (_loadingMoreApi) return;
+    if (_loadingMore) return;
     if (append && (_nextCursor == null || _nextCursor!.isEmpty)) return;
 
     setState(() {
       if (append) {
-        _loadingMoreApi = true;
+        _loadingMore = true;
+      } else {
+        _loading = true;
       }
     });
     try {
@@ -89,46 +72,27 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
             ..addAll(page.items);
         }
         _nextCursor = page.nextCursor;
-        _useApi = _apiItems.isNotEmpty;
-        _loadingMoreApi = false;
+        _loading = false;
+        _loadingMore = false;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        if (!append) _useApi = false;
-        _loadingMoreApi = false;
+        if (!append) _apiItems.clear();
+        _loading = false;
+        _loadingMore = false;
       });
-    }
-  }
-
-  void _onApiScroll() {
-    if (!_useApi || _loadingMoreApi) return;
-    if (_nextCursor == null || _nextCursor!.isEmpty) return;
-    final pos = _apiScrollController.position;
-    if (!pos.hasPixels || !pos.hasViewportDimension) return;
-    if (pos.pixels >= pos.maxScrollExtent - _loadMoreThreshold) {
-      _loadFeed(append: true);
     }
   }
 
   void _onScroll() {
-    if (_loadingMore || _useApi) return;
+    if (_loadingMore) return;
+    if (_nextCursor == null || _nextCursor!.isEmpty) return;
     final pos = _scrollController.position;
     if (!pos.hasPixels || !pos.hasViewportDimension) return;
     if (pos.pixels >= pos.maxScrollExtent - _loadMoreThreshold) {
-      _loadMore();
+      _loadFeed(append: true);
     }
-  }
-
-  void _loadMore() {
-    setState(() => _loadingMore = true);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      setState(() {
-        _previewItems.addAll(_generator.nextBatch(_loadMoreCount));
-        _loadingMore = false;
-      });
-    });
   }
 
   void _onFilterChanged(FeedAvailabilityFilter filter) {
@@ -137,109 +101,6 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
     if (_scrollController.hasClients) {
       _scrollController.jumpTo(0);
     }
-  }
-
-  double _cardWidth(BuildContext context) {
-    return MediaQuery.sizeOf(context).width -
-        2 * HomeFeedTokens.sideMargin;
-  }
-
-  double _cardHeight(FeedPreviewItem item, BuildContext context) {
-    return _cardWidth(context) / item.aspectRatioValue;
-  }
-
-  double _offsetForIndex(int index, BuildContext context) {
-    final visible = _visiblePreviewItems;
-    var offset = 0.0;
-    for (var i = 0; i < index && i < visible.length; i++) {
-      offset += _cardHeight(visible[i], context) + HomeFeedTokens.rowGap;
-    }
-    return offset;
-  }
-
-  void _jumpToFeedIndex(int index) {
-    if (!_scrollController.hasClients) return;
-
-    final visible = _visiblePreviewItems;
-    if (visible.isEmpty) return;
-
-    final targetIndex = index.clamp(0, visible.length - 1);
-    final offset = _offsetForIndex(targetIndex, context);
-    final maxExtent = _scrollController.position.maxScrollExtent;
-    _scrollController.jumpTo(offset.clamp(0.0, maxExtent));
-    _didJumpForAdvance = true;
-  }
-
-  Future<void> _scrollToFeedIndex(int index) async {
-    if (!_scrollController.hasClients) return;
-
-    final visible = _visiblePreviewItems;
-    if (visible.isEmpty) return;
-
-    var targetIndex = index;
-    if (targetIndex >= visible.length) {
-      if (targetIndex >= visible.length && !_loadingMore) {
-        _loadMore();
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-        if (!mounted) return;
-        final updated = _visiblePreviewItems;
-        if (targetIndex >= updated.length) {
-          targetIndex = updated.length - 1;
-        }
-      } else {
-        targetIndex = visible.length - 1;
-      }
-    }
-
-    if (targetIndex < 0) return;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_scrollController.hasClients) return;
-      final offset = _offsetForIndex(targetIndex, context);
-      final maxExtent = _scrollController.position.maxScrollExtent;
-      _scrollController.animateTo(
-        offset.clamp(0.0, maxExtent),
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-    });
-  }
-
-  bool _isCollectible(FeedPreviewItem item) => item.isAvailable;
-
-  Future<void> _openPreviewDetail(
-    FeedPreviewItem item, {
-    int imageIndex = 0,
-  }) async {
-    final visible = _visiblePreviewItems;
-    final index = visible.indexWhere((i) => i.id == item.id);
-    final tappedIndex = index >= 0 ? index : 0;
-    _didJumpForAdvance = false;
-
-    final page = _isCollectible(item)
-        ? AvailablePieceDetailPage(
-            item: item,
-            initialImageIndex: imageIndex,
-            tappedIndex: tappedIndex,
-            filter: _filter,
-            onWillAdvance: _jumpToFeedIndex,
-          )
-        : PieceDetailPage(
-            item: item,
-            initialImageIndex: imageIndex,
-            tappedIndex: tappedIndex,
-            filter: _filter,
-            onWillAdvance: _jumpToFeedIndex,
-          );
-
-    final result = await Navigator.of(context).push<FeedPopResult>(
-      SlideUpPageRoute<FeedPopResult>(page: page),
-    );
-
-    if (!mounted || result == null) return;
-    if (result.filter != _filter) return;
-    if (_didJumpForAdvance) return;
-    await _scrollToFeedIndex(result.nextIndex);
   }
 
   void _openApiItem(FeedItem item) {
@@ -265,19 +126,19 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
                 onAddTap: () => Navigator.pushNamed(context, '/post'),
               ),
             ),
-            Expanded(
-              child: _useApi
-                  ? _buildApiFeed(bottomInset)
-                  : _buildPreviewFeed(bottomInset),
-            ),
+            Expanded(child: _buildFeed(bottomInset)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildApiFeed(double bottomInset) {
-    final visible = _visibleApiItems;
+  Widget _buildFeed(double bottomInset) {
+    if (_loading && _apiItems.isEmpty) {
+      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+    }
+
+    final visible = _visibleItems;
     if (visible.isEmpty) {
       return Center(
         child: Text(
@@ -294,21 +155,18 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
 
     return RefreshIndicator(
       onRefresh: () => _loadFeed(refresh: true),
-      child: GridView.builder(
-        controller: _apiScrollController,
+      child: MasonryGridView.count(
+        controller: _scrollController,
         padding: EdgeInsets.fromLTRB(
           HomeFeedTokens.sideMargin,
           0,
           HomeFeedTokens.sideMargin,
           bottomInset,
         ),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 8,
-          mainAxisSpacing: 8,
-          childAspectRatio: 0.75,
-        ),
-        itemCount: visible.length + (_loadingMoreApi ? 1 : 0),
+        crossAxisCount: 2,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+        itemCount: visible.length + (_loadingMore ? 1 : 0),
         itemBuilder: (context, index) {
           if (index >= visible.length) {
             return const Padding(
@@ -323,77 +181,91 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
             );
           }
           final item = visible[index];
-          final url = item.mediaUrl;
-          return GestureDetector(
-            onTap: () => _openApiItem(item),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (url != null)
-                    Image.network(
-                      url,
-                      fit: BoxFit.cover,
-                      gaplessPlayback: true,
-                    )
-                  else
-                    ColoredBox(color: Colors.grey.shade300),
-                  if (item.type == FeedItemType.piece)
-                    FeedApiCardOverlay(
-                      avatarUrl: picsumAvatarUrl(item.id.hashCode),
-                      name: item.authorName ?? 'Artist',
-                      medium: item.piece?.medium,
-                      authorUsername: item.authorUsername,
-                    ),
-                ],
-              ),
-            ),
-          );
+          return _ApiFeedTile(item: item, onTap: () => _openApiItem(item));
         },
       ),
     );
   }
+}
 
-  Widget _buildPreviewFeed(double bottomInset) {
-    final visible = _visiblePreviewItems;
-    if (visible.isEmpty) {
-      return Center(
-        child: Text(
-          'No available pieces yet',
-          style: TextStyle(
-            color: HomeFeedTokens.textSecondary,
-            fontSize: 14,
+/// A "For You" grid tile that sizes itself to the item's real posted
+/// aspect ratio (3:4 or 16:9) instead of a fixed shape, so the image shows
+/// fully instead of being cropped to a mismatched box.
+class _ApiFeedTile extends StatefulWidget {
+  const _ApiFeedTile({required this.item, required this.onTap});
+
+  final FeedItem item;
+  final VoidCallback onTap;
+
+  @override
+  State<_ApiFeedTile> createState() => _ApiFeedTileState();
+}
+
+class _ApiFeedTileState extends State<_ApiFeedTile> {
+  double _aspectRatio = ImageAspectRatioResolver.portrait3x4;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveAspectRatio();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ApiFeedTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.item.mediaUrl != widget.item.mediaUrl) {
+      _resolveAspectRatio();
+    }
+  }
+
+  void _resolveAspectRatio() {
+    final url = widget.item.mediaUrl;
+    if (url == null) return;
+    final cached = ImageAspectRatioResolver.cached(url);
+    if (cached != null) {
+      _aspectRatio = cached;
+      return;
+    }
+    ImageAspectRatioResolver.resolve(url).then((ratio) {
+      if (mounted) setState(() => _aspectRatio = ratio);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.item;
+    final url = item.mediaUrl;
+
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
+        child: AspectRatio(
+          aspectRatio: _aspectRatio,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (url != null)
+                CachedNetworkImage(
+                  imageUrl: url,
+                  fit: BoxFit.cover,
+                  memCacheWidth: 480,
+                  errorWidget: (context, error, stackTrace) =>
+                      ColoredBox(color: Colors.grey.shade300),
+                )
+              else
+                ColoredBox(color: Colors.grey.shade300),
+              if (item.type == FeedItemType.piece)
+                FeedApiCardOverlay(
+                  avatarUrl: item.authorAvatarUrl,
+                  name: item.authorName ?? 'Artist',
+                  medium: item.piece?.medium,
+                  authorUsername: item.authorUsername,
+                ),
+            ],
           ),
         ),
-      );
-    }
-
-    return ListView.builder(
-      controller: _scrollController,
-      padding: EdgeInsets.only(bottom: bottomInset),
-      itemCount: visible.length + (_loadingMore ? 1 : 0),
-      itemBuilder: (context, index) {
-        if (index >= visible.length) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Center(
-              child: SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
-          );
-        }
-        return Padding(
-          padding: const EdgeInsets.only(bottom: HomeFeedTokens.rowGap),
-          child: FeedItemCard(
-            item: visible[index],
-            onTap: _openPreviewDetail,
-          ),
-        );
-      },
+      ),
     );
   }
 }

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../data/home_feed_dummy.dart';
 import '../../../theme/home_feed_tokens.dart';
 import '../models/profile_series_data.dart';
 import '../profile_constants.dart';
@@ -159,7 +158,6 @@ class _StackedSeriesCovers extends StatelessWidget {
           width: side,
           height: side,
           child: _SeriesPaletteCard(
-            seed: seeds.isNotEmpty ? seeds[0] : 0,
             imageUrl: urls.isNotEmpty ? urls[0] : null,
             borderRadius: radius,
             imagePx: imgPx,
@@ -177,7 +175,6 @@ class _StackedSeriesCovers extends StatelessWidget {
             width: side,
             height: side,
             child: _SeriesPaletteCard(
-              seed: i < seeds.length ? seeds[i] : i,
               imageUrl: i < urls.length ? urls[i] : null,
               borderRadius: radius,
               imagePx: imgPx,
@@ -201,14 +198,12 @@ class _StackedSeriesCovers extends StatelessWidget {
 
 class _SeriesPaletteCard extends StatelessWidget {
   const _SeriesPaletteCard({
-    required this.seed,
     this.imageUrl,
     required this.borderRadius,
     required this.imagePx,
     this.dropShadow = false,
   });
 
-  final int seed;
   final String? imageUrl;
   final BorderRadius borderRadius;
   final int imagePx;
@@ -224,41 +219,11 @@ class _SeriesPaletteCard extends StatelessWidget {
               fit: BoxFit.cover,
               width: double.infinity,
               height: double.infinity,
-              errorBuilder: (context, error, stackTrace) => Image.network(
-                picsumUrl(seed, imagePx, imagePx),
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: double.infinity,
-              ),
+              cacheWidth: imagePx,
+              errorBuilder: (context, error, stackTrace) =>
+                  const _SeriesCoverPlaceholder(),
             )
-          : Image.network(
-              picsumUrl(seed, imagePx, imagePx),
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: double.infinity,
-              loadingBuilder: (context, child, progress) {
-                if (progress == null) return child;
-                return ColoredBox(
-                  color: Colors.grey.shade300,
-                  child: Center(
-                    child: SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color:
-                            HomeFeedTokens.textPrimary.withValues(alpha: 0.35),
-                      ),
-                    ),
-                  ),
-                );
-              },
-              errorBuilder: (context, error, stackTrace) => ColoredBox(
-                color: Colors.grey.shade300,
-                child: Icon(Icons.broken_image_outlined,
-                    color: Colors.grey.shade500),
-              ),
-            ),
+          : const _SeriesCoverPlaceholder(),
     );
 
     if (!dropShadow) return image;
@@ -276,6 +241,19 @@ class _SeriesPaletteCard extends StatelessWidget {
         ],
       ),
       child: image,
+    );
+  }
+}
+
+class _SeriesCoverPlaceholder extends StatelessWidget {
+  const _SeriesCoverPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Colors.grey.shade300,
+      child: Icon(Icons.image_not_supported_outlined,
+          color: Colors.grey.shade500),
     );
   }
 }

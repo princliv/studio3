@@ -1,24 +1,122 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../models/notification_item.dart';
+import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/home_feed_tokens.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/home_feed/home_feed_widgets.dart';
 
-class NotificationsPage extends StatelessWidget {
+class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
 
-  static const _items = [
-    (type: 'save', name: 'Alex Chen', text: "saved your piece 'Coastal Forms #3'", time: '2h', thumb: true, sale: false),
-    (type: 'follow', name: 'Riley W.', text: 'started following you', time: '5h', thumb: false, sale: false),
-    (type: 'inquiry', name: 'Jordan Lee', text: 'sent an inquiry about Untitled #12', time: '1d', thumb: true, sale: false),
-    (type: 'purchase', name: 'Sam Rivera', text: "purchased 'Coastal Forms #3'", time: '2d', thumb: true, sale: true),
-  ];
+  @override
+  State<NotificationsPage> createState() => _NotificationsPageState();
+}
+
+class _NotificationsPageState extends State<NotificationsPage> {
+  final List<NotificationItem> _items = [];
+  bool _loading = true;
+  bool _loadingMore = false;
+  String? _nextCursor;
+  final _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load({bool append = false}) async {
+    if (append && (_nextCursor == null || _nextCursor!.isEmpty)) return;
+    setState(() {
+      if (append) {
+        _loadingMore = true;
+      } else {
+        _loading = true;
+      }
+    });
+    try {
+      final page = await NotificationService.instance.list(
+        cursor: append ? _nextCursor : null,
+      );
+      if (!mounted) return;
+      setState(() {
+        if (append) {
+          _items.addAll(page.items);
+        } else {
+          _items
+            ..clear()
+            ..addAll(page.items);
+        }
+        _nextCursor = page.nextCursor;
+        _loading = false;
+        _loadingMore = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        if (!append) _items.clear();
+        _loading = false;
+        _loadingMore = false;
+      });
+    }
+  }
+
+  void _onScroll() {
+    if (_loadingMore) return;
+    if (_nextCursor == null || _nextCursor!.isEmpty) return;
+    final pos = _scrollController.position;
+    if (pos.pixels >= pos.maxScrollExtent - 200) {
+      _load(append: true);
+    }
+  }
+
+  Future<void> _onTap(NotificationItem item) async {
+    if (item.read) return;
+    setState(() {
+      final index = _items.indexWhere((n) => n.id == item.id);
+      if (index != -1) {
+        _items[index] = NotificationItem(
+          id: item.id,
+          type: item.type,
+          actorName: item.actorName,
+          actorUsername: item.actorUsername,
+          actorAvatarUrl: item.actorAvatarUrl,
+          targetType: item.targetType,
+          targetId: item.targetId,
+          payload: item.payload,
+          message: item.message,
+          read: true,
+          createdAt: item.createdAt,
+        );
+      }
+    });
+    try {
+      await NotificationService.instance.markRead(item.id);
+    } catch (_) {
+      // Keep the optimistic read state even if the request fails.
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final today = _items.where((a) => a.time.endsWith('h')).toList();
-    final week = _items.where((a) => a.time.endsWith('d')).toList();
+    final now = DateTime.now();
+    final today = _items
+        .where((n) => now.difference(n.createdAt) < const Duration(hours: 24))
+        .toList();
+    final earlier = _items
+        .where((n) => now.difference(n.createdAt) >= const Duration(hours: 24))
+        .toList();
 
     return Scaffold(
       backgroundColor: HomeFeedTokens.background,
@@ -37,40 +135,63 @@ class NotificationsPage extends StatelessWidget {
                 ),
               ),
             ),
-            Expanded(
-              child: _items.isEmpty
-                  ? Center(
-                      child: Text(
-                        'No activity yet',
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          color: AppColors.slate400,
-                        ),
-                      ),
-                    )
-                  : ListView(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                      children: [
-                        if (today.isNotEmpty) ...[
-                          _SectionLabel('Today'),
-                          ...today.map((item) => Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: _ActivityCard(item: item),
-                              )),
-                          const SizedBox(height: 8),
-                        ],
-                        if (week.isNotEmpty) ...[
-                          _SectionLabel('This Week'),
-                          ...week.map((item) => Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: _ActivityCard(item: item),
-                              )),
-                        ],
-                      ],
-                    ),
-            ),
+            Expanded(child: _buildBody(today, earlier)),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildBody(
+    List<NotificationItem> today,
+    List<NotificationItem> earlier,
+  ) {
+    if (_loading && _items.isEmpty) {
+      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+    }
+
+    if (_items.isEmpty) {
+      return Center(
+        child: Text(
+          'No activity yet',
+          style: GoogleFonts.inter(fontSize: 14, color: AppColors.slate400),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () => _load(),
+      child: ListView(
+        controller: _scrollController,
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        children: [
+          if (today.isNotEmpty) ...[
+            _SectionLabel('Today'),
+            ...today.map((item) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _ActivityCard(item: item, onTap: () => _onTap(item)),
+                )),
+            const SizedBox(height: 8),
+          ],
+          if (earlier.isNotEmpty) ...[
+            _SectionLabel('Earlier'),
+            ...earlier.map((item) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _ActivityCard(item: item, onTap: () => _onTap(item)),
+                )),
+          ],
+          if (_loadingMore)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -97,69 +218,81 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-class _ActivityCard extends StatelessWidget {
-  const _ActivityCard({required this.item});
+String _timeAgo(DateTime dt) {
+  final diff = DateTime.now().difference(dt);
+  if (diff.inMinutes < 1) return 'now';
+  if (diff.inMinutes < 60) return '${diff.inMinutes}m';
+  if (diff.inHours < 24) return '${diff.inHours}h';
+  if (diff.inDays < 7) return '${diff.inDays}d';
+  return '${(diff.inDays / 7).floor()}w';
+}
 
-  final ({String type, String name, String text, String time, bool thumb, bool sale}) item;
+class _ActivityCard extends StatelessWidget {
+  const _ActivityCard({required this.item, required this.onTap});
+
+  final NotificationItem item;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return GlassCard(
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const CircleAvatar(radius: 18, backgroundColor: AppColors.slate200),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Wrap(
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Text(
-                  '${item.name} ',
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.slate900,
-                  ),
-                ),
-                Text(
-                  item.text,
-                  style: GoogleFonts.inter(fontSize: 14, color: AppColors.slate700),
-                ),
-                if (item.type == 'inquiry') ...[
-                  const SizedBox(width: 6),
-                  _Pill(label: 'Inquiry', background: AppColors.slate100, textColor: AppColors.slate600),
-                ],
-                if (item.sale) ...[
-                  const SizedBox(width: 6),
-                  _Pill(label: 'Sale', background: AppColors.slate900, textColor: AppColors.white, bold: true),
-                ],
-              ],
+    return GestureDetector(
+      onTap: onTap,
+      child: GlassCard(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            UserAvatar(
+              url: item.actorAvatarUrl,
+              name: item.actorDisplayName,
+              size: 36,
             ),
-          ),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                item.time,
-                style: GoogleFonts.inter(fontSize: 11, color: AppColors.slate400),
-              ),
-              if (item.thumb) ...[
-                const SizedBox(height: 4),
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: AppColors.slate100,
-                    borderRadius: BorderRadius.circular(AppDims.radiusSm),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    '${item.actorDisplayName} ',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.slate900,
+                    ),
                   ),
-                ),
-              ],
-            ],
-          ),
-        ],
+                  Text(
+                    item.displayText,
+                    style: GoogleFonts.inter(fontSize: 14, color: AppColors.slate700),
+                  ),
+                  if (item.isInquiry) ...[
+                    const SizedBox(width: 6),
+                    _Pill(label: 'Inquiry', background: AppColors.slate100, textColor: AppColors.slate600),
+                  ],
+                  if (item.isSale) ...[
+                    const SizedBox(width: 6),
+                    _Pill(label: 'Sale', background: AppColors.slate900, textColor: AppColors.white, bold: true),
+                  ],
+                  if (!item.read) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        color: AppColors.slate900,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              _timeAgo(item.createdAt),
+              style: GoogleFonts.inter(fontSize: 11, color: AppColors.slate400),
+            ),
+          ],
+        ),
       ),
     );
   }

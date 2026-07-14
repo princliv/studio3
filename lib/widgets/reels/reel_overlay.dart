@@ -40,13 +40,7 @@ class _ReelOverlayState extends State<ReelOverlay> {
             (post?.isSaved ?? false)
         : false;
     _likeCount = post?.likeCount ?? 0;
-    _commentCount = _initialCommentCount(postId);
-  }
-
-  int _initialCommentCount(String? postId) {
-    if (postId == null || !postId.startsWith('scene-video-dummy-')) return 0;
-    final index = int.tryParse(postId.split('-').last) ?? 0;
-    return 6 + index * 4;
+    _commentCount = 0;
   }
 
   Future<void> _toggleLike() async {
@@ -153,7 +147,6 @@ class _ReelOverlayState extends State<ReelOverlay> {
                           : HitTestBehavior.deferToChild,
                       child: ProfileAvatar(
                         url: null,
-                        seed: authorName.hashCode.abs(),
                         size: 36,
                       ),
                     ),

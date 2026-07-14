@@ -44,4 +44,6 @@ class PieceService {
     final json = await _api.get('/api/pieces/$pieceId/related-posts');
     return _api.extractList(json).map(PostSummary.fromJson).toList();
   }
+
+  Future<void> delete(String id) => _api.delete('/api/pieces/$id');
 }

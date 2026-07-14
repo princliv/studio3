@@ -14,7 +14,6 @@ class ProfileHeader extends StatelessWidget {
     required this.bioLine1,
     required this.bioLine2,
     this.avatarUrl,
-    this.avatarSeed = 902,
     this.piecesCount,
     this.collectedCount,
     this.savesCount,
@@ -33,7 +32,6 @@ class ProfileHeader extends StatelessWidget {
   final String bioLine1;
   final String bioLine2;
   final String? avatarUrl;
-  final int avatarSeed;
   final int? piecesCount;
   final int? collectedCount;
   final int? savesCount;
@@ -98,7 +96,6 @@ class ProfileHeader extends StatelessWidget {
                             : HitTestBehavior.deferToChild,
                         child: ProfileAvatar(
                           url: avatarUrl,
-                          seed: avatarSeed,
                           size: _avatarSize,
                         ),
                       ),

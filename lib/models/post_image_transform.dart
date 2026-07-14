@@ -3,7 +3,7 @@ import '../utils/crop_cover_math.dart';
 /// Per-image crop transform state for the posting edit flow.
 class PostImageTransform {
   PostImageTransform({
-    this.aspectRatio = CropAspectRatio.ratio2x3,
+    this.aspectRatio = CropAspectRatio.ratio3x4,
     this.rotationDegrees = 0,
     this.zoomFactor = 1,
     this.flipVertical = false,
@@ -30,7 +30,7 @@ class PostImageTransform {
   }
 
   void resetCrop() {
-    aspectRatio = CropAspectRatio.ratio2x3;
+    aspectRatio = CropAspectRatio.ratio3x4;
     rotationDegrees = 0;
     zoomFactor = 1;
     flipVertical = false;

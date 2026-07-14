@@ -21,8 +21,9 @@ class ProfileTabContent extends StatelessWidget {
     this.collectSegment = 'available',
     this.sellerMode = false,
     this.loading = false,
-    this.leftMasonry = const [],
-    this.rightMasonry = const [],
+    this.isOwnProfile = false,
+    this.onDeletePiece,
+    this.onDeleteScene,
   });
 
   final String currentTab;
@@ -33,8 +34,9 @@ class ProfileTabContent extends StatelessWidget {
   final String collectSegment;
   final bool sellerMode;
   final bool loading;
-  final List<({int seed, double h})> leftMasonry;
-  final List<({int seed, double h})> rightMasonry;
+  final bool isOwnProfile;
+  final void Function(PieceSummary piece)? onDeletePiece;
+  final void Function(PostSummary post)? onDeleteScene;
 
   @override
   Widget build(BuildContext context) {
@@ -63,12 +65,11 @@ class ProfileTabContent extends StatelessWidget {
         return ProfileContentGrid.fromPieces(
           pieces,
           onPieceTap: (piece) => openProfilePiece(context, piece),
+          onDeletePiece: onDeletePiece,
+          showOwnerActions: isOwnProfile,
         );
       }
-      return ProfileMasonryGrid(
-        leftItems: leftMasonry,
-        rightItems: rightMasonry,
-      );
+      return const _EmptyState(label: 'No pieces yet');
     }
 
     if (currentTab == 'scenes') {
@@ -76,12 +77,11 @@ class ProfileTabContent extends StatelessWidget {
         return ProfileContentGrid.fromPosts(
           scenes,
           onPostTap: (post) => openProfileScene(context, scenes, post),
+          onDeletePost: onDeleteScene,
+          showOwnerActions: isOwnProfile,
         );
       }
-      return ProfileMasonryGrid(
-        leftItems: leftMasonry,
-        rightItems: rightMasonry,
-      );
+      return const _EmptyState(label: 'No scenes yet');
     }
 
     if (currentTab == 'collect') {

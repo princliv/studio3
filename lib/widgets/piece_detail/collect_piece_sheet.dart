@@ -111,7 +111,7 @@ class _CollectPieceSheetState extends State<CollectPieceSheet> {
                     _PieceCard(
                       imageUrl: _imageUrl,
                       title: item.title,
-                      artistName: item.artist.name,
+                      artistName: item.displayName,
                       priceDisplay: formatCollectPrice(item.priceCents),
                       year: '${item.year}',
                       medium: item.medium,

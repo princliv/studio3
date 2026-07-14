@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/feed_preview_item.dart';
+import '../../utils/image_preview_route.dart';
 import '../home_feed/home_feed_widgets.dart';
 
 /// Hero image for detail pages — matches feed aspect ratio and carousel index.
@@ -47,27 +48,52 @@ class _DetailHeroImageState extends State<DetailHeroImage> {
   Widget build(BuildContext context) {
     final heroUrl = item.heroImageUrl;
     if (heroUrl != null && heroUrl.isNotEmpty) {
-      return FeedPicsumImage(url: heroUrl);
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => openImagePreview(
+          context,
+          imageUrls: [heroUrl],
+          initialIndex: 0,
+        ),
+        child: FeedPicsumImage(url: heroUrl),
+      );
     }
 
     if (item.imageCount > 1 && _pageController != null) {
+      final urls = List.generate(
+        item.imageCount,
+        (i) => feedPreviewImageUrl(item, imageIndex: i),
+      );
       return PageView.builder(
         controller: _pageController,
         physics: const BouncingScrollPhysics(),
         itemCount: item.imageCount,
         itemBuilder: (context, index) {
-          return FeedPicsumImage(
-            url: feedPreviewImageUrl(item, imageIndex: index),
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => openImagePreview(
+              context,
+              imageUrls: urls,
+              initialIndex: index,
+            ),
+            child: FeedPicsumImage(url: urls[index]),
           );
         },
       );
     }
 
-    return FeedPicsumImage(
-      url: feedPreviewImageUrl(
-        item,
-        imageIndex: widget.initialImageIndex,
+    final fallbackUrl = feedPreviewImageUrl(
+      item,
+      imageIndex: widget.initialImageIndex,
+    );
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => openImagePreview(
+        context,
+        imageUrls: [fallbackUrl],
+        initialIndex: 0,
       ),
+      child: FeedPicsumImage(url: fallbackUrl),
     );
   }
 }

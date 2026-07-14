@@ -12,6 +12,7 @@ import '../models/post_image_transform.dart';
 import '../theme/home_feed_tokens.dart';
 import '../utils/crop_cover_math.dart' show CropAspectRatio;
 import '../utils/image_adjust_math.dart';
+import '../widgets/post_crop_preview.dart';
 /// Image edit step — posting flow (Figma 1961:1453 / 1973:1223 / 1986:1416).
 class PostEditPage extends StatefulWidget {
   const PostEditPage({
@@ -549,12 +550,7 @@ class _EditThumbPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget image = Image.asset(
-      assetPath,
-      fit: BoxFit.cover,
-      width: double.infinity,
-      height: double.infinity,
-    );
+    Widget image = PostCropPreview.sourceImage(assetPath);
 
     if (!ImageAdjustMath.isNeutral(
       brightness: transform.brightness,
@@ -598,44 +594,10 @@ class _EditPreviewImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scale = transform.effectiveScale(imageAspect);
-    final radians = transform.rotationDegrees * math.pi / 180;
-    final sx = (transform.flipHorizontal ? -1.0 : 1.0) * scale;
-    final sy = (transform.flipVertical ? -1.0 : 1.0) * scale;
-
-    final matrix = ImageAdjustMath.combinedMatrix(
-      brightness: transform.brightness,
-      contrast: transform.contrast,
-      exposure: transform.exposure,
-    );
-
-    Widget imageContent = Transform(
-      alignment: Alignment.center,
-      transform: Matrix4.identity()
-        ..rotateZ(radians)
-        ..scaleByDouble(sx, sy, 1.0, 1),
-      child: Image.asset(
-        assetPath,
-        fit: BoxFit.cover,
-        width: double.infinity,
-        height: double.infinity,
-      ),
-    );
-
-    if (!ImageAdjustMath.isNeutral(
-      brightness: transform.brightness,
-      contrast: transform.contrast,
-      exposure: transform.exposure,
-    )) {
-      imageContent = ColorFiltered(
-        colorFilter: ColorFilter.matrix(matrix),
-        child: imageContent,
-      );
-    }
-
-    final image = ColoredBox(
-      color: Colors.black,
-      child: imageContent,
+    final image = PostCropPreview.buildTransformedContent(
+      imagePath: assetPath,
+      transform: transform,
+      imageAspect: imageAspect,
     );
 
     if (!gesturesEnabled) return image;

@@ -1,15 +1,15 @@
 import 'dart:io';
 
-import 'package:flutter/services.dart';
-
 import '../data/post_location_options.dart';
 import '../data/post_material_options.dart';
 import '../models/listing_details.dart';
+import '../models/post_image_transform.dart';
 import '../services/api_exception.dart';
 import '../services/media_service.dart';
 import '../services/piece_service.dart';
 import '../services/post_service.dart';
 import '../services/series_service.dart';
+import '../utils/post_image_renderer.dart';
 
 /// Draft state carried through the posting flow.
 class PostDraft {
@@ -27,6 +27,8 @@ class PostDraft {
     this.listingDetails,
     this.selectedSeriesId,
     this.newSeriesName,
+    this.transforms = const [],
+    this.previewImageIndex = 0,
   });
 
   final String postType;
@@ -42,6 +44,8 @@ class PostDraft {
   final ListingDetails? listingDetails;
   final String? selectedSeriesId;
   final String? newSeriesName;
+  final List<PostImageTransform> transforms;
+  final int previewImageIndex;
 
   bool get isVideo => mediaKind == 'video';
 
@@ -59,6 +63,8 @@ class PostDraft {
     ListingDetails? listingDetails,
     String? selectedSeriesId,
     String? newSeriesName,
+    List<PostImageTransform>? transforms,
+    int? previewImageIndex,
   }) {
     return PostDraft(
       postType: postType ?? this.postType,
@@ -74,6 +80,8 @@ class PostDraft {
       listingDetails: listingDetails ?? this.listingDetails,
       selectedSeriesId: selectedSeriesId ?? this.selectedSeriesId,
       newSeriesName: newSeriesName ?? this.newSeriesName,
+      transforms: transforms ?? this.transforms,
+      previewImageIndex: previewImageIndex ?? this.previewImageIndex,
     );
   }
 }
@@ -116,12 +124,20 @@ class PostPublishService {
     if (draft.imagePaths.isEmpty) {
       throw Exception('No image selected');
     }
-    final imagePath = draft.imagePaths.first;
-    final bytes = await _loadImageBytes(imagePath);
+    final imageIndex =
+        draft.previewImageIndex.clamp(0, draft.imagePaths.length - 1);
+    final imagePath = draft.imagePaths[imageIndex];
+    final transform = imageIndex < draft.transforms.length
+        ? draft.transforms[imageIndex]
+        : PostImageTransform();
+    final bytes = await PostImageRenderer.render(
+      imagePath: imagePath,
+      transform: transform,
+    );
     final mediaUrl = await _media.uploadBytes(
       purpose: purpose,
       bytes: bytes,
-      contentType: MediaService.contentTypeForPath(imagePath),
+      contentType: 'image/png',
     );
 
     if (isScene) {
@@ -187,13 +203,5 @@ class PostPublishService {
       }
       rethrow;
     }
-  }
-
-  Future<Uint8List> _loadImageBytes(String path) async {
-    if (path.startsWith('assets/')) {
-      final data = await rootBundle.load(path);
-      return data.buffer.asUint8List();
-    }
-    return File(path).readAsBytes();
   }
 }

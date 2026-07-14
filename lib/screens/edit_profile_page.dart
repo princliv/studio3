@@ -184,7 +184,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   },
                   child: ProfileAvatar(
                     url: _profilePhotoUrl,
-                    seed: 902,
                     size: 72,
                   ),
                 ),

@@ -1,8 +1,8 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/feed_item.dart';
 import '../../theme/explore_tokens.dart';
-import '../../data/home_feed_dummy.dart';
 import '../home_feed/home_feed_widgets.dart';
 
 class ExploreFeaturedCard extends StatelessWidget {
@@ -26,8 +26,7 @@ class ExploreFeaturedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final avatarSeed = item.id.hashCode.abs();
-    final avatarUrl = picsumAvatarUrl(avatarSeed);
+    final avatarUrl = item.authorAvatarUrl;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -131,12 +130,15 @@ class _HeroImage extends StatelessWidget {
     if (url == null || url!.isEmpty) {
       return const ColoredBox(color: ExploreTokens.skeleton);
     }
-    return Image.network(
-      url!,
+    return CachedNetworkImage(
+      imageUrl: url!,
       fit: BoxFit.cover,
       width: double.infinity,
       height: double.infinity,
-      errorBuilder: (context, error, stackTrace) =>
+      memCacheWidth:
+          (MediaQuery.sizeOf(context).width * MediaQuery.devicePixelRatioOf(context))
+              .round(),
+      errorWidget: (context, error, stackTrace) =>
           const ColoredBox(color: ExploreTokens.skeleton),
     );
   }

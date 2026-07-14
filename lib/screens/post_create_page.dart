@@ -13,12 +13,12 @@ import '../services/auth_session.dart';
 import '../services/api_exception.dart';
 import '../services/post_publish_service.dart';
 import '../theme/home_feed_tokens.dart';
-import '../utils/image_adjust_math.dart';
 import '../widgets/choose_location_sheet.dart';
 import '../widgets/create_flow/create_flow_widgets.dart';
 import '../widgets/create_flow/listing_details_form.dart';
 import '../widgets/create_flow/series_picker_sheet.dart';
 import '../widgets/post_create_option_sheet.dart';
+import '../widgets/post_crop_preview.dart';
 import '../widgets/seller_mode_required_dialog.dart';
 import 'add_materials_page.dart';
 
@@ -242,6 +242,8 @@ class _PostCreatePageState extends State<PostCreatePage> {
       listingDetails: listingDetails,
       selectedSeriesId: _selectedSeriesId,
       newSeriesName: _newSeriesName,
+      transforms: widget.transforms,
+      previewImageIndex: widget.previewImageIndex,
     );
   }
 
@@ -522,7 +524,6 @@ class _PreviewCard extends StatelessWidget {
   });
 
   static const _cardWidth = 200.0;
-  static const _cardHeight = 266.0;
   static const _cardRadius = 8.0;
 
   final String imagePath;
@@ -531,49 +532,15 @@ class _PreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget image;
-    if (imagePath.startsWith('assets/')) {
-      image = Image.asset(
-        imagePath,
-        width: _cardWidth,
-        height: _cardHeight,
-        fit: BoxFit.cover,
-      );
-    } else {
-      image = Image.file(
-        File(imagePath),
-        width: _cardWidth,
-        height: _cardHeight,
-        fit: BoxFit.cover,
-      );
-    }
-
-    if (!ImageAdjustMath.isNeutral(
-      brightness: transform.brightness,
-      contrast: transform.contrast,
-      exposure: transform.exposure,
-    )) {
-      image = ColorFiltered(
-        colorFilter: ColorFilter.matrix(
-          ImageAdjustMath.combinedMatrix(
-            brightness: transform.brightness,
-            contrast: transform.contrast,
-            exposure: transform.exposure,
-          ),
-        ),
-        child: image,
-      );
-    }
-
     return SizedBox(
       width: _cardWidth,
-      height: _cardHeight,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          ClipRRect(
+          PostCropPreview(
+            imagePath: imagePath,
+            transform: transform,
             borderRadius: BorderRadius.circular(_cardRadius),
-            child: image,
           ),
           if (onEdit != null)
             Positioned(

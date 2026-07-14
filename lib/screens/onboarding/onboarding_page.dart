@@ -347,7 +347,6 @@ class _OnboardingPageState extends State<OnboardingPage> {
             children: [
               ProfileAvatar(
                 url: _profilePhotoUrl,
-                seed: 902,
                 size: 72,
               ),
               const SizedBox(width: 16),

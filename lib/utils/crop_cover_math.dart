@@ -2,9 +2,8 @@ import 'dart:math' as math;
 
 /// Crop frame aspect ratios (width / height).
 enum CropAspectRatio {
-  ratio4x3(4 / 3, '4:3'),
-  ratio2x3(2 / 3, '2:3'),
-  ratio1x1(1, '1:1');
+  ratio3x4(3 / 4, '3:4'),
+  ratio16x9(16 / 9, '16:9');
 
   const CropAspectRatio(this.value, this.label);
 

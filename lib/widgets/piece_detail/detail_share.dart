@@ -11,7 +11,7 @@ Future<void> shareFeedPreviewItem(
   final imageUrl =
       item.heroImageUrl ?? feedPreviewImageUrl(item, imageIndex: imageIndex);
   final lines = <String>[
-    '${item.title} by ${item.artist.name} on Studio',
+    '${item.title} by ${item.displayName} on Studio',
     if (item.story.trim().isNotEmpty) item.story,
     imageUrl,
   ];

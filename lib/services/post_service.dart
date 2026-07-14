@@ -38,4 +38,6 @@ class PostService {
     final json = await _api.get('/api/user/me/saved/posts', auth: true);
     return _api.extractList(json).map(PostSummary.fromJson).toList();
   }
+
+  Future<void> delete(String id) => _api.delete('/api/posts/$id');
 }

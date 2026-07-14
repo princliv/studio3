@@ -28,6 +28,9 @@ import 'theme/home_feed_tokens.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+  ]);
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       systemNavigationBarColor: HomeFeedTokens.background,
@@ -135,8 +138,6 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> {
-  static const _avatarSeed = 902;
-
   int _selectedNavIndex = BottomNavIndex.home;
 
   List<Widget> _buildTabs() => [
@@ -197,7 +198,6 @@ class _MainShellState extends State<MainShell> {
             selectedNavIndex: _selectedNavIndex,
             onNavTap: _onNavTap,
             avatarUrl: AuthSession.instance.user?.profilePhotoUrl,
-            avatarSeed: _avatarSeed,
           ),
         ],
       ),

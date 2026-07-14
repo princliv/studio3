@@ -1,4 +1,3 @@
-import '../data/scene_videos_dummy.dart';
 import '../models/feed_item.dart';
 import '../models/feed_page.dart';
 import 'api_client.dart';
@@ -53,18 +52,8 @@ class FeedService {
   }
 
   /// Video scenes for Reels (`type: post` + `mediaType: video`).
-  Future<FeedPage> getVideoScenes({String? cursor, int? limit}) async {
-    try {
-      final page = await getExplore(
-        videoOnly: true,
-        cursor: cursor,
-        limit: limit,
-      );
-      if (page.items.isNotEmpty || cursor != null) return page;
-    } catch (_) {
-      if (cursor != null) rethrow;
-    }
-    return FeedPage(items: List<FeedItem>.from(kSceneVideoDummyItems));
+  Future<FeedPage> getVideoScenes({String? cursor, int? limit}) {
+    return getExplore(videoOnly: true, cursor: cursor, limit: limit);
   }
 
   Map<String, String> _query({String? cursor, int? limit}) {

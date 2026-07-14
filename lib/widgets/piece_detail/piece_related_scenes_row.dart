@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../data/home_feed_dummy.dart';
 import '../../models/feed_preview_item.dart';
 import '../../theme/home_feed_tokens.dart';
 import '../../utils/explore_detail_route.dart';
-import '../home_feed/home_feed_widgets.dart';
 import '../../models/feed_item.dart';
 import '../../models/post_summary.dart';
 
@@ -70,14 +68,10 @@ class PieceRelatedScenesRow extends StatelessWidget {
                             scene.mediaUrl!,
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) =>
-                                FeedPicsumImage(
-                              url: picsumUrl(scene.imageSeed, 128, 227),
-                            ),
+                                const _ScenePlaceholder(),
                           )
                         else
-                          FeedPicsumImage(
-                            url: picsumUrl(scene.imageSeed, 128, 227),
-                          ),
+                          const _ScenePlaceholder(),
                         if (scene.isVideo)
                           Container(
                             color: Colors.black.withValues(alpha: 0.22),
@@ -118,6 +112,19 @@ class PieceRelatedScenesRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ScenePlaceholder extends StatelessWidget {
+  const _ScenePlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Colors.grey.shade300,
+      child: Icon(Icons.image_not_supported_outlined,
+          color: Colors.grey.shade500),
     );
   }
 }

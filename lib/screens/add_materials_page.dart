@@ -6,7 +6,7 @@ import '../data/post_material_options.dart';
 import '../data/post_media_assets.dart';
 import '../models/post_image_transform.dart';
 import '../theme/home_feed_tokens.dart';
-import '../utils/image_adjust_math.dart';
+import '../widgets/post_crop_preview.dart';
 import 'pick_materials_page.dart';
 
 /// Add materials — posting flow (Figma 2021:4128).
@@ -30,7 +30,6 @@ class _AddMaterialsPageState extends State<AddMaterialsPage> {
   static const _textSecondary = Color(0xFF8C8880);
 
   static const _previewWidth = 256.0;
-  static const _previewHeight = 340.0;
   static const _previewRadius = 8.0;
 
   late List<PostMaterialOption> _selected;
@@ -86,12 +85,13 @@ class _AddMaterialsPageState extends State<AddMaterialsPage> {
                     padding: const EdgeInsets.fromLTRB(10, 12, 10, 0),
                     child: Column(
                       children: [
-                        _MaterialsPreviewImage(
-                          assetPath: widget.previewImagePath,
-                          transform: widget.transform,
+                        SizedBox(
                           width: _previewWidth,
-                          height: _previewHeight,
-                          radius: _previewRadius,
+                          child: PostCropPreview(
+                            imagePath: widget.previewImagePath,
+                            transform: widget.transform,
+                            borderRadius: BorderRadius.circular(_previewRadius),
+                          ),
                         ),
                         if (_selected.isNotEmpty) ...[
                           const SizedBox(height: 24),
@@ -227,54 +227,6 @@ class _AddMaterialsBanner extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _MaterialsPreviewImage extends StatelessWidget {
-  const _MaterialsPreviewImage({
-    required this.assetPath,
-    required this.transform,
-    required this.width,
-    required this.height,
-    required this.radius,
-  });
-
-  final String assetPath;
-  final PostImageTransform transform;
-  final double width;
-  final double height;
-  final double radius;
-
-  @override
-  Widget build(BuildContext context) {
-    Widget image = Image.asset(
-      assetPath,
-      width: width,
-      height: height,
-      fit: BoxFit.cover,
-    );
-
-    if (!ImageAdjustMath.isNeutral(
-      brightness: transform.brightness,
-      contrast: transform.contrast,
-      exposure: transform.exposure,
-    )) {
-      image = ColorFiltered(
-        colorFilter: ColorFilter.matrix(
-          ImageAdjustMath.combinedMatrix(
-            brightness: transform.brightness,
-            contrast: transform.contrast,
-            exposure: transform.exposure,
-          ),
-        ),
-        child: image,
-      );
-    }
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: image,
     );
   }
 }

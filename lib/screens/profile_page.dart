@@ -10,6 +10,7 @@ import '../services/series_service.dart';
 import '../services/social_service.dart';
 import '../services/user_service.dart';
 import '../theme/home_feed_tokens.dart';
+import '../widgets/delete_confirmation_dialog.dart';
 import '../widgets/profile_avatar_preview_sheet.dart';
 import '../widgets/profile_cover_image.dart';
 import 'profile/models/profile_series_data.dart';
@@ -47,29 +48,6 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _listedPiecesLoaded = false;
   bool _seriesLoaded = false;
   String _collectSegment = 'available';
-
-  static const _avatarSeed = 902;
-  static const _name = 'Sarah Olson';
-  static const _handle = '@sarahsunnyart';
-  static const _followingFollowers = '100 following · 89 followers';
-  static const _bioLine1 = 'Oil on canvas · Dallas, TX';
-  static const _bioLine2 =
-      'Figurative oil painter exploring memory, identity, and the in-between.';
-
-  static const _leftMasonry = <({int seed, double h})>[
-    (seed: 301, h: 292),
-    (seed: 302, h: 168),
-    (seed: 303, h: 174),
-    (seed: 304, h: 318),
-  ];
-
-  static const _rightMasonry = <({int seed, double h})>[
-    (seed: 311, h: 182),
-    (seed: 312, h: 132),
-    (seed: 313, h: 302),
-    (seed: 314, h: 156),
-    (seed: 315, h: 278),
-  ];
 
   bool get _isTabContext => widget.username == null;
 
@@ -268,7 +246,6 @@ class _ProfilePageState extends State<ProfilePage> {
     showProfileAvatarPreview(
       context,
       avatarUrl: avatarUrl,
-      seed: _avatarSeed,
       allowChange: _isOwnProfile && !widget.viewerMode,
       onChanged: () async {
         _resetTabCache();
@@ -295,6 +272,47 @@ class _ProfilePageState extends State<ProfilePage> {
     _toggleFollow();
   }
 
+  Future<void> _deletePiece(PieceSummary piece) async {
+    final confirmed = await showDeleteConfirmationDialog(
+      context,
+      itemLabel: 'piece',
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await PieceService.instance.delete(piece.id);
+      if (!mounted) return;
+      setState(() {
+        _pieces = _pieces.where((p) => p.id != piece.id).toList();
+        _listedPieces = _listedPieces.where((p) => p.id != piece.id).toList();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete piece: $e')),
+      );
+    }
+  }
+
+  Future<void> _deleteScene(PostSummary post) async {
+    final confirmed = await showDeleteConfirmationDialog(
+      context,
+      itemLabel: 'scene',
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await PostService.instance.delete(post.id);
+      if (!mounted) return;
+      setState(() {
+        _scenes = _scenes.where((p) => p.id != post.id).toList();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete scene: $e')),
+      );
+    }
+  }
+
   void _showViewerModePreviewSnackBar() {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -317,9 +335,9 @@ class _ProfilePageState extends State<ProfilePage> {
     final isOwnProfile = _isOwnProfile;
     final showPublicActions = widget.viewerMode || !isOwnProfile;
 
-    final name = profile?.name ?? sessionUser?.name ?? _name;
+    final name = profile?.name ?? sessionUser?.name ?? '';
     final handle = profile?.handle ??
-        (sessionUser != null ? '@${sessionUser.username}' : _handle);
+        (sessionUser != null ? '@${sessionUser.username}' : '');
     final coverUrl = profile?.coverPhotoUrl;
     final avatarUrl = profile?.profilePhotoUrl;
 
@@ -374,16 +392,11 @@ class _ProfilePageState extends State<ProfilePage> {
                 child: ProfileHeader(
                   name: name,
                   handle: handle,
-                  followingFollowers:
-                      profile?.followingFollowers ?? _followingFollowers,
-                  bioLine1: profile?.location?.isNotEmpty == true
-                      ? profile!.location!
-                      : _bioLine1,
-                  bioLine2: profile?.bio?.isNotEmpty == true
-                      ? profile!.bio!
-                      : _bioLine2,
+                  followingFollowers: profile?.followingFollowers ??
+                      '0 following · 0 followers',
+                  bioLine1: profile?.location ?? '',
+                  bioLine2: profile?.bio ?? '',
                   avatarUrl: avatarUrl,
-                  avatarSeed: _avatarSeed,
                   piecesCount: profile?.piecesCount ?? _pieces.length,
                   collectedCount: profile?.collectedCount,
                   savesCount: profile?.savesCount,
@@ -422,8 +435,9 @@ class _ProfilePageState extends State<ProfilePage> {
                     collectSegment: _collectSegment,
                     sellerMode: sellerEnabled,
                     loading: _tabContentLoading,
-                    leftMasonry: _leftMasonry,
-                    rightMasonry: _rightMasonry,
+                    isOwnProfile: isOwnProfile && !widget.viewerMode,
+                    onDeletePiece: _deletePiece,
+                    onDeleteScene: _deleteScene,
                   ),
                 ),
               ),

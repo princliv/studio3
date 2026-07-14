@@ -14,6 +14,7 @@ class PostSummary {
     this.isSaved = false,
     this.authorUsername,
     this.authorName,
+    this.authorAvatarUrl,
     this.linkedPiece,
   });
 
@@ -29,6 +30,7 @@ class PostSummary {
   final bool isSaved;
   final String? authorUsername;
   final String? authorName;
+  final String? authorAvatarUrl;
   final PieceSummary? linkedPiece;
 
   factory PostSummary.fromJson(Map<String, dynamic> json) {
@@ -52,6 +54,9 @@ class PostSummary {
       authorName: author?['name'] as String? ??
           user?['name'] as String? ??
           json['authorName'] as String?,
+      authorAvatarUrl: author?['profilePhotoUrl'] as String? ??
+          user?['profilePhotoUrl'] as String? ??
+          json['authorAvatarUrl'] as String?,
       linkedPiece: pieceJson is Map<String, dynamic>
           ? PieceSummary.fromJson(pieceJson)
           : null,

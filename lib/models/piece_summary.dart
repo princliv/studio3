@@ -22,6 +22,7 @@ class PieceSummary {
     this.isSaved = false,
     this.authorUsername,
     this.authorName,
+    this.authorAvatarUrl,
     this.series,
   });
 
@@ -45,6 +46,7 @@ class PieceSummary {
   final bool isSaved;
   final String? authorUsername;
   final String? authorName;
+  final String? authorAvatarUrl;
   final PieceSeriesInfo? series;
 
   factory PieceSummary.fromJson(Map<String, dynamic> json) {
@@ -76,6 +78,9 @@ class PieceSummary {
       authorName: author?['name'] as String? ??
           user?['name'] as String? ??
           json['authorName'] as String?,
+      authorAvatarUrl: author?['profilePhotoUrl'] as String? ??
+          user?['profilePhotoUrl'] as String? ??
+          json['authorAvatarUrl'] as String?,
       series: seriesJson is Map<String, dynamic>
           ? PieceSeriesInfo.fromJson(seriesJson)
           : null,

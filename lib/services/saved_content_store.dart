@@ -25,7 +25,7 @@ class SavedEntry {
       preview?.title ?? feedItem?.title ?? feedItem?.post?.caption ?? 'Saved';
 
   String get authorName =>
-      preview?.artist.name ?? feedItem?.authorName ?? 'Artist';
+      preview?.displayName ?? feedItem?.authorName ?? 'Artist';
 
   bool get isVideoScene =>
       feedItem?.isVideo == true || preview?.medium == 'Video';
@@ -75,7 +75,8 @@ class SavedContentStore extends ChangeNotifier {
           caption: item.title,
           mediaUrl: item.heroImageUrl,
           mediaType: 'video',
-          authorName: item.artist.name,
+          authorName: item.displayName,
+          authorAvatarUrl: item.authorAvatarUrl,
           authorUsername: item.handle.replaceFirst('@', ''),
         ),
       );

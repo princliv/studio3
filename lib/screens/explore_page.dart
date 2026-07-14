@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../data/explore_dummy.dart';
 import '../models/explore_feed_block.dart';
 import '../models/feed_item.dart';
 import '../models/user_profile.dart';
@@ -113,12 +112,9 @@ class _ExplorePageState extends State<ExplorePage> {
     }
   }
 
-  List<FeedItem> get _sourceItems =>
-      _allItems.isNotEmpty ? _allItems : kExploreFeedDummyItems;
+  List<FeedItem> get _sourceItems => _allItems;
 
-  FeedItem? get _effectiveFeatured {
-    return _featured ?? kExploreFeaturedDummy;
-  }
+  FeedItem? get _effectiveFeatured => _featured;
 
   List<FeedItem> _filterItems(
     List<FeedItem> items,

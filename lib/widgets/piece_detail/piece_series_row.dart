@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../data/home_feed_dummy.dart';
 import '../../theme/home_feed_tokens.dart';
-import '../home_feed/home_feed_widgets.dart';
 
 class PieceSeriesRow extends StatelessWidget {
   const PieceSeriesRow({
@@ -58,19 +56,28 @@ class PieceSeriesRow extends StatelessWidget {
                           url,
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) =>
-                              FeedPicsumImage(
-                            url: picsumUrl(thumbSeeds[index], 118, 118),
-                          ),
+                              const _ThumbPlaceholder(),
                         )
-                      : FeedPicsumImage(
-                          url: picsumUrl(thumbSeeds[index], 118, 118),
-                        ),
+                      : const _ThumbPlaceholder(),
                 ),
               );
             },
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ThumbPlaceholder extends StatelessWidget {
+  const _ThumbPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Colors.grey.shade300,
+      child: Icon(Icons.image_not_supported_outlined,
+          color: Colors.grey.shade500),
     );
   }
 }

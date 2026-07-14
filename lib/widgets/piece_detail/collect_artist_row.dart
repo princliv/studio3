@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../data/home_feed_dummy.dart';
 import '../../models/feed_preview_item.dart';
 import '../../theme/collect_detail_tokens.dart';
 import '../../utils/profile_navigation.dart';
+import '../home_feed/home_feed_widgets.dart';
 
 /// Artist row for collect detail (Figma 2302-1554).
 class CollectArtistRow extends StatelessWidget {
@@ -33,18 +33,10 @@ class CollectArtistRow extends StatelessWidget {
           GestureDetector(
             onTap: () => openUserProfile(context, item.handle),
             behavior: HitTestBehavior.opaque,
-            child: ClipOval(
-              child: Image.network(
-                picsumAvatarUrl(item.artist.avatarSeed),
-                width: 28,
-                height: 28,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  width: 28,
-                  height: 28,
-                  color: CollectDetailTokens.textSecondary.withValues(alpha: 0.3),
-                ),
-              ),
+            child: UserAvatar(
+              url: item.displayAvatarUrl,
+              name: item.displayName,
+              size: 28,
             ),
           ),
           const SizedBox(width: 8),
@@ -53,7 +45,7 @@ class CollectArtistRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item.artist.name,
+                  item.displayName,
                   style: GoogleFonts.inter(
                     fontSize: 12,
                     fontWeight: FontWeight.w400,

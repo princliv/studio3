@@ -1,4 +1,3 @@
-import '../data/home_feed_dummy.dart';
 import 'feed_item.dart';
 import 'piece_summary.dart';
 import 'post_summary.dart';
@@ -11,14 +10,12 @@ enum FeedAvailabilityFilter { all, available }
 class RelatedScene {
   const RelatedScene({
     this.id,
-    this.imageSeed = 0,
     this.mediaUrl,
     this.mediaType,
     this.duration,
   });
 
   final String? id;
-  final int imageSeed;
   final String? mediaUrl;
   final String? mediaType;
   final String? duration;
@@ -31,19 +28,18 @@ class RelatedScene {
   factory RelatedScene.fromPost(PostSummary post) {
     return RelatedScene(
       id: post.id,
-      imageSeed: post.id.hashCode.abs(),
       mediaUrl: post.mediaUrl,
       mediaType: post.mediaType,
     );
   }
 }
 
-/// Local dummy Piece/Scene shown in the For You feed when API data is unavailable.
+/// Real API-backed Piece/Scene view model shared by the feed, detail, and
+/// profile screens.
 class FeedPreviewItem {
   const FeedPreviewItem({
     required this.id,
     required this.imageSeeds,
-    required this.artistIndex,
     required this.title,
     required this.medium,
     required this.year,
@@ -66,11 +62,12 @@ class FeedPreviewItem {
     this.isSaved = false,
     this.likeCount = 0,
     this.commentCount = 0,
+    this.authorName,
+    this.authorAvatarUrl,
   });
 
   final String id;
   final List<int> imageSeeds;
-  final int artistIndex;
   final String title;
   final String medium;
   final int year;
@@ -93,13 +90,22 @@ class FeedPreviewItem {
   final bool isSaved;
   final int likeCount;
   final int commentCount;
+  final String? authorName;
+  final String? authorAvatarUrl;
 
   int get imageCount => imageSeeds.length;
 
-  bool get isApiBacked => !id.contains('dummy');
+  /// All feed items are real/API-backed now that no dummy generator exists.
+  bool get isApiBacked => true;
 
-  HomeFeedArtist get artist =>
-      kHomeFeedArtists[artistIndex % kHomeFeedArtists.length];
+  /// Real poster name when available, otherwise a neutral placeholder —
+  /// never a fabricated name.
+  String get displayName =>
+      (authorName != null && authorName!.isNotEmpty) ? authorName! : 'Artist';
+
+  /// Real poster avatar URL, or null — callers should show an initials
+  /// placeholder rather than falling back to a fake photo.
+  String? get displayAvatarUrl => authorAvatarUrl;
 
   double get aspectRatioValue =>
       aspectRatio == FeedAspectRatio.portrait3x4 ? 3 / 4 : 16 / 9;
@@ -116,7 +122,6 @@ class FeedPreviewItem {
   FeedPreviewItem copyWith({
     String? id,
     List<int>? imageSeeds,
-    int? artistIndex,
     String? title,
     String? medium,
     int? year,
@@ -139,11 +144,12 @@ class FeedPreviewItem {
     bool? isSaved,
     int? likeCount,
     int? commentCount,
+    String? authorName,
+    String? authorAvatarUrl,
   }) {
     return FeedPreviewItem(
       id: id ?? this.id,
       imageSeeds: imageSeeds ?? this.imageSeeds,
-      artistIndex: artistIndex ?? this.artistIndex,
       title: title ?? this.title,
       medium: medium ?? this.medium,
       year: year ?? this.year,
@@ -166,12 +172,13 @@ class FeedPreviewItem {
       isSaved: isSaved ?? this.isSaved,
       likeCount: likeCount ?? this.likeCount,
       commentCount: commentCount ?? this.commentCount,
+      authorName: authorName ?? this.authorName,
+      authorAvatarUrl: authorAvatarUrl ?? this.authorAvatarUrl,
     );
   }
 
   /// Builds a preview-shaped item from an API [PieceSummary] for collect detail.
   factory FeedPreviewItem.fromPieceSummary(PieceSummary piece) {
-    final artistIndex = piece.id.hashCode.abs() % kHomeFeedArtists.length;
     final username = piece.authorUsername ?? 'artist';
     final series = piece.series;
     final seriesThumbs = series?.previewPieces
@@ -187,7 +194,6 @@ class FeedPreviewItem {
     return FeedPreviewItem(
       id: piece.id,
       imageSeeds: [piece.id.hashCode.abs()],
-      artistIndex: artistIndex,
       title: piece.title,
       medium: piece.medium ?? 'Mixed media',
       year: piece.yearCreated ?? DateTime.now().year,
@@ -208,6 +214,8 @@ class FeedPreviewItem {
       isSaved: piece.isSaved,
       likeCount: piece.likeCount,
       commentCount: piece.commentCount,
+      authorName: piece.authorName,
+      authorAvatarUrl: piece.authorAvatarUrl,
     );
   }
 
@@ -218,13 +226,11 @@ class FeedPreviewItem {
     }
 
     final post = item.post!;
-    final artistIndex = post.id.hashCode.abs() % kHomeFeedArtists.length;
     final username = post.authorUsername ?? 'artist';
     final isVideo = item.isVideo;
     return FeedPreviewItem(
       id: post.id,
       imageSeeds: [post.id.hashCode.abs()],
-      artistIndex: artistIndex,
       title: post.caption ?? 'Scene',
       medium: isVideo ? 'Video' : 'Scene',
       year: DateTime.now().year,
@@ -241,6 +247,8 @@ class FeedPreviewItem {
       isSaved: post.isSaved,
       likeCount: post.likeCount,
       commentCount: post.commentCount,
+      authorName: post.authorName,
+      authorAvatarUrl: post.authorAvatarUrl,
     );
   }
 
@@ -273,16 +281,9 @@ FeedAspectRatio aspectRatioFromDimensions(String? dimensions) {
       : FeedAspectRatio.portrait3x4;
 }
 
+/// The real media URL for [item], or an empty string when genuinely
+/// missing — callers already show a neutral broken-image placeholder for
+/// an unloadable URL, so there is no fake stand-in photo here.
 String feedPreviewImageUrl(FeedPreviewItem item, {int imageIndex = 0}) {
-  if (item.heroImageUrl != null && item.heroImageUrl!.isNotEmpty) {
-    return item.heroImageUrl!;
-  }
-  final seed =
-      item.imageSeeds[imageIndex.clamp(0, item.imageSeeds.length - 1)];
-  switch (item.aspectRatio) {
-    case FeedAspectRatio.portrait3x4:
-      return picsumUrl(seed, 390, 520);
-    case FeedAspectRatio.landscape16x9:
-      return picsumUrl(seed, 390, 220);
-  }
+  return item.heroImageUrl ?? '';
 }
