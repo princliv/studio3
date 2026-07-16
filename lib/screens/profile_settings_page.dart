@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../services/auth_service.dart';
 import '../services/auth_session.dart';
+import '../services/device_service.dart';
 import '../models/user_profile.dart';
 import '../services/user_service.dart';
 import '../theme/home_feed_tokens.dart';
@@ -132,7 +133,17 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                 );
               },
             ),
+            _SettingsTile(
+              icon: Icons.point_of_sale_outlined,
+              label: 'My sales',
+              onTap: () => Navigator.pushNamed(context, '/sales'),
+            ),
           ],
+          _SettingsTile(
+            icon: Icons.receipt_long_outlined,
+            label: 'My orders',
+            onTap: () => Navigator.pushNamed(context, '/orders'),
+          ),
           const SizedBox(height: 8),
           _SettingsTile(
             icon: Icons.collections_bookmark_outlined,
@@ -149,6 +160,11 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
             onTap: () => Navigator.pushNamed(context, '/edit-profile'),
           ),
           _SettingsTile(
+            icon: Icons.local_shipping_outlined,
+            label: 'Shipping addresses',
+            onTap: () => Navigator.pushNamed(context, '/addresses'),
+          ),
+          _SettingsTile(
             icon: Icons.visibility_outlined,
             label: 'See profile as viewer',
             onTap: () => openOwnProfileAsViewer(context),
@@ -162,6 +178,7 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
             icon: Icons.devices_other_outlined,
             label: 'Log out of all devices',
             onTap: () async {
+              await DeviceService.instance.unregisterCurrentDevice();
               await AuthService.instance.logoutAllDevices();
               if (!context.mounted) return;
               Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
@@ -178,6 +195,7 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
             label: 'Log out',
             destructive: true,
             onTap: () async {
+              await DeviceService.instance.unregisterCurrentDevice();
               await AuthService.instance.logout();
               if (!context.mounted) return;
               Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);

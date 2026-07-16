@@ -5,8 +5,11 @@ class UserProfile {
     required this.username,
     required this.name,
     this.email,
+    this.phone,
     this.bio,
     this.location,
+    this.latitude,
+    this.longitude,
     this.profilePhotoUrl,
     this.coverPhotoUrl,
     this.role,
@@ -26,8 +29,11 @@ class UserProfile {
   final String username;
   final String name;
   final String? email;
+  final String? phone;
   final String? bio;
   final String? location;
+  final double? latitude;
+  final double? longitude;
   final String? profilePhotoUrl;
   final String? coverPhotoUrl;
   final String? role;
@@ -48,8 +54,11 @@ class UserProfile {
       username: json['username'] as String? ?? '',
       name: json['name'] as String? ?? '',
       email: json['email'] as String?,
+      phone: json['phone'] as String?,
       bio: json['bio'] as String?,
       location: json['location'] as String?,
+      latitude: (json['latitude'] as num?)?.toDouble(),
+      longitude: (json['longitude'] as num?)?.toDouble(),
       profilePhotoUrl: json['profilePhotoUrl'] as String?,
       coverPhotoUrl: json['coverPhotoUrl'] as String?,
       role: json['role'] as String?,

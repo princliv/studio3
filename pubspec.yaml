@@ -45,6 +45,9 @@ dependencies:
   shared_preferences: ^2.3.3
   video_player: ^2.9.2
   cached_network_image: ^3.4.1
+  geolocator: ^14.0.3
+  firebase_core: ^4.12.1
+  firebase_messaging: ^16.4.3
 
 dev_dependencies:
   flutter_test:
@@ -56,6 +59,41 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_native_splash: ^2.4.4
+  flutter_launcher_icons: ^0.14.3
+  # Used by tool/generate_brand_assets.dart to derive app_icon.png / splash_icon.png
+  image: ^4.8.0
+
+# Native splash screen — dark background + Studio3 icon (replaces the
+# default white/Flutter splash). Generate with:
+#   dart run flutter_native_splash:create
+flutter_native_splash:
+  color: "#0A0A0A"
+  color_dark: "#0A0A0A"
+  image: assets/logo/logo_icon_white.png
+  image_dark: assets/logo/logo_icon_white.png
+  # Android 12+'s SplashScreen API always clips the icon into a fixed circle,
+  # so it needs a version with extra transparent padding (splash_icon.png) or
+  # the mark gets cropped — the plain `image` above isn't masked and can stay
+  # tightly cropped.
+  android_12:
+    color: "#0A0A0A"
+    color_dark: "#0A0A0A"
+    image: assets/logo/splash_icon.png
+    image_dark: assets/logo/splash_icon.png
+
+# App icon — Studio3 mark on a dark square (replaces the default Flutter
+# icon). Uses a pre-flattened opaque source (app_icon.png) rather than
+# feeding a transparent PNG through flutter_launcher_icons' own alpha-flatten
+# step, which was found to introduce green fringing on the edges of the
+# generated iOS icon. Generate with:
+#   dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/logo/app_icon.png
+  adaptive_icon_background: "#0A0A0A"
+  adaptive_icon_foreground: assets/logo/logo_icon_white.png
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

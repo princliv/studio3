@@ -13,6 +13,7 @@ import '../utils/explore_layout_engine.dart';
 import '../widgets/explore/explore_featured_card.dart';
 import '../widgets/explore/explore_feed_section.dart';
 import '../widgets/explore/explore_near_you_placeholder.dart';
+import '../widgets/explore/nearby_sellers_row.dart';
 import '../widgets/explore/explore_sticky_header.dart';
 import '../widgets/feed_skeleton.dart';
 
@@ -238,6 +239,9 @@ class _ExplorePageState extends State<ExplorePage> {
                 ),
               const SliverToBoxAdapter(
                 child: ExploreNearYouPlaceholder(),
+              ),
+              const SliverToBoxAdapter(
+                child: NearbySellersRow(),
               ),
               if (showSkeleton)
                 const SliverToBoxAdapter(

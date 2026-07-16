@@ -34,6 +34,16 @@ class InquiryService {
     return InquiryInboxPage(items: items, nextCursor: nextCursor);
   }
 
+  Future<InquiryCreateResult> createInquiry(String pieceId, String message) async {
+    final json = await _api.post(
+      '/api/inquiries',
+      body: {'pieceId': pieceId, 'message': message},
+      auth: true,
+    );
+    final data = _api.extractData(json) as Map<String, dynamic>;
+    return InquiryCreateResult.fromJson(data);
+  }
+
   Future<InquiryThread> getThread(String id) async {
     final json = await _api.get('/api/inquiries/$id', auth: true);
     final data = _api.extractData(json) as Map<String, dynamic>;

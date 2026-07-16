@@ -29,8 +29,8 @@ class StudioHeaderLogo extends StatelessWidget {
 class StudioAuthLogo extends StatelessWidget {
   const StudioAuthLogo({
     super.key,
-    this.iconHeight = 40,
-    this.textHeight = 28,
+    this.iconHeight = 64,
+    this.textHeight = 40,
   });
 
   final double iconHeight;

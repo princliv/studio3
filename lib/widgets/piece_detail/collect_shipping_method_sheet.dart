@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../models/address.dart';
 import '../../models/collect_checkout.dart';
-import '../../models/collect_shipping_address.dart';
+import '../../services/api_exception.dart';
+import '../../services/order_service.dart';
 import '../../theme/collect_detail_tokens.dart';
 import 'collect_shipping_sheet.dart';
 
@@ -10,16 +12,19 @@ import 'collect_shipping_sheet.dart';
 class CollectShippingMethodSheet extends StatefulWidget {
   const CollectShippingMethodSheet({
     super.key,
+    required this.pieceId,
     required this.address,
     this.initialMethodId,
   });
 
-  final CollectShippingAddress address;
+  final String pieceId;
+  final Address address;
   final String? initialMethodId;
 
   static Future<CollectShippingSelection?> show(
     BuildContext context, {
-    required CollectShippingAddress address,
+    required String pieceId,
+    required Address address,
     String? initialMethodId,
   }) {
     return showModalBottomSheet<CollectShippingSelection>(
@@ -29,6 +34,7 @@ class CollectShippingMethodSheet extends StatefulWidget {
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.2),
       builder: (context) => CollectShippingMethodSheet(
+        pieceId: pieceId,
         address: address,
         initialMethodId: initialMethodId,
       ),
@@ -42,26 +48,51 @@ class CollectShippingMethodSheet extends StatefulWidget {
 
 class _CollectShippingMethodSheetState
     extends State<CollectShippingMethodSheet> {
-  late String _selectedId;
-  late CollectShippingAddress _address;
+  String? _selectedId;
+  late Address _address;
+  List<CollectShippingMethod> _methods = [];
+  bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _selectedId = widget.initialMethodId ?? kCollectShippingMethods.first.id;
     _address = widget.address;
+    _selectedId = widget.initialMethodId;
+    _load();
   }
 
-  CollectShippingMethod get _selected =>
-      kCollectShippingMethods.firstWhere((m) => m.id == _selectedId);
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final quotes = await OrderService.instance.getShippingQuote(widget.pieceId);
+      if (!mounted) return;
+      setState(() {
+        _methods = quotes.map(CollectShippingMethod.fromQuote).toList();
+        _selectedId ??= _methods.isNotEmpty ? _methods.first.id : null;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e is ApiException ? e.message : 'Could not load shipping rates';
+        _loading = false;
+      });
+    }
+  }
+
+  CollectShippingMethod? get _selected =>
+      _methods.where((m) => m.id == _selectedId).firstOrNull;
 
   void _save() {
+    final method = _selected;
+    if (method == null) return;
     Navigator.pop(
       context,
-      CollectShippingSelection(
-        address: _address,
-        method: _selected,
-      ),
+      CollectShippingSelection(address: _address, method: method),
     );
   }
 
@@ -95,137 +126,145 @@ class _CollectShippingMethodSheetState
                 onBack: () => Navigator.pop(context),
               ),
               Expanded(
-                child: ListView(
-                  padding: EdgeInsets.fromLTRB(16, 0, 16, 24 + bottomInset),
-                  children: [
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: CollectDetailTokens.sheetCardFill,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  'Ship to',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w400,
-                                    color: CollectDetailTokens.textSecondary,
+                child: _loading
+                    ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+                    : ListView(
+                        padding: EdgeInsets.fromLTRB(16, 0, 16, 24 + bottomInset),
+                        children: [
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: CollectDetailTokens.sheetCardFill,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        'Ship to',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w400,
+                                          color: CollectDetailTokens.textSecondary,
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      GestureDetector(
+                                        onTap: _changeAddress,
+                                        child: Text(
+                                          'Change',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w500,
+                                            color: CollectDetailTokens.textSecondary,
+                                            decoration: TextDecoration.underline,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ),
-                                const Spacer(),
-                                GestureDetector(
-                                  onTap: _changeAddress,
-                                  child: Text(
-                                    'Change',
+                                  const SizedBox(height: 12),
+                                  _AddressLine(
+                                    address.label?.isNotEmpty == true
+                                        ? address.label!
+                                        : address.fullName,
+                                  ),
+                                  _AddressLine(address.line1),
+                                  if (address.line2 != null &&
+                                      address.line2!.isNotEmpty)
+                                    _AddressLine(address.line2!),
+                                  _AddressLine(
+                                    '${address.city}, ${address.state} ${address.zip}',
+                                  ),
+                                  _AddressLine(address.phone),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: CollectDetailTokens.sheetCardFill,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Shipping method',
                                     style: GoogleFonts.inter(
                                       fontSize: 11,
-                                      fontWeight: FontWeight.w500,
+                                      fontWeight: FontWeight.w400,
                                       color: CollectDetailTokens.textSecondary,
-                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  if (_error != null)
+                                    Text(
+                                      _error!,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        color: Colors.red.shade300,
+                                      ),
+                                    )
+                                  else
+                                    for (var i = 0; i < _methods.length; i++) ...[
+                                      if (i > 0)
+                                        const Padding(
+                                          padding: EdgeInsets.symmetric(vertical: 10),
+                                          child: Divider(
+                                            height: 1,
+                                            color: CollectDetailTokens.divider,
+                                          ),
+                                        ),
+                                      _MethodOption(
+                                        method: _methods[i],
+                                        selected: _selectedId == _methods[i].id,
+                                        onTap: () => setState(
+                                          () => _selectedId = _methods[i].id,
+                                        ),
+                                      ),
+                                    ],
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          SizedBox(
+                            height: CollectDetailTokens.collectButtonHeight,
+                            width: double.infinity,
+                            child: Material(
+                              color: _selected != null
+                                  ? CollectDetailTokens.ctaFill
+                                  : CollectDetailTokens.ctaFill.withValues(alpha: 0.5),
+                              borderRadius: BorderRadius.circular(
+                                CollectDetailTokens.collectButtonRadius,
+                              ),
+                              child: InkWell(
+                                onTap: _selected != null ? _save : null,
+                                borderRadius: BorderRadius.circular(
+                                  CollectDetailTokens.collectButtonRadius,
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'Save and continue',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w400,
+                                      color: CollectDetailTokens.textInverse,
                                     ),
                                   ),
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            _AddressLine(
-                              '${address.firstName} ${address.lastName}',
-                            ),
-                            _AddressLine(address.street),
-                            if (address.apt != null && address.apt!.isNotEmpty)
-                              _AddressLine(address.apt!),
-                            _AddressLine(
-                              '${address.city}, ${address.state} ${address.zip}',
-                            ),
-                            const _AddressLine('United States'),
-                            if (address.phone != null &&
-                                address.phone!.isNotEmpty)
-                              _AddressLine(address.phone!),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: CollectDetailTokens.sheetCardFill,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Shipping method',
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w400,
-                                color: CollectDetailTokens.textSecondary,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            for (var i = 0;
-                                i < kCollectShippingMethods.length;
-                                i++) ...[
-                              if (i > 0)
-                                const Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 10),
-                                  child: Divider(
-                                    height: 1,
-                                    color: CollectDetailTokens.divider,
-                                  ),
-                                ),
-                              _MethodOption(
-                                method: kCollectShippingMethods[i],
-                                selected:
-                                    _selectedId ==
-                                    kCollectShippingMethods[i].id,
-                                onTap: () => setState(
-                                  () => _selectedId =
-                                      kCollectShippingMethods[i].id,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      height: CollectDetailTokens.collectButtonHeight,
-                      width: double.infinity,
-                      child: Material(
-                        color: CollectDetailTokens.ctaFill,
-                        borderRadius: BorderRadius.circular(
-                          CollectDetailTokens.collectButtonRadius,
-                        ),
-                        child: InkWell(
-                          onTap: _save,
-                          borderRadius: BorderRadius.circular(
-                            CollectDetailTokens.collectButtonRadius,
-                          ),
-                          child: Center(
-                            child: Text(
-                              'Save and continue',
-                              style: GoogleFonts.inter(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w400,
-                                color: CollectDetailTokens.textInverse,
                               ),
                             ),
                           ),
-                        ),
+                        ],
                       ),
-                    ),
-                  ],
-                ),
               ),
             ],
           ),
@@ -233,6 +272,10 @@ class _CollectShippingMethodSheetState
       ),
     );
   }
+}
+
+extension<T> on Iterable<T> {
+  T? get firstOrNull => isEmpty ? null : first;
 }
 
 class _AddressLine extends StatelessWidget {

@@ -3,14 +3,18 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import 'package:google_fonts/google_fonts.dart';
+
 import '../data/post_material_options.dart';
 import '../data/post_location_options.dart';
 import '../data/post_picker_options.dart';
 import '../data/post_media_assets.dart';
 import '../models/listing_details.dart';
+import '../models/piece_summary.dart';
 import '../models/post_image_transform.dart';
 import '../services/auth_session.dart';
 import '../services/api_exception.dart';
+import '../services/piece_service.dart';
 import '../services/post_publish_service.dart';
 import '../theme/home_feed_tokens.dart';
 import '../widgets/choose_location_sheet.dart';
@@ -57,8 +61,10 @@ class _PostCreatePageState extends State<PostCreatePage> {
 
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _altTextController = TextEditingController();
   final _listingFormKey = GlobalKey<ListingDetailsFormState>();
   bool _aiToolsUsed = false;
+  bool _isProcess = false;
   bool _publishing = false;
   bool _listForSale = false;
   final List<PostLocationOption> _selectedLocations = [];
@@ -68,6 +74,8 @@ class _PostCreatePageState extends State<PostCreatePage> {
   String? _selectedSeriesId;
   String? _newSeriesName;
   String? _seriesLabel;
+  String? _linkedPieceId;
+  String? _linkedPieceLabel;
 
   bool get _isPiece => widget.postType == 'piece';
 
@@ -83,6 +91,7 @@ class _PostCreatePageState extends State<PostCreatePage> {
     AuthSession.instance.removeListener(_onSessionChanged);
     _nameController.dispose();
     _descriptionController.dispose();
+    _altTextController.dispose();
     super.dispose();
   }
 
@@ -199,6 +208,37 @@ class _PostCreatePageState extends State<PostCreatePage> {
     }
   }
 
+  Future<void> _openLinkedPiecePicker() async {
+    final username = AuthSession.instance.user?.username;
+    if (username == null || username.isEmpty) return;
+    List<PieceSummary> pieces;
+    try {
+      pieces = await PieceService.instance.getUserPieces(username);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not load your pieces')),
+      );
+      return;
+    }
+    if (!mounted) return;
+    final selected = await showModalBottomSheet<PieceSummary?>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      builder: (context) => _LinkedPiecePickerSheet(
+        pieces: pieces,
+        selectedId: _linkedPieceId,
+      ),
+    );
+    if (!mounted) return;
+    setState(() {
+      _linkedPieceId = selected?.id;
+      _linkedPieceLabel = selected?.title;
+    });
+  }
+
   Future<void> _openSeriesPicker() async {
     final result = await SeriesPickerSheet.show(
       context,
@@ -224,7 +264,7 @@ class _PostCreatePageState extends State<PostCreatePage> {
 
   PostDraft _buildDraft() {
     ListingDetails? listingDetails;
-    if (_isPiece && _listForSale) {
+    if (_isPiece) {
       listingDetails = _listingFormKey.currentState?.buildListingDetails();
     }
 
@@ -236,7 +276,7 @@ class _PostCreatePageState extends State<PostCreatePage> {
       title: _nameController.text,
       description: _descriptionController.text,
       mediumId: _selectedMediumId,
-      styleIds: _selectedStyleIds.toList(),
+      styleTags: _selectedStyleIds.toList(),
       locations: List<PostLocationOption>.from(_selectedLocations),
       materials: List<PostMaterialOption>.from(_selectedMaterials),
       listingDetails: listingDetails,
@@ -244,6 +284,11 @@ class _PostCreatePageState extends State<PostCreatePage> {
       newSeriesName: _newSeriesName,
       transforms: widget.transforms,
       previewImageIndex: widget.previewImageIndex,
+      aiDisclosed: _aiToolsUsed,
+      altText: _altTextController.text,
+      linkedPieceId: _linkedPieceId,
+      isProcess: _isProcess,
+      isForSale: _isPiece && _listForSale,
     );
   }
 
@@ -253,7 +298,7 @@ class _PostCreatePageState extends State<PostCreatePage> {
       await PostPublishService.instance.publish(draft);
       if (!mounted) return;
       Navigator.of(context).popUntil((route) => route.isFirst);
-      final message = draft.listingDetails != null
+      final message = draft.isForSale
           ? 'Piece listed for sale'
           : 'Published successfully';
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
@@ -407,14 +452,39 @@ class _PostCreatePageState extends State<PostCreatePage> {
                       trailing: _seriesLabel,
                       onTap: _openSeriesPicker,
                     ),
+                    CreateFlowMetadataRow(
+                      iconAsset: PostMediaAssets.createScenesIcon,
+                      iconWidth: 12,
+                      iconHeight: 11,
+                      label: 'Related scenes',
+                      onTap: () {},
+                    ),
+                    const SizedBox(height: 8),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                      child: CreateFlowTextField(
+                        controller: _altTextController,
+                        hint: 'Alt text — describe the image for accessibility',
+                        style: CreateFlowTextFieldStyle.body,
+                        maxLines: 2,
+                        minLines: 1,
+                      ),
+                    ),
+                  ] else ...[
+                    CreateFlowMetadataRow(
+                      iconAsset: PostMediaAssets.createScenesIcon,
+                      iconWidth: 12,
+                      iconHeight: 11,
+                      label: 'Link to piece',
+                      trailing: _linkedPieceLabel,
+                      onTap: _openLinkedPiecePicker,
+                    ),
+                    CreateFlowToggleRow(
+                      label: 'Process / work-in-progress scene',
+                      value: _isProcess,
+                      onChanged: (value) => setState(() => _isProcess = value),
+                    ),
                   ],
-                  CreateFlowMetadataRow(
-                    iconAsset: PostMediaAssets.createScenesIcon,
-                    iconWidth: 12,
-                    iconHeight: 11,
-                    label: 'Related scenes',
-                    onTap: () {},
-                  ),
                   CreateFlowToggleRow(
                     label: 'AI tools used',
                     iconAsset: PostMediaAssets.createAiToolsIcon,
@@ -427,8 +497,10 @@ class _PostCreatePageState extends State<PostCreatePage> {
                       value: _listForSale,
                       onChanged: _onListForSaleChanged,
                     ),
-                    if (_listForSale)
-                      ListingDetailsForm(key: _listingFormKey),
+                    ListingDetailsForm(
+                      key: _listingFormKey,
+                      showSaleFields: _listForSale,
+                    ),
                   ],
                 ],
               ),
@@ -566,6 +638,139 @@ class _PreviewCard extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// Single-select picker for linking a scene to one of the user's pieces.
+class _LinkedPiecePickerSheet extends StatelessWidget {
+  const _LinkedPiecePickerSheet({
+    required this.pieces,
+    this.selectedId,
+  });
+
+  final List<PieceSummary> pieces;
+  final String? selectedId;
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.45,
+      minChildSize: 0.32,
+      maxChildSize: 0.88,
+      builder: (context, scrollController) {
+        return DecoratedBox(
+          decoration: const BoxDecoration(
+            color: Color(0xFF231F1B),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 10),
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4A4843),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                child: Text(
+                  'Link to piece',
+                  style: GoogleFonts.inter(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: pieces.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Text(
+                            'You don\'t have any pieces yet.',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              color: const Color(0xFF8C8880),
+                            ),
+                          ),
+                        ),
+                      )
+                    : ListView(
+                        controller: scrollController,
+                        padding: EdgeInsets.fromLTRB(8, 0, 8, bottomInset + 16),
+                        children: [
+                          _LinkedPieceTile(
+                            title: 'None',
+                            selected: selectedId == null,
+                            onTap: () => Navigator.pop(context),
+                          ),
+                          for (final piece in pieces)
+                            _LinkedPieceTile(
+                              title: piece.title,
+                              selected: selectedId == piece.id,
+                              onTap: () => Navigator.pop(context, piece),
+                            ),
+                        ],
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _LinkedPieceTile extends StatelessWidget {
+  const _LinkedPieceTile({
+    required this.title,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String title;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Row(
+            children: [
+              Icon(
+                selected ? Icons.radio_button_checked : Icons.radio_button_off,
+                color: selected ? Colors.white : Colors.white38,
+                size: 22,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -171,28 +171,25 @@ class AuthScaffold extends StatelessWidget {
                     constraints: BoxConstraints(minHeight: constraints.maxHeight),
                     child: Column(
                       children: [
-                        SizedBox(
-                          height: showBack ? 52 : null,
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              const Center(child: StudioAuthLogo()),
-                              if (showBack)
-                                Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: IconButton(
-                                    onPressed: onBackPressed ?? () => Navigator.maybePop(context),
-                                    icon: const Icon(
-                                      Icons.arrow_back_ios_new_rounded,
-                                      color: AuthColors.textMuted,
-                                      size: 20,
-                                    ),
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                        Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            const Center(child: StudioAuthLogo()),
+                            if (showBack)
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: IconButton(
+                                  onPressed: onBackPressed ?? () => Navigator.maybePop(context),
+                                  icon: const Icon(
+                                    Icons.arrow_back_ios_new_rounded,
+                                    color: AuthColors.textMuted,
+                                    size: 20,
                                   ),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
                                 ),
-                            ],
-                          ),
+                              ),
+                          ],
                         ),
                         if (!compact) ...[
                           Text(

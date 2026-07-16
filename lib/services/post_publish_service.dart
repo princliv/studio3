@@ -21,7 +21,7 @@ class PostDraft {
     this.title = '',
     this.description = '',
     this.mediumId,
-    this.styleIds = const [],
+    this.styleTags = const [],
     this.locations = const [],
     this.materials = const [],
     this.listingDetails,
@@ -29,6 +29,11 @@ class PostDraft {
     this.newSeriesName,
     this.transforms = const [],
     this.previewImageIndex = 0,
+    this.aiDisclosed = false,
+    this.altText,
+    this.linkedPieceId,
+    this.isProcess = false,
+    this.isForSale = false,
   });
 
   final String postType;
@@ -38,7 +43,7 @@ class PostDraft {
   final String title;
   final String description;
   final String? mediumId;
-  final List<String> styleIds;
+  final List<String> styleTags;
   final List<PostLocationOption> locations;
   final List<PostMaterialOption> materials;
   final ListingDetails? listingDetails;
@@ -46,6 +51,11 @@ class PostDraft {
   final String? newSeriesName;
   final List<PostImageTransform> transforms;
   final int previewImageIndex;
+  final bool aiDisclosed;
+  final String? altText;
+  final String? linkedPieceId;
+  final bool isProcess;
+  final bool isForSale;
 
   bool get isVideo => mediaKind == 'video';
 
@@ -57,7 +67,7 @@ class PostDraft {
     String? title,
     String? description,
     String? mediumId,
-    List<String>? styleIds,
+    List<String>? styleTags,
     List<PostLocationOption>? locations,
     List<PostMaterialOption>? materials,
     ListingDetails? listingDetails,
@@ -65,6 +75,11 @@ class PostDraft {
     String? newSeriesName,
     List<PostImageTransform>? transforms,
     int? previewImageIndex,
+    bool? aiDisclosed,
+    String? altText,
+    String? linkedPieceId,
+    bool? isProcess,
+    bool? isForSale,
   }) {
     return PostDraft(
       postType: postType ?? this.postType,
@@ -74,7 +89,7 @@ class PostDraft {
       title: title ?? this.title,
       description: description ?? this.description,
       mediumId: mediumId ?? this.mediumId,
-      styleIds: styleIds ?? this.styleIds,
+      styleTags: styleTags ?? this.styleTags,
       locations: locations ?? this.locations,
       materials: materials ?? this.materials,
       listingDetails: listingDetails ?? this.listingDetails,
@@ -82,6 +97,11 @@ class PostDraft {
       newSeriesName: newSeriesName ?? this.newSeriesName,
       transforms: transforms ?? this.transforms,
       previewImageIndex: previewImageIndex ?? this.previewImageIndex,
+      aiDisclosed: aiDisclosed ?? this.aiDisclosed,
+      altText: altText ?? this.altText,
+      linkedPieceId: linkedPieceId ?? this.linkedPieceId,
+      isProcess: isProcess ?? this.isProcess,
+      isForSale: isForSale ?? this.isForSale,
     );
   }
 }
@@ -98,7 +118,7 @@ class PostPublishService {
   Future<void> publish(PostDraft draft) async {
     final isScene = draft.postType == 'scene';
     final isVideo = draft.isVideo;
-    final isListing = draft.listingDetails != null;
+    final isListing = draft.isForSale;
     final purpose = isScene ? 'post' : 'piece';
 
     if (isVideo) {
@@ -117,6 +137,9 @@ class PostPublishService {
         'mediaType': 'video',
         if (draft.description.trim().isNotEmpty)
           'caption': draft.description.trim(),
+        if (draft.linkedPieceId != null && draft.linkedPieceId!.isNotEmpty)
+          'linkedPieceId': draft.linkedPieceId,
+        'isProcess': draft.isProcess,
       });
       return;
     }
@@ -146,11 +169,15 @@ class PostPublishService {
         'mediaType': 'image',
         if (draft.description.trim().isNotEmpty)
           'caption': draft.description.trim(),
+        if (draft.linkedPieceId != null && draft.linkedPieceId!.isNotEmpty)
+          'linkedPieceId': draft.linkedPieceId,
+        'isProcess': draft.isProcess,
       });
       return;
     }
 
     final caption = draft.description.trim();
+    final materials = draft.materials.map((m) => m.name).toList();
 
     final body = <String, dynamic>{
       'title': draft.title.trim().isNotEmpty ? draft.title.trim() : 'Untitled',
@@ -158,6 +185,19 @@ class PostPublishService {
       'mediaType': 'image',
       if (caption.isNotEmpty) 'caption': caption,
       if (draft.mediumId != null) 'medium': draft.mediumId,
+      if (draft.listingDetails?.yearCreated != null)
+        'yearCreated': draft.listingDetails!.yearCreated,
+      if (draft.listingDetails?.framingMounting?.trim().isNotEmpty == true)
+        'framingMounting': draft.listingDetails!.framingMounting!.trim(),
+      if (draft.listingDetails?.provenance?.trim().isNotEmpty == true)
+        'provenance': draft.listingDetails!.provenance!.trim(),
+      if (draft.listingDetails?.handlingNotes?.trim().isNotEmpty == true)
+        'handlingNotes': draft.listingDetails!.handlingNotes!.trim(),
+      if (materials.isNotEmpty) 'materials': materials,
+      if (draft.styleTags.isNotEmpty) 'styleTags': draft.styleTags,
+      'aiDisclosed': draft.aiDisclosed,
+      if (draft.altText != null && draft.altText!.trim().isNotEmpty)
+        'altText': draft.altText!.trim(),
       if (isListing) ...{
         'isForSale': true,
         if (draft.listingDetails?.priceCents != null)
@@ -166,14 +206,6 @@ class PostPublishService {
           'dimensions': draft.listingDetails!.dimensionsString,
         if (draft.listingDetails?.location != null)
           'shippingRegion': draft.listingDetails!.location,
-        if (draft.listingDetails?.yearCreated != null)
-          'yearCreated': draft.listingDetails!.yearCreated,
-        if (draft.listingDetails?.framingMounting?.trim().isNotEmpty == true)
-          'framingMounting': draft.listingDetails!.framingMounting!.trim(),
-        if (draft.listingDetails?.provenance?.trim().isNotEmpty == true)
-          'provenance': draft.listingDetails!.provenance!.trim(),
-        if (draft.listingDetails?.handlingNotes?.trim().isNotEmpty == true)
-          'handlingNotes': draft.listingDetails!.handlingNotes!.trim(),
       },
     };
 

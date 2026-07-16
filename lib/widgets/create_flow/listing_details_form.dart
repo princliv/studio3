@@ -7,9 +7,15 @@ import '../../theme/home_feed_tokens.dart';
 import '../choose_location_sheet.dart';
 import 'create_flow_widgets.dart';
 
-/// Inline listing fields for piece details when "List for sale" is enabled.
+/// Inline listing + general artwork-detail fields for piece creation.
+///
+/// Price/dimensions/shipping-region only apply when [showSaleFields] is true
+/// ("List for sale" toggled on); year/framing/provenance/handling notes are
+/// general piece metadata and always render regardless of sale status.
 class ListingDetailsForm extends StatefulWidget {
-  const ListingDetailsForm({super.key});
+  const ListingDetailsForm({super.key, this.showSaleFields = true});
+
+  final bool showSaleFields;
 
   @override
   ListingDetailsFormState createState() => ListingDetailsFormState();
@@ -112,134 +118,136 @@ class ListingDetailsFormState extends State<ListingDetailsForm> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 8),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: createFlowHorizontalInset),
-          child: CreateFlowDivider(),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CreateFlowTextField(
-                controller: _priceController,
-                hint: 'Price (required)',
-                prefixText: '\$ ',
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              ),
-              if (!isPriceValid && _priceController.text.trim().isNotEmpty) ...[
-                const SizedBox(height: 6),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Text(
-                    'Enter a valid price greater than 0',
-                    style: GoogleFonts.inter(fontSize: 11, color: _textSecondary),
-                  ),
-                ),
-              ] else if (_priceController.text.trim().isEmpty) ...[
-                const SizedBox(height: 6),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Text(
-                    'Required to list for sale',
-                    style: GoogleFonts.inter(fontSize: 11, color: _textSecondary),
-                  ),
-                ),
-              ],
-            ],
+        if (widget.showSaleFields) ...[
+          const SizedBox(height: 8),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: createFlowHorizontalInset),
+            child: CreateFlowDivider(),
           ),
-        ),
-        const SizedBox(height: 10),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: createFlowHorizontalInset),
-          child: CreateFlowDivider(),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: CreateFlowTextField(
-                  controller: _widthController,
-                  hint: 'W',
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: Text(
-                  '×',
-                  style: GoogleFonts.inter(fontSize: 14, color: _textSecondary),
-                ),
-              ),
-              Expanded(
-                child: CreateFlowTextField(
-                  controller: _heightController,
-                  hint: 'H',
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: Text(
-                  '×',
-                  style: GoogleFonts.inter(fontSize: 14, color: _textSecondary),
-                ),
-              ),
-              Expanded(
-                child: CreateFlowTextField(
-                  controller: _depthController,
-                  hint: 'D',
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                ),
-              ),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          child: Container(
-            height: 38,
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            decoration: BoxDecoration(
-              color: _neutral700,
-              borderRadius: BorderRadius.circular(100),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _UnitChip(
-                  label: 'in',
-                  selected: _dimensionUnit == 'in',
-                  onTap: () => setState(() => _dimensionUnit = 'in'),
-                ),
-                _UnitChip(
-                  label: 'cm',
-                  selected: _dimensionUnit == 'cm',
-                  onTap: () => setState(() => _dimensionUnit = 'cm'),
-                ),
-              ],
-            ),
-          ),
-        ),
-        CreateFlowToggleRow(
-          label: 'Non-standard format',
-          value: _nonStandardFormat,
-          onChanged: (v) => setState(() => _nonStandardFormat = v),
-        ),
-        if (_nonStandardFormat)
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-            child: CreateFlowTextField(
-              controller: _nonStandardController,
-              hint: 'Describe non-standard dimensions',
-              style: CreateFlowTextFieldStyle.body,
-              maxLines: 2,
-              minLines: 2,
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CreateFlowTextField(
+                  controller: _priceController,
+                  hint: 'Price (required)',
+                  prefixText: '\$ ',
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                ),
+                if (!isPriceValid && _priceController.text.trim().isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Text(
+                      'Enter a valid price greater than 0',
+                      style: GoogleFonts.inter(fontSize: 11, color: _textSecondary),
+                    ),
+                  ),
+                ] else if (_priceController.text.trim().isEmpty) ...[
+                  const SizedBox(height: 6),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Text(
+                      'Required to list for sale',
+                      style: GoogleFonts.inter(fontSize: 11, color: _textSecondary),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
+          const SizedBox(height: 10),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: createFlowHorizontalInset),
+            child: CreateFlowDivider(),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: CreateFlowTextField(
+                    controller: _widthController,
+                    hint: 'W',
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Text(
+                    '×',
+                    style: GoogleFonts.inter(fontSize: 14, color: _textSecondary),
+                  ),
+                ),
+                Expanded(
+                  child: CreateFlowTextField(
+                    controller: _heightController,
+                    hint: 'H',
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Text(
+                    '×',
+                    style: GoogleFonts.inter(fontSize: 14, color: _textSecondary),
+                  ),
+                ),
+                Expanded(
+                  child: CreateFlowTextField(
+                    controller: _depthController,
+                    hint: 'D',
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Container(
+              height: 38,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: BoxDecoration(
+                color: _neutral700,
+                borderRadius: BorderRadius.circular(100),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _UnitChip(
+                    label: 'in',
+                    selected: _dimensionUnit == 'in',
+                    onTap: () => setState(() => _dimensionUnit = 'in'),
+                  ),
+                  _UnitChip(
+                    label: 'cm',
+                    selected: _dimensionUnit == 'cm',
+                    onTap: () => setState(() => _dimensionUnit = 'cm'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          CreateFlowToggleRow(
+            label: 'Non-standard format',
+            value: _nonStandardFormat,
+            onChanged: (v) => setState(() => _nonStandardFormat = v),
+          ),
+          if (_nonStandardFormat)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              child: CreateFlowTextField(
+                controller: _nonStandardController,
+                hint: 'Describe non-standard dimensions',
+                style: CreateFlowTextFieldStyle.body,
+                maxLines: 2,
+                minLines: 2,
+              ),
+            ),
+        ],
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: createFlowHorizontalInset),
           child: CreateFlowDivider(),
@@ -251,25 +259,27 @@ class ListingDetailsFormState extends State<ListingDetailsForm> {
             hint: 'Framing/mounting (optional)',
           ),
         ),
-        CreateFlowMetadataRow(
-          iconAsset: PostMediaAssets.createLocationIcon,
-          iconWidth: 12,
-          iconHeight: 16,
-          label: 'Shipping region',
-          trailing: _location,
-          onTap: _openLocationPicker,
-        ),
-        if (_location != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(28, 0, 16, 4),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: CreateFlowLocationChip(
-                label: _location!,
-                onRemove: () => setState(() => _location = null),
+        if (widget.showSaleFields) ...[
+          CreateFlowMetadataRow(
+            iconAsset: PostMediaAssets.createLocationIcon,
+            iconWidth: 12,
+            iconHeight: 16,
+            label: 'Shipping region',
+            trailing: _location,
+            onTap: _openLocationPicker,
+          ),
+          if (_location != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(28, 0, 16, 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: CreateFlowLocationChip(
+                  label: _location!,
+                  onRemove: () => setState(() => _location = null),
+                ),
               ),
             ),
-          ),
+        ],
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
           child: CreateFlowTextField(

@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 /// Listing-specific fields collected in the listing details step.
 class ListingDetails {
   const ListingDetails({
@@ -44,23 +42,5 @@ class ListingDetails {
     final h = height?.toString() ?? '?';
     final d = depth?.toString() ?? '?';
     return '${w}x${h}x$d $dimensionUnit';
-  }
-
-  /// Extra listing metadata serialized into caption until backend adds fields.
-  String buildCaptionExtras({String? baseCaption}) {
-    final extras = <String, dynamic>{
-      if (framingMounting?.trim().isNotEmpty == true)
-        'framingMounting': framingMounting!.trim(),
-      if (provenance?.trim().isNotEmpty == true)
-        'provenance': provenance!.trim(),
-      if (yearCreated != null) 'yearCreated': yearCreated,
-      if (handlingNotes?.trim().isNotEmpty == true)
-        'handlingNotes': handlingNotes!.trim(),
-      if (nonStandardFormat) 'nonStandardFormat': true,
-    };
-    if (extras.isEmpty) return baseCaption ?? '';
-    final block = '---listing---\n${jsonEncode(extras)}';
-    if (baseCaption == null || baseCaption.trim().isEmpty) return block;
-    return '${baseCaption.trim()}\n\n$block';
   }
 }

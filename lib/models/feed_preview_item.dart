@@ -64,6 +64,7 @@ class FeedPreviewItem {
     this.commentCount = 0,
     this.authorName,
     this.authorAvatarUrl,
+    this.status,
   });
 
   final String id;
@@ -92,6 +93,9 @@ class FeedPreviewItem {
   final int commentCount;
   final String? authorName;
   final String? authorAvatarUrl;
+  final String? status;
+
+  bool get isLive => status == null || status == 'live';
 
   int get imageCount => imageSeeds.length;
 
@@ -146,6 +150,7 @@ class FeedPreviewItem {
     int? commentCount,
     String? authorName,
     String? authorAvatarUrl,
+    String? status,
   }) {
     return FeedPreviewItem(
       id: id ?? this.id,
@@ -174,6 +179,7 @@ class FeedPreviewItem {
       commentCount: commentCount ?? this.commentCount,
       authorName: authorName ?? this.authorName,
       authorAvatarUrl: authorAvatarUrl ?? this.authorAvatarUrl,
+      status: status ?? this.status,
     );
   }
 
@@ -216,6 +222,7 @@ class FeedPreviewItem {
       commentCount: piece.commentCount,
       authorName: piece.authorName,
       authorAvatarUrl: piece.authorAvatarUrl,
+      status: piece.status,
     );
   }
 

@@ -16,6 +16,9 @@ Postman-ready API documentation for the **Studiothree Discover** backend. Use th
 | Social | [flows/social.md](./flows/social.md) | Follow, like, save, comments |
 | Feeds | [flows/feeds.md](./flows/feeds.md) | Following, explore, for-you |
 | Series | [flows/series.md](./flows/series.md) | Piece grouping for profile Series tab |
+| Notifications | [flows/notifications.md](./flows/notifications.md) | Activity feed + push delivery |
+| Inquiries | [flows/inquiries.md](./flows/inquiries.md) | Piece-scoped buyer/seller chat |
+| Orders | [flows/orders.md](./flows/orders.md) | Shipping quotes, checkout, order management |
 
 ## Quick reference
 
@@ -28,3 +31,5 @@ See [quick-reference.md](./quick-reference.md) for a single-table endpoint index
 3. Complete onboarding ([user-profile.md](./flows/user-profile.md))
 4. Presign media → Create piece or scene ([media.md](./flows/media.md), [pieces-scenes.md](./flows/pieces-scenes.md))
 5. Browse feeds, like/save/comment ([feeds.md](./flows/feeds.md), [social.md](./flows/social.md))
+6. Save an address, get a shipping quote, checkout ([user-profile.md](./flows/user-profile.md#addresses-protected), [orders.md](./flows/orders.md))
+7. Ask about a piece, check notifications ([inquiries.md](./flows/inquiries.md), [notifications.md](./flows/notifications.md))

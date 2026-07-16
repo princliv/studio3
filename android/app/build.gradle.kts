@@ -5,6 +5,13 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Applied only once google-services.json is dropped into android/app/ — until
+// then Firebase.initializeApp() fails at runtime and is caught in main.dart,
+// so the build itself must not depend on the file existing.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 android {
     namespace = "com.example.studio3"
     compileSdk = flutter.compileSdkVersion

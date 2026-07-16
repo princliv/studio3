@@ -1,4 +1,5 @@
-import 'collect_shipping_address.dart';
+import '../models/address.dart';
+import '../models/shipping_quote.dart';
 
 class CollectShippingMethod {
   const CollectShippingMethod({
@@ -14,28 +15,16 @@ class CollectShippingMethod {
   final int priceCents;
 
   String get priceDisplay => '\$${(priceCents / 100).toStringAsFixed(2)}';
-}
 
-const kCollectShippingMethods = <CollectShippingMethod>[
-  CollectShippingMethod(
-    id: 'standard',
-    title: 'Standard Shipping',
-    duration: '4 - 6 Business Days',
-    priceCents: 500,
-  ),
-  CollectShippingMethod(
-    id: 'expedited',
-    title: 'Expedited Shipping',
-    duration: '4 - 6 Business Days',
-    priceCents: 500,
-  ),
-  CollectShippingMethod(
-    id: 'express',
-    title: 'Express Shipping',
-    duration: '4 - 6 Business Days',
-    priceCents: 500,
-  ),
-];
+  factory CollectShippingMethod.fromQuote(ShippingMethodQuote quote) {
+    return CollectShippingMethod(
+      id: quote.id,
+      title: quote.title,
+      duration: quote.duration,
+      priceCents: quote.cents,
+    );
+  }
+}
 
 class CollectShippingSelection {
   const CollectShippingSelection({
@@ -43,7 +32,7 @@ class CollectShippingSelection {
     required this.method,
   });
 
-  final CollectShippingAddress address;
+  final Address address;
   final CollectShippingMethod method;
 }
 

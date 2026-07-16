@@ -138,22 +138,32 @@ class ApiClient {
       return _parseResponse(response);
     } on DioException catch (e) {
       throw _toApiException(e);
+    } catch (e) {
+      throw ApiException(
+        'Cannot reach server at ${ApiConfig.baseUrl}. Is the API running?',
+      );
     }
   }
 
   Future<Map<String, dynamic>> delete(
     String path, {
+    Map<String, dynamic>? body,
     bool auth = true,
   }) async {
     try {
       final dio = await _client;
       final response = await dio.delete<Map<String, dynamic>>(
         path,
+        data: body,
         options: Options(headers: _authHeaders(auth: auth)),
       );
       return _parseResponse(response);
     } on DioException catch (e) {
       throw _toApiException(e);
+    } catch (e) {
+      throw ApiException(
+        'Cannot reach server at ${ApiConfig.baseUrl}. Is the API running?',
+      );
     }
   }
 
@@ -233,7 +243,17 @@ class ApiClient {
       return data.whereType<Map<String, dynamic>>().toList();
     }
     if (data is Map<String, dynamic>) {
-      for (final key in ['items', 'pieces', 'posts', 'feed', 'results']) {
+      for (final key in [
+        'items',
+        'pieces',
+        'posts',
+        'feed',
+        'results',
+        'orders',
+        'sales',
+        'addresses',
+        'methods',
+      ]) {
         final list = data[key];
         if (list is List) {
           return list.whereType<Map<String, dynamic>>().toList();

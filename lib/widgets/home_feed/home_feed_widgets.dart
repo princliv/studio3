@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../data/nav_assets.dart';
 import '../../models/feed_preview_item.dart';
+import '../../services/notification_service.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/home_feed_tokens.dart';
 import '../../utils/profile_navigation.dart';
@@ -93,8 +94,31 @@ class FeedHomeHeader extends StatelessWidget {
 
 /// Right-side header icon that opens a small popup with
 /// "Notifications" and "Chats" entries.
-class _InboxMenuButton extends StatelessWidget {
+class _InboxMenuButton extends StatefulWidget {
   const _InboxMenuButton();
+
+  @override
+  State<_InboxMenuButton> createState() => _InboxMenuButtonState();
+}
+
+class _InboxMenuButtonState extends State<_InboxMenuButton> {
+  int _unreadCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshUnreadCount();
+  }
+
+  Future<void> _refreshUnreadCount() async {
+    try {
+      final count = await NotificationService.instance.getUnreadCount();
+      if (!mounted) return;
+      setState(() => _unreadCount = count);
+    } catch (_) {
+      // Keep the last known count if the request fails.
+    }
+  }
 
   Future<void> _openMenu(BuildContext context) async {
     final box = context.findRenderObject() as RenderBox;
@@ -140,7 +164,8 @@ class _InboxMenuButton extends StatelessWidget {
     );
 
     if (selection != null && context.mounted) {
-      Navigator.pushNamed(context, selection);
+      await Navigator.pushNamed(context, selection);
+      _refreshUnreadCount();
     }
   }
 
@@ -152,10 +177,37 @@ class _InboxMenuButton extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         child: Padding(
           padding: const EdgeInsets.all(8),
-          child: SvgPicture.asset(
-            NavAssets.bellIcon,
-            width: 18,
-            height: 18,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              SvgPicture.asset(
+                NavAssets.bellIcon,
+                width: 18,
+                height: 18,
+              ),
+              if (_unreadCount > 0)
+                Positioned(
+                  top: -2,
+                  right: -2,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFE05252),
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      _unreadCount > 9 ? '9+' : '$_unreadCount',
+                      style: GoogleFonts.inter(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ),

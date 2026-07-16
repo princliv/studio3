@@ -1,3 +1,4 @@
+import 'post_summary.dart';
 import 'series_summary.dart';
 
 class PieceSummary {
@@ -24,6 +25,12 @@ class PieceSummary {
     this.authorName,
     this.authorAvatarUrl,
     this.series,
+    this.status,
+    this.materials = const [],
+    this.styleTags = const [],
+    this.aiDisclosed = false,
+    this.altText,
+    this.relatedPosts,
   });
 
   final String id;
@@ -48,11 +55,20 @@ class PieceSummary {
   final String? authorName;
   final String? authorAvatarUrl;
   final PieceSeriesInfo? series;
+  final String? status;
+  final List<String> materials;
+  final List<String> styleTags;
+  final bool aiDisclosed;
+  final String? altText;
+  final List<PostSummary>? relatedPosts;
+
+  bool get isLive => status == null || status == 'live';
 
   factory PieceSummary.fromJson(Map<String, dynamic> json) {
     final author = json['author'] as Map<String, dynamic>?;
     final user = json['user'] as Map<String, dynamic>?;
     final seriesJson = json['series'];
+    final relatedPostsJson = json['relatedPosts'];
     return PieceSummary(
       id: json['id'] as String? ?? json['_id'] as String? ?? '',
       title: json['title'] as String? ?? '',
@@ -83,6 +99,19 @@ class PieceSummary {
           json['authorAvatarUrl'] as String?,
       series: seriesJson is Map<String, dynamic>
           ? PieceSeriesInfo.fromJson(seriesJson)
+          : null,
+      status: json['status'] as String?,
+      materials: (json['materials'] as List?)?.whereType<String>().toList() ??
+          const [],
+      styleTags: (json['styleTags'] as List?)?.whereType<String>().toList() ??
+          const [],
+      aiDisclosed: json['aiDisclosed'] as bool? ?? false,
+      altText: json['altText'] as String?,
+      relatedPosts: relatedPostsJson is List
+          ? relatedPostsJson
+              .whereType<Map<String, dynamic>>()
+              .map(PostSummary.fromJson)
+              .toList()
           : null,
     );
   }

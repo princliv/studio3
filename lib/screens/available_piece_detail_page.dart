@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../models/feed_preview_item.dart';
+import '../services/api_exception.dart';
+import '../services/auth_session.dart';
+import '../services/piece_service.dart';
 import '../theme/collect_detail_tokens.dart';
 import '../utils/content_detail_loader.dart';
+import 'edit_piece_page.dart';
+import '../widgets/piece_detail/ask_about_piece_sheet.dart';
 import '../widgets/piece_detail/available_collect_bar.dart';
 import '../widgets/piece_detail/collect_artist_row.dart';
 import '../widgets/piece_detail/collect_piece_sheet.dart';
@@ -70,10 +75,64 @@ class _AvailablePieceDetailPageState extends State<AvailablePieceDetailPage>
     CollectPieceSheet.show(context, item: item);
   }
 
+  String get _authorHandle =>
+      item.handle.startsWith('@') ? item.handle.substring(1) : item.handle;
+
+  bool get _isOwner {
+    final viewerUsername = AuthSession.instance.user?.username;
+    if (viewerUsername == null || viewerUsername.isEmpty) return false;
+    return viewerUsername.toLowerCase() == _authorHandle.toLowerCase();
+  }
+
+  bool get _canAskAboutPiece {
+    final viewerUsername = AuthSession.instance.user?.username;
+    if (viewerUsername == null || viewerUsername.isEmpty) return false;
+    return viewerUsername.toLowerCase() != _authorHandle.toLowerCase();
+  }
+
+  Future<void> _onEdit() async {
+    try {
+      final piece = await PieceService.instance.getById(item.id);
+      if (!mounted) return;
+      final saved = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute<bool>(builder: (_) => EditPiecePage(piece: piece)),
+      );
+      if (saved == true) _loadDetail();
+    } catch (e) {
+      if (!mounted) return;
+      final message = e is ApiException ? e.message : 'Could not load for editing';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
+  Future<void> _onAskAboutPiece() async {
+    final sent = await AskAboutPieceSheet.show(context, pieceId: item.id);
+    if (sent == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Message sent to the artist')),
+      );
+    }
+  }
+
+  String _statusLabel(String? status) {
+    switch (status) {
+      case 'sold':
+        return 'Sold';
+      case 'reserved':
+        return 'Reserved';
+      case 'delisted':
+        return 'Not for sale';
+      default:
+        return 'Unavailable';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final collectBarHeight = AvailableCollectBar.totalHeight(context);
     final price = formatCollectPrice(item.priceCents);
+    final isLive = item.isLive;
 
     return Scaffold(
       backgroundColor: CollectDetailTokens.background,
@@ -108,6 +167,20 @@ class _AvailablePieceDetailPageState extends State<AvailablePieceDetailPage>
                         ),
                       ),
                     ),
+                    if (_isOwner)
+                      Positioned(
+                        top: MediaQuery.paddingOf(context).top + 8,
+                        right: 8,
+                        child: IconButton(
+                          onPressed: _onEdit,
+                          icon: const Icon(Icons.edit_outlined),
+                          color: CollectDetailTokens.textPrimary,
+                          style: IconButton.styleFrom(
+                            backgroundColor: CollectDetailTokens.background
+                                .withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -138,6 +211,19 @@ class _AvailablePieceDetailPageState extends State<AvailablePieceDetailPage>
                       onFollowToggle: () =>
                           setState(() => _following = !_following),
                     ),
+                    if (_canAskAboutPiece)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          CollectDetailTokens.horizontalPadding,
+                          8,
+                          CollectDetailTokens.horizontalPadding,
+                          0,
+                        ),
+                        child: OutlinedButton(
+                          onPressed: _onAskAboutPiece,
+                          child: const Text('Ask about this piece'),
+                        ),
+                      ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(
                         CollectDetailTokens.horizontalPadding,
@@ -259,7 +345,8 @@ class _AvailablePieceDetailPageState extends State<AvailablePieceDetailPage>
           ),
           AvailableCollectBar(
             priceDisplay: price,
-            onCollect: _onCollect,
+            onCollect: isLive ? _onCollect : null,
+            statusLabel: isLive ? null : _statusLabel(item.status),
           ),
         ],
       ),

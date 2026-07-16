@@ -1,7 +1,9 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'services/auth_session.dart';
+import 'services/device_service.dart';
 import 'services/user_service.dart';
 import 'utils/app_routes.dart';
 import 'utils/profile_navigation.dart';
@@ -23,6 +25,9 @@ import 'screens/chat_page.dart';
 import 'screens/onboarding/onboarding_page.dart';
 import 'screens/edit_profile_page.dart';
 import 'screens/manage_series_page.dart';
+import 'screens/address_list_page.dart';
+import 'screens/my_orders_page.dart';
+import 'screens/my_sales_page.dart';
 import 'models/auth_user.dart';
 import 'theme/home_feed_tokens.dart';
 
@@ -38,6 +43,11 @@ Future<void> main() async {
     ),
   );
   await AuthSession.instance.initialize();
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint('Firebase unavailable (no config yet?): $e');
+  }
   runApp(const Studio3App());
 }
 
@@ -70,6 +80,9 @@ class Studio3App extends StatelessWidget {
         '/profile-settings': (context) => const ProfileSettingsPage(),
         '/manage-series': (context) => const ManageSeriesPage(),
         '/edit-profile': (context) => const EditProfilePage(),
+        '/addresses': (context) => const AddressListPage(),
+        '/orders': (context) => const MyOrdersPage(),
+        '/sales': (context) => const MySalesPage(),
         '/profile': (context) {
           final args = parseProfileRouteArgs(
             ModalRoute.of(context)?.settings.arguments,
@@ -99,6 +112,8 @@ class AuthGate extends StatefulWidget {
 }
 
 class _AuthGateState extends State<AuthGate> {
+  bool _deviceRegistered = false;
+
   @override
   void initState() {
     super.initState();
@@ -117,7 +132,12 @@ class _AuthGateState extends State<AuthGate> {
   void _checkAuth() {
     if (!mounted) return;
     final session = AuthSession.instance;
+    if (session.isLoggedIn && !_deviceRegistered) {
+      _deviceRegistered = true;
+      DeviceService.instance.registerCurrentDevice();
+    }
     if (!session.isLoggedIn) {
+      _deviceRegistered = false;
       Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
       return;
     }

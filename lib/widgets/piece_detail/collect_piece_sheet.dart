@@ -3,8 +3,11 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../models/collect_checkout.dart';
 import '../../models/feed_preview_item.dart';
+import '../../services/api_exception.dart';
+import '../../services/order_service.dart';
 import '../../theme/collect_detail_tokens.dart';
 import '../home_feed/home_feed_widgets.dart';
+import 'collect_order_confirmation_sheet.dart';
 import 'collect_payment_sheet.dart';
 import 'collect_shipping_method_sheet.dart';
 import 'collect_shipping_sheet.dart';
@@ -36,6 +39,7 @@ class CollectPieceSheet extends StatefulWidget {
 class _CollectPieceSheetState extends State<CollectPieceSheet> {
   CollectShippingSelection? _shipping;
   CollectPaymentMethod? _payment;
+  bool _collecting = false;
 
   FeedPreviewItem get item => widget.item;
 
@@ -67,6 +71,7 @@ class _CollectPieceSheetState extends State<CollectPieceSheet> {
 
     final selection = await CollectShippingMethodSheet.show(
       context,
+      pieceId: item.id,
       address: address,
       initialMethodId: _shipping?.method.id,
     );
@@ -81,6 +86,35 @@ class _CollectPieceSheetState extends State<CollectPieceSheet> {
     );
     if (!mounted || result == null) return;
     setState(() => _payment = result);
+  }
+
+  Future<void> _onCollect() async {
+    final shipping = _shipping;
+    if (shipping == null || _collecting) return;
+    setState(() => _collecting = true);
+    try {
+      final order = await OrderService.instance.collect(
+        item.id,
+        addressId: shipping.address.id,
+        shippingMethod: shipping.method.id,
+      );
+      final confirmed = await OrderService.instance.confirm(order.id);
+      if (!mounted) return;
+      Navigator.pop(context);
+      await CollectOrderConfirmationSheet.show(context, order: confirmed);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _collecting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _collecting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not complete checkout. Please try again.')),
+      );
+    }
   }
 
   @override
@@ -145,14 +179,10 @@ class _CollectPieceSheetState extends State<CollectPieceSheet> {
                     ),
                     const SizedBox(height: 28),
                     _CollectCta(
-                      onTap: () {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Collect flow coming soon'),
-                          ),
-                        );
-                      },
+                      loading: _collecting,
+                      onTap: _shipping == null || _collecting
+                          ? null
+                          : _onCollect,
                     ),
                   ],
                 ),
@@ -548,9 +578,10 @@ class _SummaryLine extends StatelessWidget {
 }
 
 class _CollectCta extends StatelessWidget {
-  const _CollectCta({required this.onTap});
+  const _CollectCta({required this.onTap, this.loading = false});
 
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
@@ -558,7 +589,9 @@ class _CollectCta extends StatelessWidget {
       height: CollectDetailTokens.collectButtonHeight,
       width: double.infinity,
       child: Material(
-        color: CollectDetailTokens.ctaFill,
+        color: onTap == null
+            ? CollectDetailTokens.ctaFill.withValues(alpha: 0.5)
+            : CollectDetailTokens.ctaFill,
         borderRadius: BorderRadius.circular(
           CollectDetailTokens.collectButtonRadius,
         ),
@@ -568,14 +601,23 @@ class _CollectCta extends StatelessWidget {
             CollectDetailTokens.collectButtonRadius,
           ),
           child: Center(
-            child: Text(
-              'Collect this piece',
-              style: GoogleFonts.inter(
-                fontSize: 16,
-                fontWeight: FontWeight.w400,
-                color: CollectDetailTokens.textInverse,
-              ),
-            ),
+            child: loading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: CollectDetailTokens.textInverse,
+                    ),
+                  )
+                : Text(
+                    'Collect this piece',
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w400,
+                      color: CollectDetailTokens.textInverse,
+                    ),
+                  ),
           ),
         ),
       ),

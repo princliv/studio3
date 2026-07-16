@@ -18,4 +18,7 @@ This file has been split into flow-wise docs under [`docs/api/`](./docs/api/READ
 | Social | [docs/api/flows/social.md](./docs/api/flows/social.md) |
 | Feeds | [docs/api/flows/feeds.md](./docs/api/flows/feeds.md) |
 | Series | [docs/api/flows/series.md](./docs/api/flows/series.md) |
+| Notifications | [docs/api/flows/notifications.md](./docs/api/flows/notifications.md) |
+| Inquiries | [docs/api/flows/inquiries.md](./docs/api/flows/inquiries.md) |
+| Orders | [docs/api/flows/orders.md](./docs/api/flows/orders.md) |
 | Quick reference | [docs/api/quick-reference.md](./docs/api/quick-reference.md) |

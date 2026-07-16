@@ -8,10 +8,12 @@ class AvailableCollectBar extends StatelessWidget {
     super.key,
     required this.priceDisplay,
     this.onCollect,
+    this.statusLabel,
   });
 
   final String priceDisplay;
   final VoidCallback? onCollect;
+  final String? statusLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -53,7 +55,9 @@ class AvailableCollectBar extends StatelessWidget {
               SizedBox(
                 height: CollectDetailTokens.collectButtonHeight,
                 child: Material(
-                  color: CollectDetailTokens.ctaFill,
+                  color: onCollect == null
+                      ? CollectDetailTokens.ctaFill.withValues(alpha: 0.5)
+                      : CollectDetailTokens.ctaFill,
                   borderRadius: BorderRadius.circular(
                     CollectDetailTokens.collectButtonRadius,
                   ),
@@ -64,7 +68,7 @@ class AvailableCollectBar extends StatelessWidget {
                     ),
                     child: Center(
                       child: Text(
-                        'Collect',
+                        statusLabel ?? 'Collect',
                         style: GoogleFonts.inter(
                           fontSize: CollectDetailTokens.collectLabelSize,
                           fontWeight: FontWeight.w400,

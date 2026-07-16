@@ -38,4 +38,10 @@ class NotificationService {
       _api.patch('/api/notifications/$id/read');
 
   Future<void> markAllRead() => _api.post('/api/notifications/read-all', auth: true);
+
+  Future<int> getUnreadCount() async {
+    final json = await _api.get('/api/notifications/unread-count', auth: true);
+    final data = _api.extractData(json);
+    return data is Map<String, dynamic> ? (data['count'] as num?)?.toInt() ?? 0 : 0;
+  }
 }

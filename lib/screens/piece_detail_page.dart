@@ -2,8 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../models/feed_preview_item.dart';
+import '../services/api_exception.dart';
+import '../services/auth_session.dart';
+import '../services/piece_service.dart';
+import '../services/post_service.dart';
 import '../theme/home_feed_tokens.dart';
 import '../utils/content_detail_loader.dart';
+import 'edit_piece_page.dart';
+import 'edit_scene_page.dart';
+import '../widgets/piece_detail/ask_about_piece_sheet.dart';
 import '../widgets/piece_detail/detail_hero_image.dart';
 import '../widgets/piece_detail/detail_save_state.dart';
 import '../widgets/piece_detail/detail_scroll_handoff.dart';
@@ -45,6 +52,57 @@ class _PieceDetailPageState extends State<PieceDetailPage>
   FeedPreviewItem get likeItem => _item;
 
   FeedPreviewItem get item => _item;
+
+  String get _authorHandle =>
+      item.handle.startsWith('@') ? item.handle.substring(1) : item.handle;
+
+  bool get _isOwner {
+    final viewerUsername = AuthSession.instance.user?.username;
+    if (viewerUsername == null || viewerUsername.isEmpty) return false;
+    return viewerUsername.toLowerCase() == _authorHandle.toLowerCase();
+  }
+
+  bool get _canAskAboutPiece {
+    if (item.isScene) return false;
+    final viewerUsername = AuthSession.instance.user?.username;
+    if (viewerUsername == null || viewerUsername.isEmpty) return false;
+    return viewerUsername.toLowerCase() != _authorHandle.toLowerCase();
+  }
+
+  Future<void> _onEdit() async {
+    try {
+      if (item.isPiece) {
+        final piece = await PieceService.instance.getById(item.id);
+        if (!mounted) return;
+        final saved = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute<bool>(builder: (_) => EditPiecePage(piece: piece)),
+        );
+        if (saved == true) _loadDetail();
+      } else {
+        final post = await PostService.instance.getById(item.id);
+        if (!mounted) return;
+        final saved = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute<bool>(builder: (_) => EditScenePage(post: post)),
+        );
+        if (saved == true) _loadDetail();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      final message = e is ApiException ? e.message : 'Could not load for editing';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
+  Future<void> _onAskAboutPiece() async {
+    final sent = await AskAboutPieceSheet.show(context, pieceId: item.id);
+    if (sent == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Message sent to the artist')),
+      );
+    }
+  }
 
   @override
   void initState() {
@@ -95,6 +153,20 @@ class _PieceDetailPageState extends State<PieceDetailPage>
                     ),
                   ),
                 ),
+                if (_isOwner)
+                  Positioned(
+                    top: MediaQuery.paddingOf(context).top + 8,
+                    right: 8,
+                    child: IconButton(
+                      onPressed: _onEdit,
+                      icon: const Icon(Icons.edit_outlined),
+                      color: HomeFeedTokens.textPrimary,
+                      style: IconButton.styleFrom(
+                        backgroundColor:
+                            HomeFeedTokens.detailBackground.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -121,6 +193,14 @@ class _PieceDetailPageState extends State<PieceDetailPage>
                   onFollowToggle: () =>
                       setState(() => _following = !_following),
                 ),
+                if (_canAskAboutPiece)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    child: OutlinedButton(
+                      onPressed: _onAskAboutPiece,
+                      child: const Text('Ask about this piece'),
+                    ),
+                  ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                   child: Text(

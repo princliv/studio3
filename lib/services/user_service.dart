@@ -1,6 +1,7 @@
 import '../models/piece_summary.dart';
 import '../models/user_profile.dart';
 import 'api_client.dart';
+import 'api_exception.dart';
 import 'auth_session.dart';
 
 class UserService {
@@ -30,13 +31,20 @@ class UserService {
     String? location,
     String? profilePhotoUrl,
     String? coverPhotoUrl,
+    double? latitude,
+    double? longitude,
   }) async {
+    if ((latitude == null) != (longitude == null)) {
+      throw ApiException('latitude and longitude must be sent together');
+    }
     final body = <String, dynamic>{};
     if (name != null) body['name'] = name;
     if (bio != null) body['bio'] = bio;
     if (location != null) body['location'] = location;
     if (profilePhotoUrl != null) body['profilePhotoUrl'] = profilePhotoUrl;
     if (coverPhotoUrl != null) body['coverPhotoUrl'] = coverPhotoUrl;
+    if (latitude != null) body['latitude'] = latitude;
+    if (longitude != null) body['longitude'] = longitude;
     final json = await _api.patch('/api/user/me', body: body);
     final data = _api.extractData(json) as Map<String, dynamic>;
     final profile = UserProfile.fromJson(data);

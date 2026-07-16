@@ -1,3 +1,18 @@
+/// Result of `POST /api/inquiries`.
+class InquiryCreateResult {
+  const InquiryCreateResult({required this.id, required this.reused});
+
+  final String id;
+  final bool reused;
+
+  factory InquiryCreateResult.fromJson(Map<String, dynamic> json) {
+    return InquiryCreateResult(
+      id: json['id'] as String? ?? '',
+      reused: json['reused'] as bool? ?? false,
+    );
+  }
+}
+
 /// One row in the inquiries inbox, from `GET /api/inquiries`.
 class InquirySummary {
   const InquirySummary({

@@ -63,7 +63,7 @@ The server sets an httpOnly cookie `refreshToken` on **Login**, **Register**, an
 }
 ```
 
-Common status codes: `200`/`201` success, `400` bad request, `401` unauthorized, `409` conflict, `429` too many requests, `500` server error.
+Common status codes: `200`/`201` success, `400` bad request, `401` unauthorized, `403` forbidden, `404` not found, `409` conflict, `429` too many requests, `500` server error, `501` not implemented (payment provider — see [Orders](./flows/orders.md#confirm-pay)).
 
 ## Protected routes
 
