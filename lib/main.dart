@@ -3,9 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'services/auth_session.dart';
+import 'services/cache_service.dart';
+import 'services/connectivity_service.dart';
 import 'services/device_service.dart';
+import 'services/permission_service.dart';
+import 'services/saved_content_store.dart';
 import 'services/user_service.dart';
 import 'utils/app_routes.dart';
+import 'utils/app_state_store.dart';
 import 'utils/profile_navigation.dart';
 import 'theme/app_theme.dart';
 import 'widgets/bottom_nav.dart' show BottomNav, BottomNavIndex;
@@ -43,6 +48,10 @@ Future<void> main() async {
     ),
   );
   await AuthSession.instance.initialize();
+  await CacheService.instance.init();
+  await AppStateStore.instance.initialize();
+  await SavedContentStore.instance.load();
+  await ConnectivityService.instance.init();
   try {
     await Firebase.initializeApp();
   } catch (e) {
@@ -135,6 +144,7 @@ class _AuthGateState extends State<AuthGate> {
     if (session.isLoggedIn && !_deviceRegistered) {
       _deviceRegistered = true;
       DeviceService.instance.registerCurrentDevice();
+      PermissionService.instance.requestNotifications();
     }
     if (!session.isLoggedIn) {
       _deviceRegistered = false;
@@ -157,8 +167,8 @@ class MainShell extends StatefulWidget {
   State<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
-  int _selectedNavIndex = BottomNavIndex.home;
+class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
+  late int _selectedNavIndex = AppStateStore.instance.lastNavIndex;
 
   List<Widget> _buildTabs() => [
         const HomeFeedPage(),
@@ -171,14 +181,24 @@ class _MainShellState extends State<MainShell> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     AuthSession.instance.addListener(_onSessionChanged);
     _loadProfilePhoto();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     AuthSession.instance.removeListener(_onSessionChanged);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      AppStateStore.instance.saveNavIndex(_selectedNavIndex);
+    }
   }
 
   void _onSessionChanged() {
@@ -197,6 +217,7 @@ class _MainShellState extends State<MainShell> {
 
   void _onNavTap(int navIndex) {
     setState(() => _selectedNavIndex = navIndex);
+    AppStateStore.instance.saveNavIndex(navIndex);
     if (navIndex == BottomNavIndex.profile) {
       _loadProfilePhoto();
     }

@@ -2,6 +2,8 @@ import '../models/piece_summary.dart';
 import '../models/post_summary.dart';
 import 'api_client.dart';
 import 'auth_session.dart';
+import 'cache_service.dart';
+import 'connectivity_service.dart';
 
 class PieceService {
   PieceService._();
@@ -24,9 +26,32 @@ class PieceService {
     return PieceSummary.fromJson(data);
   }
 
+  /// Cache-first piece detail — short TTL since availability/price can
+  /// change, but enables offline drill-in from an already-cached feed.
+  Future<PieceSummary> getByIdCached(String id, {bool forceRefresh = false}) {
+    final key = 'piece.$id';
+    return CacheService.instance.fetchWithCache<PieceSummary>(
+      key: key,
+      ttl: const Duration(minutes: 2),
+      forceRefresh: forceRefresh,
+      fetchRaw: () {
+        if (!ConnectivityService.instance.isOnline) {
+          throw CacheMiss(key);
+        }
+        return _api.get(
+          '/api/pieces/$id',
+          auth: AuthSession.instance.isLoggedIn,
+        );
+      },
+      parse: (json) =>
+          PieceSummary.fromJson(_api.extractData(json) as Map<String, dynamic>),
+    );
+  }
+
   Future<PieceSummary> update(String id, Map<String, dynamic> body) async {
     final json = await _api.patch('/api/pieces/$id', body: body);
     final data = _api.extractData(json) as Map<String, dynamic>;
+    await CacheService.instance.invalidate('piece.$id');
     return PieceSummary.fromJson(data);
   }
 

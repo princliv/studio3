@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../models/notification_item.dart';
+import '../services/connectivity_service.dart';
 import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/home_feed_tokens.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/home_feed/home_feed_widgets.dart';
+import '../widgets/offline_state.dart';
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
@@ -22,10 +24,13 @@ class _NotificationsPageState extends State<NotificationsPage> {
   String? _nextCursor;
   final _scrollController = ScrollController();
 
+  bool _showOfflineState = false;
+
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    ConnectivityService.instance.addReconnectHook(_onReconnected);
     _load();
   }
 
@@ -33,10 +38,13 @@ class _NotificationsPageState extends State<NotificationsPage> {
   void dispose() {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    ConnectivityService.instance.removeReconnectHook(_onReconnected);
     super.dispose();
   }
 
-  Future<void> _load({bool append = false}) async {
+  Future<void> _onReconnected() => _load(refresh: true);
+
+  Future<void> _load({bool append = false, bool refresh = false}) async {
     if (append && (_nextCursor == null || _nextCursor!.isEmpty)) return;
     setState(() {
       if (append) {
@@ -46,9 +54,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
       }
     });
     try {
-      final page = await NotificationService.instance.list(
-        cursor: append ? _nextCursor : null,
-      );
+      final page = append
+          ? await NotificationService.instance.list(cursor: _nextCursor)
+          : await NotificationService.instance.listCached(
+              forceRefresh: refresh,
+            );
       if (!mounted) return;
       setState(() {
         if (append) {
@@ -61,6 +71,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
         _nextCursor = page.nextCursor;
         _loading = false;
         _loadingMore = false;
+        _showOfflineState =
+            _items.isEmpty && !ConnectivityService.instance.isOnline;
       });
     } catch (_) {
       if (!mounted) return;
@@ -68,6 +80,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
         if (!append) _items.clear();
         _loading = false;
         _loadingMore = false;
+        _showOfflineState =
+            _items.isEmpty && !ConnectivityService.instance.isOnline;
       });
     }
   }
@@ -146,6 +160,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
     List<NotificationItem> today,
     List<NotificationItem> earlier,
   ) {
+    if (_showOfflineState) {
+      return OfflineState(onRetry: () => _load(refresh: true));
+    }
     if (_loading && _items.isEmpty) {
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     }

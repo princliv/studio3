@@ -69,6 +69,24 @@ class PostSummary {
     return null;
   }
 
+  Map<String, dynamic> toJson() => {
+        'type': 'post',
+        'id': id,
+        if (caption != null) 'caption': caption,
+        if (mediaUrl != null) 'mediaUrl': mediaUrl,
+        if (mediaType != null) 'mediaType': mediaType,
+        if (pieceId != null) 'linkedPieceId': pieceId,
+        'isProcess': isProcess,
+        'likeCount': likeCount,
+        'commentCount': commentCount,
+        'isLiked': isLiked,
+        'isSaved': isSaved,
+        if (authorUsername != null) 'authorUsername': authorUsername,
+        if (authorName != null) 'authorName': authorName,
+        if (authorAvatarUrl != null) 'authorAvatarUrl': authorAvatarUrl,
+        if (linkedPiece != null) 'piece': linkedPiece!.toJson(),
+      };
+
   bool get isVideo {
     final t = mediaType?.toLowerCase();
     return t == 'video' || t == 'reel' || t == 'reels';

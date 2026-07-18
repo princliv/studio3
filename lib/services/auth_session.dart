@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/auth_user.dart';
+import 'cache_service.dart';
+import 'saved_content_store.dart';
 
 class AuthSession {
   AuthSession._();
@@ -122,6 +124,10 @@ class AuthSession {
     await _prefs?.remove(_tokenKey);
     await _prefs?.remove(_userKey);
     await _prefs?.remove(_sellerKey);
+    // Prevent a second account on this device from seeing the previous
+    // account's cached feed/addresses/saved items.
+    await CacheService.instance.clearAll();
+    await SavedContentStore.instance.clearLocal();
     notifyListeners();
   }
 }

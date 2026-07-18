@@ -5,7 +5,9 @@ import 'package:image_picker/image_picker.dart';
 
 import '../data/post_media_assets.dart';
 import '../models/post_image_transform.dart';
+import '../services/permission_service.dart';
 import '../theme/home_feed_tokens.dart';
+import '../widgets/permission_denied_sheet.dart';
 import 'post_create_page.dart';
 import 'post_edit_page.dart';
 
@@ -93,7 +95,23 @@ class _PostPageState extends State<PostPage> {
       );
   }
 
+  Future<bool> _ensureGalleryAccess({required bool forVideo}) async {
+    final outcome = await PermissionService.instance
+        .requestGalleryAccess(forVideo: forVideo);
+    if (outcome == GalleryPermissionOutcome.granted) return true;
+    if (outcome == GalleryPermissionOutcome.deniedForever && mounted) {
+      await showPermissionDeniedSheet(
+        context,
+        title: forVideo ? 'Video access needed' : 'Photo access needed',
+        message:
+            'Enable ${forVideo ? 'video' : 'photo'} library access in Settings to continue.',
+      );
+    }
+    return false;
+  }
+
   Future<void> _pickFromGallery() async {
+    if (!await _ensureGalleryAccess(forVideo: false)) return;
     final images = await _picker.pickMultiImage(limit: _maxSelection);
     if (images.isEmpty || !mounted) return;
     setState(() {
@@ -107,6 +125,7 @@ class _PostPageState extends State<PostPage> {
   }
 
   Future<void> _pickVideo() async {
+    if (!await _ensureGalleryAccess(forVideo: true)) return;
     final video = await _picker.pickVideo(source: ImageSource.gallery);
     if (video == null || !mounted) return;
     setState(() {

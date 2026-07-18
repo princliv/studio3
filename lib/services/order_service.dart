@@ -1,6 +1,8 @@
 import '../models/order.dart';
 import '../models/shipping_quote.dart';
 import 'api_client.dart';
+import 'cache_service.dart';
+import 'connectivity_service.dart';
 
 class OrderPage {
   const OrderPage({required this.items, this.nextCursor});
@@ -37,12 +39,14 @@ class OrderService {
       auth: true,
     );
     final data = _api.extractData(json) as Map<String, dynamic>;
+    await CacheService.instance.invalidate('orders.mine');
     return Order.fromJson(data);
   }
 
   Future<Order> confirm(String orderId) async {
     final json = await _api.post('/api/orders/$orderId/confirm', auth: true);
     final data = _api.extractData(json) as Map<String, dynamic>;
+    await CacheService.instance.invalidate('orders.mine');
     return Order.fromJson(data);
   }
 
@@ -70,6 +74,28 @@ class OrderService {
       query: query.isEmpty ? null : query,
       auth: true,
     );
+    return _parseOrderPage(json);
+  }
+
+  /// Cache-first order list (page 1 only) — cached for offline viewing, but
+  /// screens should still force a refresh on focus since order status
+  /// (shipped/delivered) is something users expect to be current.
+  Future<OrderPage> getMyOrdersCached({bool forceRefresh = false}) {
+    return CacheService.instance.fetchWithCache<OrderPage>(
+      key: 'orders.mine',
+      ttl: const Duration(minutes: 2),
+      forceRefresh: forceRefresh,
+      fetchRaw: () {
+        if (!ConnectivityService.instance.isOnline) {
+          throw const CacheMiss('orders.mine');
+        }
+        return _api.get('/api/user/me/orders', auth: true);
+      },
+      parse: _parseOrderPage,
+    );
+  }
+
+  OrderPage _parseOrderPage(Map<String, dynamic> json) {
     final data = _api.extractData(json);
     final items = _api.extractList(json).map(Order.fromJson).toList(growable: false);
     final nextCursor =

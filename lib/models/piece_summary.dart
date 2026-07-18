@@ -122,6 +122,39 @@ class PieceSummary {
     return null;
   }
 
+  Map<String, dynamic> toJson() => {
+        'type': 'piece',
+        'id': id,
+        'title': title,
+        if (mediaUrl != null) 'mediaUrl': mediaUrl,
+        if (mediaType != null) 'mediaType': mediaType,
+        if (caption != null) 'caption': caption,
+        if (medium != null) 'medium': medium,
+        'isForSale': isForSale,
+        if (priceCents != null) 'priceCents': priceCents,
+        if (dimensions != null) 'dimensions': dimensions,
+        if (shippingRegion != null) 'shippingRegion': shippingRegion,
+        if (yearCreated != null) 'yearCreated': yearCreated,
+        if (framingMounting != null) 'framingMounting': framingMounting,
+        if (provenance != null) 'provenance': provenance,
+        if (handlingNotes != null) 'handlingNotes': handlingNotes,
+        'likeCount': likeCount,
+        'commentCount': commentCount,
+        'isLiked': isLiked,
+        'isSaved': isSaved,
+        if (authorUsername != null) 'authorUsername': authorUsername,
+        if (authorName != null) 'authorName': authorName,
+        if (authorAvatarUrl != null) 'authorAvatarUrl': authorAvatarUrl,
+        if (series != null) 'series': series!.toJson(),
+        if (status != null) 'status': status,
+        'materials': materials,
+        'styleTags': styleTags,
+        'aiDisclosed': aiDisclosed,
+        if (altText != null) 'altText': altText,
+        if (relatedPosts != null)
+          'relatedPosts': relatedPosts!.map((p) => p.toJson()).toList(),
+      };
+
   String? get priceDisplay {
     if (priceCents == null) return null;
     return '\$${(priceCents! / 100).toStringAsFixed(0)}';

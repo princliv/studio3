@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/explore_feed_block.dart';
 import '../models/feed_item.dart';
 import '../models/user_profile.dart';
+import '../services/connectivity_service.dart';
 import '../services/feed_service.dart';
 import '../services/user_service.dart';
 import '../theme/explore_tokens.dart';
@@ -42,6 +43,7 @@ class _ExplorePageState extends State<ExplorePage> {
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    ConnectivityService.instance.addReconnectHook(_onReconnected);
     _loadData();
   }
 
@@ -50,8 +52,11 @@ class _ExplorePageState extends State<ExplorePage> {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     _searchController.dispose();
+    ConnectivityService.instance.removeReconnectHook(_onReconnected);
     super.dispose();
   }
+
+  Future<void> _onReconnected() => _loadData(refresh: true);
 
   Future<void> _loadData({bool append = false, bool refresh = false}) async {
     if (append) {
@@ -64,13 +69,15 @@ class _ExplorePageState extends State<ExplorePage> {
     }
 
     try {
-      final page = await FeedService.instance.getExplore(
-        cursor: append ? _nextCursor : null,
-      );
+      final page = append
+          ? await FeedService.instance.getExplore(cursor: _nextCursor)
+          : await FeedService.instance.getExploreCached(
+              forceRefresh: refresh,
+            );
       UserProfile? profile = _profile;
       if (!append) {
         try {
-          profile = await UserService.instance.getMe();
+          profile = await UserService.instance.getMeCached();
         } catch (_) {
           profile = null;
         }

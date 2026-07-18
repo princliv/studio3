@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../models/order.dart';
+import '../services/connectivity_service.dart';
 import '../services/order_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/home_feed_tokens.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/offline_state.dart';
 import 'order_detail_page.dart';
 
 class MyOrdersPage extends StatefulWidget {
@@ -22,10 +24,13 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
   String? _nextCursor;
   final _scrollController = ScrollController();
 
+  bool _showOfflineState = false;
+
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    ConnectivityService.instance.addReconnectHook(_onReconnected);
     _load();
   }
 
@@ -33,10 +38,13 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
   void dispose() {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    ConnectivityService.instance.removeReconnectHook(_onReconnected);
     super.dispose();
   }
 
-  Future<void> _load({bool append = false}) async {
+  Future<void> _onReconnected() => _load(refresh: true);
+
+  Future<void> _load({bool append = false, bool refresh = false}) async {
     if (append && (_nextCursor == null || _nextCursor!.isEmpty)) return;
     setState(() {
       if (append) {
@@ -46,9 +54,13 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
       }
     });
     try {
-      final page = await OrderService.instance.getMyOrders(
-        cursor: append ? _nextCursor : null,
-      );
+      // Always force-refresh on a non-append load — order status matters
+      // more than avoiding the request, unlike the feed/address caches.
+      final page = append
+          ? await OrderService.instance.getMyOrders(cursor: _nextCursor)
+          : await OrderService.instance.getMyOrdersCached(
+              forceRefresh: refresh || ConnectivityService.instance.isOnline,
+            );
       if (!mounted) return;
       setState(() {
         if (append) {
@@ -61,12 +73,16 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
         _nextCursor = page.nextCursor;
         _loading = false;
         _loadingMore = false;
+        _showOfflineState =
+            _orders.isEmpty && !ConnectivityService.instance.isOnline;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _loading = false;
         _loadingMore = false;
+        _showOfflineState =
+            _orders.isEmpty && !ConnectivityService.instance.isOnline;
       });
     }
   }
@@ -110,6 +126,9 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
   }
 
   Widget _buildBody() {
+    if (_showOfflineState) {
+      return OfflineState(onRetry: () => _load(refresh: true));
+    }
     if (_loading && _orders.isEmpty) {
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     }

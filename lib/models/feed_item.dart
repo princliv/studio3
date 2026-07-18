@@ -58,6 +58,9 @@ class FeedItem {
     final t = mediaType?.toLowerCase();
     return t == 'video' || t == 'reel' || t == 'reels';
   }
+
+  Map<String, dynamic> toJson() =>
+      type == FeedItemType.piece ? piece!.toJson() : post!.toJson();
 }
 
 enum FeedItemType { piece, post }

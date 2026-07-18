@@ -32,6 +32,20 @@ class RelatedScene {
       mediaType: post.mediaType,
     );
   }
+
+  factory RelatedScene.fromJson(Map<String, dynamic> json) => RelatedScene(
+        id: json['id'] as String?,
+        mediaUrl: json['mediaUrl'] as String?,
+        mediaType: json['mediaType'] as String?,
+        duration: json['duration'] as String?,
+      );
+
+  Map<String, dynamic> toJson() => {
+        if (id != null) 'id': id,
+        if (mediaUrl != null) 'mediaUrl': mediaUrl,
+        if (mediaType != null) 'mediaType': mediaType,
+        if (duration != null) 'duration': duration,
+      };
 }
 
 /// Real API-backed Piece/Scene view model shared by the feed, detail, and
@@ -261,6 +275,75 @@ class FeedPreviewItem {
 
   static List<RelatedScene> relatedScenesFromPosts(List<PostSummary> posts) {
     return posts.map(RelatedScene.fromPost).toList(growable: false);
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'imageSeeds': imageSeeds,
+        'title': title,
+        'medium': medium,
+        'year': year,
+        'dimensions': dimensions,
+        'story': story,
+        'handle': handle,
+        'isAvailable': isAvailable,
+        'aspectRatio': aspectRatio.name,
+        'isProcess': isProcess,
+        'seriesName': seriesName,
+        'seriesThumbs': seriesThumbs,
+        'seriesThumbUrls': seriesThumbUrls,
+        'relatedScenes': relatedScenes.map((s) => s.toJson()).toList(),
+        if (priceCents != null) 'priceCents': priceCents,
+        if (shippingRegion != null) 'shippingRegion': shippingRegion,
+        if (framingNote != null) 'framingNote': framingNote,
+        if (provenanceNote != null) 'provenanceNote': provenanceNote,
+        if (heroImageUrl != null) 'heroImageUrl': heroImageUrl,
+        'isLiked': isLiked,
+        'isSaved': isSaved,
+        'likeCount': likeCount,
+        'commentCount': commentCount,
+        if (authorName != null) 'authorName': authorName,
+        if (authorAvatarUrl != null) 'authorAvatarUrl': authorAvatarUrl,
+        if (status != null) 'status': status,
+      };
+
+  factory FeedPreviewItem.fromCacheJson(Map<String, dynamic> json) {
+    return FeedPreviewItem(
+      id: json['id'] as String? ?? '',
+      imageSeeds: (json['imageSeeds'] as List?)?.cast<int>() ?? const [],
+      title: json['title'] as String? ?? '',
+      medium: json['medium'] as String? ?? '',
+      year: json['year'] as int? ?? DateTime.now().year,
+      dimensions: json['dimensions'] as String? ?? '',
+      story: json['story'] as String? ?? '',
+      handle: json['handle'] as String? ?? '',
+      isAvailable: json['isAvailable'] as bool? ?? false,
+      aspectRatio: (json['aspectRatio'] as String?) == 'landscape16x9'
+          ? FeedAspectRatio.landscape16x9
+          : FeedAspectRatio.portrait3x4,
+      isProcess: json['isProcess'] as bool? ?? false,
+      seriesName: json['seriesName'] as String? ?? '',
+      seriesThumbs: (json['seriesThumbs'] as List?)?.cast<int>() ?? const [],
+      seriesThumbUrls:
+          (json['seriesThumbUrls'] as List?)?.cast<String>() ?? const [],
+      relatedScenes: (json['relatedScenes'] as List?)
+              ?.whereType<Map<String, dynamic>>()
+              .map(RelatedScene.fromJson)
+              .toList() ??
+          const [],
+      priceCents: json['priceCents'] as int?,
+      shippingRegion: json['shippingRegion'] as String?,
+      framingNote: json['framingNote'] as String?,
+      provenanceNote: json['provenanceNote'] as String?,
+      heroImageUrl: json['heroImageUrl'] as String?,
+      isLiked: json['isLiked'] as bool? ?? false,
+      isSaved: json['isSaved'] as bool? ?? false,
+      likeCount: json['likeCount'] as int? ?? 0,
+      commentCount: json['commentCount'] as int? ?? 0,
+      authorName: json['authorName'] as String?,
+      authorAvatarUrl: json['authorAvatarUrl'] as String?,
+      status: json['status'] as String?,
+    );
   }
 
   static List<String> seriesThumbUrlsFrom(PieceSeriesInfo? series) {

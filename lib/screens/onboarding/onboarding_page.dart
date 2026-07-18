@@ -7,9 +7,11 @@ import 'package:image_picker/image_picker.dart';
 import '../../data/post_picker_options.dart';
 import '../../services/api_exception.dart';
 import '../../services/media_service.dart';
+import '../../services/permission_service.dart';
 import '../../services/user_service.dart';
 import '../../theme/home_feed_tokens.dart';
 import '../../widgets/auth_ui.dart';
+import '../../widgets/permission_denied_sheet.dart';
 import '../../widgets/profile_avatar.dart';
 import '../../widgets/profile_cover_image.dart';
 import '../../widgets/studio_loading.dart';
@@ -118,6 +120,19 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   Future<void> _uploadPhoto(String purpose) async {
     if (_uploadingPhoto || _loading) return;
+    final outcome = await PermissionService.instance
+        .requestGalleryAccess(forVideo: false);
+    if (outcome == GalleryPermissionOutcome.deniedForever) {
+      if (mounted) {
+        await showPermissionDeniedSheet(
+          context,
+          title: 'Photo access needed',
+          message: 'Enable photo library access in Settings to upload a photo.',
+        );
+      }
+      return;
+    }
+    if (outcome == GalleryPermissionOutcome.denied) return;
     setState(() => _uploadingPhoto = true);
     try {
       final picked = await _picker.pickImage(source: ImageSource.gallery);

@@ -5,7 +5,9 @@ import 'package:image_picker/image_picker.dart';
 
 import '../services/api_exception.dart';
 import '../services/media_service.dart';
+import '../services/permission_service.dart';
 import '../services/user_service.dart';
+import '../widgets/permission_denied_sheet.dart';
 
 final _picker = ImagePicker();
 
@@ -14,6 +16,21 @@ Future<String?> pickAndUploadPhoto(
   BuildContext context,
   String purpose,
 ) async {
+  final outcome = await PermissionService.instance
+      .requestGalleryAccess(forVideo: false);
+  if (outcome == GalleryPermissionOutcome.deniedForever) {
+    if (context.mounted) {
+      await showPermissionDeniedSheet(
+        context,
+        title: 'Photo access needed',
+        message: 'Enable photo library access in Settings to upload photos.',
+      );
+    }
+    return null;
+  }
+  if (outcome == GalleryPermissionOutcome.denied) {
+    return null;
+  }
   try {
     final picked = await _picker.pickImage(source: ImageSource.gallery);
     if (picked == null) return null;

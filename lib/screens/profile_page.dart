@@ -108,7 +108,7 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       final UserProfile profile;
       if (_isTabContext || (_isOwnProfile && !widget.viewerMode)) {
-        profile = await UserService.instance.getMe();
+        profile = await UserService.instance.getMeCached();
       } else {
         profile = await UserService.instance.getPublicProfile(widget.username!);
       }

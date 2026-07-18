@@ -4,9 +4,11 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/address.dart';
 import '../services/address_service.dart';
 import '../services/api_exception.dart';
+import '../services/connectivity_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/home_feed_tokens.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/offline_state.dart';
 import 'address_form_page.dart';
 
 class AddressListPage extends StatefulWidget {
@@ -24,16 +26,26 @@ class _AddressListPageState extends State<AddressListPage> {
   @override
   void initState() {
     super.initState();
+    ConnectivityService.instance.addReconnectHook(_onReconnected);
     _load();
   }
 
-  Future<void> _load() async {
+  @override
+  void dispose() {
+    ConnectivityService.instance.removeReconnectHook(_onReconnected);
+    super.dispose();
+  }
+
+  Future<void> _onReconnected() => _load(refresh: true);
+
+  Future<void> _load({bool refresh = false}) async {
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final addresses = await AddressService.instance.getAddresses();
+      final addresses =
+          await AddressService.instance.getAddressesCached(forceRefresh: refresh);
       if (!mounted) return;
       setState(() {
         _addresses = addresses;
@@ -142,6 +154,11 @@ class _AddressListPageState extends State<AddressListPage> {
   }
 
   Widget _buildBody() {
+    if (_addresses.isEmpty &&
+        !_loading &&
+        !ConnectivityService.instance.isOnline) {
+      return OfflineState(onRetry: () => _load(refresh: true));
+    }
     if (_loading && _addresses.isEmpty) {
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     }

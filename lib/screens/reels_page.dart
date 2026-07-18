@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/feed_item.dart';
+import '../services/connectivity_service.dart';
 import '../services/feed_service.dart';
 import '../widgets/reels/reel_player_page.dart';
 
@@ -44,8 +45,11 @@ class _ReelsPageState extends State<ReelsPage> with RouteAware {
     super.initState();
     _currentIndex = widget.initialIndex;
     _pageController = PageController(initialPage: widget.initialIndex);
+    ConnectivityService.instance.addReconnectHook(_onReconnected);
     _loadItems();
   }
+
+  Future<void> _onReconnected() => _loadItems(refresh: true);
 
   @override
   void didChangeDependencies() {
@@ -73,6 +77,7 @@ class _ReelsPageState extends State<ReelsPage> with RouteAware {
   void dispose() {
     routeObserver.unsubscribe(this);
     _pageController.dispose();
+    ConnectivityService.instance.removeReconnectHook(_onReconnected);
     super.dispose();
   }
 
@@ -91,9 +96,12 @@ class _ReelsPageState extends State<ReelsPage> with RouteAware {
       setState(() => _loading = _items.isEmpty);
     }
     try {
-      final page = await FeedService.instance.getVideoScenes(
-        cursor: append ? _nextCursor : null,
-      );
+      final page = append
+          ? await FeedService.instance.getVideoScenes(cursor: _nextCursor)
+          : await FeedService.instance.getExploreCached(
+              videoOnly: true,
+              forceRefresh: refresh,
+            );
       if (!mounted) return;
       setState(() {
         if (append) {

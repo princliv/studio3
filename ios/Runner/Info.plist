@@ -42,6 +42,8 @@
 		<true/>
 		<key>NSLocationWhenInUseUsageDescription</key>
 		<string>Studio3 uses your location to show shipping addresses and nearby sellers.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>Studio3 needs access to your photo library so you can upload artwork photos and videos.</string>
 		<key>UIStatusBarHidden</key>
 		<false/>
 	</dict>

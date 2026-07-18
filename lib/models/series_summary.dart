@@ -18,6 +18,12 @@ class SeriesPreviewPiece {
       title: json['title'] as String?,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        if (mediaUrl != null) 'mediaUrl': mediaUrl,
+        if (title != null) 'title': title,
+      };
 }
 
 /// Series row from `GET /api/users/:username/series` or `GET /api/series/:id`.
@@ -104,4 +110,11 @@ class PieceSeriesInfo {
         ),
       )
       .toList(growable: false);
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'pieceIds': pieceIds,
+        'previewPieces': previewPieces.map((p) => p.toJson()).toList(),
+      };
 }

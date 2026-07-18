@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import '../models/piece_summary.dart';
 import '../models/user_profile.dart';
 import 'api_client.dart';
 import 'api_exception.dart';
 import 'auth_session.dart';
+import 'cache_service.dart';
+import 'connectivity_service.dart';
 
 class UserService {
   UserService._();
@@ -17,6 +21,28 @@ class UserService {
     final profile = UserProfile.fromJson(data);
     await _syncSessionFromProfile(profile, data);
     return profile;
+  }
+
+  /// Cache-first own-profile fetch — short TTL since profile fields can
+  /// change from other devices/sessions.
+  Future<UserProfile> getMeCached({bool forceRefresh = false}) {
+    return CacheService.instance.fetchWithCache<UserProfile>(
+      key: 'user.me',
+      ttl: const Duration(minutes: 2),
+      forceRefresh: forceRefresh,
+      fetchRaw: () {
+        if (!ConnectivityService.instance.isOnline) {
+          throw const CacheMiss('user.me');
+        }
+        return _api.get('/api/user/me', auth: true);
+      },
+      parse: (json) {
+        final data = _api.extractData(json) as Map<String, dynamic>;
+        final profile = UserProfile.fromJson(data);
+        unawaited(_syncSessionFromProfile(profile, data));
+        return profile;
+      },
+    );
   }
 
   Future<UserProfile> getPublicProfile(String username) async {
@@ -49,6 +75,7 @@ class UserService {
     final data = _api.extractData(json) as Map<String, dynamic>;
     final profile = UserProfile.fromJson(data);
     await _syncSessionFromProfile(profile, data);
+    await CacheService.instance.invalidate('user.me');
     return profile;
   }
 

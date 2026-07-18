@@ -2,6 +2,8 @@ import '../models/feed_item.dart';
 import '../models/feed_page.dart';
 import 'api_client.dart';
 import 'auth_session.dart';
+import 'cache_service.dart';
+import 'connectivity_service.dart';
 
 class FeedService {
   FeedService._();
@@ -54,6 +56,61 @@ class FeedService {
   /// Video scenes for Reels (`type: post` + `mediaType: video`).
   Future<FeedPage> getVideoScenes({String? cursor, int? limit}) {
     return getExplore(videoOnly: true, cursor: cursor, limit: limit);
+  }
+
+  /// Cache-first first page of the "For You" feed — pagination past page 1
+  /// always stays network-only. Serves cached data immediately when fresh
+  /// (or when offline and cache exists), refreshing in the background
+  /// otherwise.
+  Future<FeedPage> getForYouCached({bool forceRefresh = false}) {
+    return CacheService.instance.fetchWithCache<FeedPage>(
+      key: 'feed.forYou',
+      ttl: const Duration(minutes: 5),
+      forceRefresh: forceRefresh,
+      fetchRaw: () {
+        if (!ConnectivityService.instance.isOnline) {
+          throw const CacheMiss('feed.forYou');
+        }
+        return _api.get(
+          '/api/feed/for-you',
+          query: _query(),
+          auth: true,
+        );
+      },
+      parse: _parseFeedPage,
+    );
+  }
+
+  /// Cache-first Explore feed, keyed per medium filter so "All"/"Video"/etc
+  /// each cache independently.
+  Future<FeedPage> getExploreCached({
+    String? medium,
+    bool videoOnly = false,
+    bool forceRefresh = false,
+  }) {
+    final key = 'feed.explore.${videoOnly ? 'video' : (medium ?? 'all')}';
+    return CacheService.instance.fetchWithCache<FeedPage>(
+      key: key,
+      ttl: const Duration(minutes: 5),
+      forceRefresh: forceRefresh,
+      fetchRaw: () {
+        if (!ConnectivityService.instance.isOnline) {
+          throw CacheMiss(key);
+        }
+        final query = _query();
+        if (videoOnly) {
+          query['medium'] = 'video';
+        } else if (medium != null && medium.isNotEmpty && medium != 'All') {
+          query['medium'] = medium.toLowerCase();
+        }
+        return _api.get(
+          '/api/feed/explore',
+          query: query.isEmpty ? null : query,
+          auth: AuthSession.instance.isLoggedIn,
+        );
+      },
+      parse: (json) => _parseFeedPage(json, videoOnly: videoOnly),
+    );
   }
 
   Map<String, String> _query({String? cursor, int? limit}) {

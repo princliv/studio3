@@ -7,6 +7,8 @@ import '../theme/home_feed_tokens.dart';
 import '../utils/explore_detail_route.dart';
 import '../utils/image_aspect_ratio_resolver.dart';
 import '../widgets/home_feed/home_feed_widgets.dart';
+import '../widgets/offline_state.dart';
+import '../services/connectivity_service.dart';
 import '../services/feed_service.dart';
 
 class HomeFeedPage extends StatefulWidget {
@@ -32,10 +34,13 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
     return _apiItems.where((item) => item.isForSale).toList();
   }
 
+  bool _showOfflineState = false;
+
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    ConnectivityService.instance.addReconnectHook(_onReconnected);
     _loadFeed();
   }
 
@@ -43,8 +48,11 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
   void dispose() {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    ConnectivityService.instance.removeReconnectHook(_onReconnected);
     super.dispose();
   }
+
+  Future<void> _onReconnected() => _loadFeed(refresh: true);
 
   Future<void> _loadFeed({bool append = false, bool refresh = false}) async {
     if (_loadingMore) return;
@@ -58,9 +66,9 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
       }
     });
     try {
-      final page = await FeedService.instance.getForYou(
-        cursor: append ? _nextCursor : null,
-      );
+      final page = append
+          ? await FeedService.instance.getForYou(cursor: _nextCursor)
+          : await FeedService.instance.getForYouCached(forceRefresh: refresh);
       if (!mounted) return;
       setState(() {
         if (append) {
@@ -73,6 +81,8 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
         _nextCursor = page.nextCursor;
         _loading = false;
         _loadingMore = false;
+        _showOfflineState =
+            _apiItems.isEmpty && !ConnectivityService.instance.isOnline;
       });
     } catch (_) {
       if (!mounted) return;
@@ -80,6 +90,8 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
         if (!append) _apiItems.clear();
         _loading = false;
         _loadingMore = false;
+        _showOfflineState =
+            _apiItems.isEmpty && !ConnectivityService.instance.isOnline;
       });
     }
   }
@@ -133,6 +145,9 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
   }
 
   Widget _buildFeed(double bottomInset) {
+    if (_showOfflineState) {
+      return OfflineState(onRetry: () => _loadFeed(refresh: true));
+    }
     if (_loading && _apiItems.isEmpty) {
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     }

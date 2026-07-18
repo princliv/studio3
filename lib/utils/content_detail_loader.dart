@@ -9,10 +9,7 @@ abstract final class ContentDetailLoader {
   static Future<FeedPreviewItem> loadPiece(FeedPreviewItem seed) async {
     if (!seed.isApiBacked || seed.isScene) return seed;
     try {
-      final piece = await PieceService.instance.getById(
-        seed.id,
-        auth: AuthSession.instance.isLoggedIn,
-      );
+      final piece = await PieceService.instance.getByIdCached(seed.id);
       var item = FeedPreviewItem.fromPieceSummary(piece);
       try {
         final related = await PieceService.instance.getRelatedPosts(seed.id);
