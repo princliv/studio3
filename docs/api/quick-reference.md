@@ -16,9 +16,13 @@ Single-table endpoint index. See flow docs for request/response examples.
 | POST | `{{baseUrl}}/api/auth/forget-password` | — | `{ "email" }` |
 | POST | `{{baseUrl}}/api/auth/reset-password` | — | `{ "token", "newPassword" }` |
 | GET | `{{baseUrl}}/api/user/me` | Bearer | — |
-| PATCH | `{{baseUrl}}/api/user/me` | Bearer | Profile fields incl. `latitude`/`longitude` |
+| PATCH | `{{baseUrl}}/api/user/me` | Bearer | Profile fields incl. `latitude`/`longitude`, `pronouns`, `bannerTargetType`/`Id`, `bannerAutoRule`, `messagePermission`, `profileVisibility` |
 | PATCH | `{{baseUrl}}/api/user/me/username` | Bearer | `{ "username" }` |
-| GET | `{{baseUrl}}/api/user/:username` | Optional Bearer | — |
+| PATCH | `{{baseUrl}}/api/user/me/password` | Bearer | `{ "currentPassword", "newPassword" }` |
+| POST | `{{baseUrl}}/api/user/me/email/request-change` | Bearer | `{ "newEmail" }` |
+| POST | `{{baseUrl}}/api/user/me/email/confirm-change` | Bearer | `{ "newEmail", "otp" }` |
+| PATCH | `{{baseUrl}}/api/user/me/notification-preferences` | Bearer | `{ "push"?, "dailyDigest"? }` |
+| GET | `{{baseUrl}}/api/user/:username` | Optional Bearer | — (locked header if private + not following) |
 | GET | `{{baseUrl}}/api/users/nearby` | Optional Bearer | Query: `lat`, `lng`, `radiusKm?`, `limit?` |
 | PATCH | `{{baseUrl}}/api/user/me/role` | Bearer | `{ "role" }` |
 | POST | `{{baseUrl}}/api/user/me/onboarding/*` | Bearer | See [user-profile flow](./flows/user-profile.md) |
@@ -40,7 +44,11 @@ Single-table endpoint index. See flow docs for request/response examples.
 | GET | `{{baseUrl}}/api/users/:username/series` | — | Public profile (pieceCount > 1) |
 | GET | `{{baseUrl}}/api/user/me/series` | Bearer | Owner management (all series) |
 | POST/PATCH/GET/DELETE | `{{baseUrl}}/api/series/*` | Varies | See [series flow](./flows/series.md) |
-| POST/DELETE | `{{baseUrl}}/api/users/:username/follow` | Bearer | — |
+| POST/DELETE | `{{baseUrl}}/api/users/:username/follow` | Bearer | Follows, or requests if target is private |
+| GET | `{{baseUrl}}/api/users/follow-requests` | Bearer | Pending requests to the caller |
+| POST | `{{baseUrl}}/api/users/follow-requests/:username/accept` \| `/decline` | Bearer | See [social flow](./flows/social.md#follow-requests-private-accounts) |
+| GET | `{{baseUrl}}/api/users/blocked` | Bearer | — |
+| POST/DELETE | `{{baseUrl}}/api/users/:username/block` | Bearer | See [social flow](./flows/social.md#blocking) |
 | POST/DELETE | `{{baseUrl}}/api/pieces/:id/like` \| `/api/posts/:id/like` | Bearer | — |
 | POST/DELETE | `{{baseUrl}}/api/pieces/:id/save` \| `/api/posts/:id/save` | Bearer | — |
 | GET | `{{baseUrl}}/api/feed/following` | Bearer | Query: `cursor?`, `limit?` |
@@ -48,6 +56,8 @@ Single-table endpoint index. See flow docs for request/response examples.
 | GET | `{{baseUrl}}/api/feed/for-you` | Bearer | Query: `cursor?`, `limit?` |
 | GET/PATCH/POST | `{{baseUrl}}/api/notifications/*` | Bearer | See [notifications flow](./flows/notifications.md) |
 | GET/POST/PATCH | `{{baseUrl}}/api/inquiries/*` | Bearer | See [inquiries flow](./flows/inquiries.md) |
+| GET | `{{baseUrl}}/api/inquiries/requests` | Bearer | Pending message requests (seller-side) |
+| POST | `{{baseUrl}}/api/inquiries/:id/accept` \| `/decline` | Bearer | Seller only — see [inquiries flow](./flows/inquiries.md#message-requests-private-accounts--restricted-messaging) |
 | GET/PATCH/POST | `{{baseUrl}}/api/orders/*` | Bearer | See [orders flow](./flows/orders.md) |
 | GET | `{{baseUrl}}/api/user/me/orders` \| `/sales` | Bearer | Buyer / seller history |
 
