@@ -1,6 +1,24 @@
+import '../models/blocked_user.dart';
 import '../models/comment_page.dart';
 import '../models/feed_item.dart';
+import '../models/follow_request.dart';
 import 'api_client.dart';
+
+/// Result of `POST`/`DELETE /api/users/:username/follow`. Private accounts
+/// return `requested: true` instead of following immediately.
+class FollowResult {
+  const FollowResult({required this.following, required this.requested});
+
+  final bool following;
+  final bool requested;
+
+  factory FollowResult.fromJson(Map<String, dynamic> json) {
+    return FollowResult(
+      following: json['following'] as bool? ?? false,
+      requested: json['requested'] as bool? ?? false,
+    );
+  }
+}
 
 class SocialService {
   SocialService._();
@@ -8,12 +26,46 @@ class SocialService {
 
   final _api = ApiClient.instance;
 
-  Future<void> follow(String username) async {
-    await _api.post('/api/users/$username/follow', auth: true);
+  Future<FollowResult> follow(String username) async {
+    final json = await _api.post('/api/users/$username/follow', auth: true);
+    return _parseFollowResult(json);
   }
 
-  Future<void> unfollow(String username) async {
-    await _api.delete('/api/users/$username/follow');
+  Future<FollowResult> unfollow(String username) async {
+    final json = await _api.delete('/api/users/$username/follow');
+    return _parseFollowResult(json);
+  }
+
+  FollowResult _parseFollowResult(Map<String, dynamic> json) {
+    final data = _api.extractData(json);
+    if (data is Map<String, dynamic>) return FollowResult.fromJson(data);
+    return const FollowResult(following: false, requested: false);
+  }
+
+  Future<List<FollowRequest>> listFollowRequests() async {
+    final json = await _api.get('/api/users/follow-requests', auth: true);
+    return _api.extractList(json).map(FollowRequest.fromJson).toList();
+  }
+
+  Future<void> acceptFollowRequest(String username) async {
+    await _api.post('/api/users/follow-requests/$username/accept', auth: true);
+  }
+
+  Future<void> declineFollowRequest(String username) async {
+    await _api.post('/api/users/follow-requests/$username/decline', auth: true);
+  }
+
+  Future<List<BlockedUser>> listBlocked() async {
+    final json = await _api.get('/api/users/blocked', auth: true);
+    return _api.extractList(json).map(BlockedUser.fromJson).toList();
+  }
+
+  Future<void> blockUser(String username) async {
+    await _api.post('/api/users/$username/block', auth: true);
+  }
+
+  Future<void> unblockUser(String username) async {
+    await _api.delete('/api/users/$username/block');
   }
 
   Future<void> likePiece(String id) async {

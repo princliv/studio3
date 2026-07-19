@@ -33,6 +33,11 @@ import 'screens/manage_series_page.dart';
 import 'screens/address_list_page.dart';
 import 'screens/my_orders_page.dart';
 import 'screens/my_sales_page.dart';
+import 'screens/change_password_page.dart';
+import 'screens/change_email_page.dart';
+import 'screens/notification_preferences_page.dart';
+import 'screens/follow_requests_page.dart';
+import 'screens/blocked_users_page.dart';
 import 'models/auth_user.dart';
 import 'theme/home_feed_tokens.dart';
 
@@ -92,6 +97,11 @@ class Studio3App extends StatelessWidget {
         '/addresses': (context) => const AddressListPage(),
         '/orders': (context) => const MyOrdersPage(),
         '/sales': (context) => const MySalesPage(),
+        '/change-password': (context) => const ChangePasswordPage(),
+        '/change-email': (context) => const ChangeEmailPage(),
+        '/notification-preferences': (context) => const NotificationPreferencesPage(),
+        '/follow-requests': (context) => const FollowRequestsPage(),
+        '/blocked-users': (context) => const BlockedUsersPage(),
         '/profile': (context) {
           final args = parseProfileRouteArgs(
             ModalRoute.of(context)?.settings.arguments,

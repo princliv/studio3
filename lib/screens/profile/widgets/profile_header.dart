@@ -5,6 +5,10 @@ import '../../../theme/home_feed_tokens.dart';
 import '../../../widgets/profile_avatar.dart';
 import '../profile_constants.dart';
 
+/// Follow relationship from the viewer to this profile — a private account
+/// yields [pending] instead of jumping straight to [following].
+enum FollowState { none, pending, following }
+
 class ProfileHeader extends StatelessWidget {
   const ProfileHeader({
     super.key,
@@ -20,7 +24,7 @@ class ProfileHeader extends StatelessWidget {
     this.salesCount,
     this.sellerMode = false,
     this.isOwnProfile = true,
-    this.isFollowing = false,
+    this.followState = FollowState.none,
     this.onFollow,
     this.onMessage,
     this.onAvatarTap,
@@ -38,7 +42,7 @@ class ProfileHeader extends StatelessWidget {
   final int? salesCount;
   final bool sellerMode;
   final bool isOwnProfile;
-  final bool isFollowing;
+  final FollowState followState;
   final VoidCallback? onFollow;
   final VoidCallback? onMessage;
   final VoidCallback? onAvatarTap;
@@ -195,7 +199,7 @@ class ProfileHeader extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _FollowButton(
-                      isFollowing: isFollowing,
+                      state: followState,
                       onPressed: onFollow,
                     ),
                     const SizedBox(width: 10),
@@ -255,38 +259,48 @@ class _StatBlock extends StatelessWidget {
 }
 
 class _FollowButton extends StatelessWidget {
-  const _FollowButton({required this.isFollowing, this.onPressed});
+  const _FollowButton({required this.state, this.onPressed});
 
-  final bool isFollowing;
+  final FollowState state;
   final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
+    final outlined = state != FollowState.none;
+    final label = switch (state) {
+      FollowState.none => 'Follow',
+      FollowState.pending => 'Requested',
+      FollowState.following => 'Following',
+    };
     return Material(
-      color: isFollowing ? Colors.transparent : HomeFeedTokens.textPrimary,
+      color: outlined ? Colors.transparent : HomeFeedTokens.textPrimary,
       borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
       child: InkWell(
         onTap: onPressed,
         borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
         child: DecoratedBox(
-          decoration: isFollowing
+          decoration: outlined
               ? BoxDecoration(
                   borderRadius:
                       BorderRadius.circular(HomeFeedTokens.cardRadius),
                   border: Border.all(
-                    color: HomeFeedTokens.textPrimary.withValues(alpha: 0.35),
+                    color: HomeFeedTokens.textPrimary.withValues(
+                      alpha: state == FollowState.pending ? 0.2 : 0.35,
+                    ),
                   ),
                 )
               : const BoxDecoration(),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 28),
             child: Text(
-              isFollowing ? 'Following' : 'Follow',
+              label,
               style: GoogleFonts.inter(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
-                color: isFollowing
-                    ? HomeFeedTokens.textPrimary
+                color: outlined
+                    ? HomeFeedTokens.textPrimary.withValues(
+                        alpha: state == FollowState.pending ? 0.7 : 1,
+                      )
                     : HomeFeedTokens.textInverse,
               ),
             ),

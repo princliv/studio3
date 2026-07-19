@@ -55,10 +55,17 @@ class UserService {
     String? name,
     String? bio,
     String? location,
+    String? pronouns,
     String? profilePhotoUrl,
     String? coverPhotoUrl,
     double? latitude,
     double? longitude,
+    String? bannerAutoRule,
+    String? messagePermission,
+    String? profileVisibility,
+    bool updateBannerTarget = false,
+    String? bannerTargetType,
+    String? bannerTargetId,
   }) async {
     if ((latitude == null) != (longitude == null)) {
       throw ApiException('latitude and longitude must be sent together');
@@ -67,16 +74,95 @@ class UserService {
     if (name != null) body['name'] = name;
     if (bio != null) body['bio'] = bio;
     if (location != null) body['location'] = location;
+    if (pronouns != null) body['pronouns'] = pronouns;
     if (profilePhotoUrl != null) body['profilePhotoUrl'] = profilePhotoUrl;
     if (coverPhotoUrl != null) body['coverPhotoUrl'] = coverPhotoUrl;
     if (latitude != null) body['latitude'] = latitude;
     if (longitude != null) body['longitude'] = longitude;
+    if (bannerAutoRule != null) body['bannerAutoRule'] = bannerAutoRule;
+    if (messagePermission != null) body['messagePermission'] = messagePermission;
+    if (profileVisibility != null) body['profileVisibility'] = profileVisibility;
+    // Backend requires bannerTargetType/Id sent together (both null clears
+    // the manual pin) — only include them when the caller explicitly wants
+    // to change the pin, since plain nullable params can't tell "unset" from
+    // "don't touch".
+    if (updateBannerTarget) {
+      body['bannerTargetType'] = bannerTargetType;
+      body['bannerTargetId'] = bannerTargetId;
+    }
     final json = await _api.patch('/api/user/me', body: body);
     final data = _api.extractData(json) as Map<String, dynamic>;
     final profile = UserProfile.fromJson(data);
     await _syncSessionFromProfile(profile, data);
     await CacheService.instance.invalidate('user.me');
     return profile;
+  }
+
+  /// Authenticated password change — distinct from the unauthenticated
+  /// email-token forgot/reset flow in `AuthService`. Revokes the caller's
+  /// other active sessions on success (not the current one).
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await _api.patch('/api/user/me/password', body: {
+      'currentPassword': currentPassword,
+      'newPassword': newPassword,
+    });
+  }
+
+  /// Step 1 of authenticated email change: sends an OTP to [newEmail].
+  Future<void> requestEmailChange(String newEmail) async {
+    await _api.post(
+      '/api/user/me/email/request-change',
+      body: {'newEmail': newEmail},
+      auth: true,
+    );
+  }
+
+  /// Step 2: verifies the OTP and swaps the account email.
+  Future<String> confirmEmailChange({
+    required String newEmail,
+    required String otp,
+  }) async {
+    final json = await _api.post(
+      '/api/user/me/email/confirm-change',
+      body: {'newEmail': newEmail, 'otp': otp},
+      auth: true,
+    );
+    final data = _api.extractData(json) as Map<String, dynamic>;
+    final email = data['email'] as String? ?? newEmail;
+    final user = _session.user;
+    if (user != null) {
+      await _session.updateUser(user.copyWith(email: email));
+    }
+    await CacheService.instance.invalidate('user.me');
+    return email;
+  }
+
+  /// Partial, deep-merged update of push/daily-digest notification settings.
+  Future<NotificationPreferences> updateNotificationPreferences({
+    Map<String, bool>? push,
+    bool? dailyDigestEnabled,
+    String? dailyDigestTime,
+  }) async {
+    final body = <String, dynamic>{};
+    if (push != null) body['push'] = push;
+    if (dailyDigestEnabled != null || dailyDigestTime != null) {
+      body['dailyDigest'] = {
+        if (dailyDigestEnabled != null) 'enabled': dailyDigestEnabled,
+        if (dailyDigestTime != null) 'time': dailyDigestTime,
+      };
+    }
+    final json = await _api.patch(
+      '/api/user/me/notification-preferences',
+      body: body,
+    );
+    final data = _api.extractData(json) as Map<String, dynamic>;
+    final prefsJson =
+        data['notificationPreferences'] as Map<String, dynamic>? ?? data;
+    await CacheService.instance.invalidate('user.me');
+    return NotificationPreferences.fromJson(prefsJson);
   }
 
   Future<UserProfile> changeUsername(String username) async {

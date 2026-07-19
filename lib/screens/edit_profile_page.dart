@@ -10,9 +10,23 @@ import '../services/auth_session.dart';
 import '../services/user_service.dart';
 import '../theme/home_feed_tokens.dart';
 import '../utils/profile_photo_upload.dart';
+import '../widgets/labeled_dropdown.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/profile_cover_image.dart';
 import '../widgets/studio_loading.dart';
+import 'profile_banner_picker_sheet.dart';
+
+const _visibilityOptions = [('public', 'Public'), ('private', 'Private')];
+const _messagePermissionOptions = [
+  ('everyone', 'Everyone'),
+  ('following', 'People I follow'),
+  ('no_one', 'No one'),
+];
+const _bannerRuleOptions = [
+  ('most_saved', 'Most saved'),
+  ('most_recent', 'Most recent'),
+  ('none', 'None (manual pin)'),
+];
 
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({super.key});
@@ -26,6 +40,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final _bioController = TextEditingController();
   final _locationController = TextEditingController();
   final _usernameController = TextEditingController();
+  final _pronounsController = TextEditingController();
 
   bool _loading = true;
   bool _saving = false;
@@ -37,6 +52,15 @@ class _EditProfilePageState extends State<EditProfilePage> {
   double? _longitude;
   bool _locating = false;
   Timer? _usernameDebounce;
+
+  String _username = '';
+  String _profileVisibility = 'public';
+  String _messagePermission = 'everyone';
+  String _bannerAutoRule = 'none';
+  String? _bannerTargetType;
+  String? _bannerTargetId;
+  String? _bannerMediaUrl;
+  bool _bannerPinChanged = false;
 
   @override
   void initState() {
@@ -50,6 +74,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _bioController.dispose();
     _locationController.dispose();
     _usernameController.dispose();
+    _pronounsController.dispose();
     _usernameDebounce?.cancel();
     super.dispose();
   }
@@ -63,17 +88,36 @@ class _EditProfilePageState extends State<EditProfilePage> {
         _bioController.text = profile.bio ?? '';
         _locationController.text = profile.location ?? '';
         _usernameController.text = profile.username;
+        _pronounsController.text = profile.pronouns ?? '';
         _profilePhotoUrl = profile.profilePhotoUrl;
         _coverPhotoUrl = profile.coverPhotoUrl;
         _latitude = profile.latitude;
         _longitude = profile.longitude;
         _canChangeUsername = profile.canChangeUsername;
+        _username = profile.username;
+        _profileVisibility = profile.profileVisibility;
+        _messagePermission = profile.messagePermission;
+        _bannerAutoRule = profile.bannerAutoRule;
+        _bannerTargetType = profile.bannerTargetType;
+        _bannerTargetId = profile.bannerTargetId;
+        _bannerMediaUrl = profile.banner?.mediaUrl;
         _loading = false;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() => _loading = false);
     }
+  }
+
+  Future<void> _pickBanner() async {
+    final result = await showProfileBannerPicker(context, username: _username);
+    if (result == null) return;
+    setState(() {
+      _bannerTargetType = result.$1;
+      _bannerTargetId = result.$2;
+      _bannerMediaUrl = null; // cleared/changed locally; server confirms on save
+      _bannerPinChanged = true;
+    });
   }
 
   void _onUsernameChanged(String value) {
@@ -142,10 +186,17 @@ class _EditProfilePageState extends State<EditProfilePage> {
         name: _nameController.text.trim(),
         bio: _bioController.text.trim(),
         location: _locationController.text.trim(),
+        pronouns: _pronounsController.text.trim(),
         profilePhotoUrl: _profilePhotoUrl,
         coverPhotoUrl: _coverPhotoUrl,
         latitude: _latitude,
         longitude: _longitude,
+        profileVisibility: _profileVisibility,
+        messagePermission: _messagePermission,
+        bannerAutoRule: _bannerAutoRule,
+        updateBannerTarget: _bannerPinChanged,
+        bannerTargetType: _bannerTargetType,
+        bannerTargetId: _bannerTargetId,
       );
       if (!mounted) return;
       Navigator.pop(context, true);
@@ -270,6 +321,69 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         : 'Use my current location',
                   ),
                 ),
+                const SizedBox(height: 16),
+                _Field(label: 'Pronouns', controller: _pronounsController),
+                const SizedBox(height: 24),
+                Text(
+                  'Privacy',
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: HomeFeedTokens.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                LabeledDropdown(
+                  label: 'Profile visibility',
+                  value: _profileVisibility,
+                  options: _visibilityOptions,
+                  onChanged: (v) => setState(() => _profileVisibility = v),
+                ),
+                const SizedBox(height: 16),
+                LabeledDropdown(
+                  label: 'Who can message you',
+                  value: _messagePermission,
+                  options: _messagePermissionOptions,
+                  onChanged: (v) => setState(() => _messagePermission = v),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Profile banner',
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: HomeFeedTokens.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                LabeledDropdown(
+                  label: 'Banner rule',
+                  value: _bannerAutoRule,
+                  options: _bannerRuleOptions,
+                  onChanged: (v) => setState(() => _bannerAutoRule = v),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _pickBanner,
+                  icon: const Icon(Icons.push_pin_outlined, size: 18),
+                  label: Text(
+                    _bannerTargetId != null
+                        ? 'Change pinned banner'
+                        : 'Pin a piece or post',
+                  ),
+                ),
+                if (_bannerMediaUrl != null) ...[
+                  const SizedBox(height: 10),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      _bannerMediaUrl!,
+                      height: 80,
+                      width: 80,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ],
           ],
         ),
       ),
