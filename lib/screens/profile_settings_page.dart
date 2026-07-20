@@ -177,6 +177,11 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
 
             const _SectionHeader('Privacy'),
             SettingsTile(
+              icon: Icons.shield_outlined,
+              label: 'Profile visibility & messaging',
+              onTap: () => Navigator.pushNamed(context, '/privacy-settings'),
+            ),
+            SettingsTile(
               icon: Icons.person_add_alt_outlined,
               label: 'Follow requests',
               onTap: () => Navigator.pushNamed(context, '/follow-requests'),

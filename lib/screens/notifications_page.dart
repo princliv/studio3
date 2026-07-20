@@ -139,14 +139,26 @@ class _NotificationsPageState extends State<NotificationsPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              child: Text(
-                'Activity',
-                style: GoogleFonts.inter(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: HomeFeedTokens.textPrimary,
-                ),
+              padding: const EdgeInsets.fromLTRB(4, 8, 16, 16),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      color: HomeFeedTokens.textPrimary,
+                      size: 20,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  Text(
+                    'Activity',
+                    style: GoogleFonts.inter(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: HomeFeedTokens.textPrimary,
+                    ),
+                  ),
+                ],
               ),
             ),
             Expanded(child: _buildBody(today, earlier)),

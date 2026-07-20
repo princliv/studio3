@@ -30,7 +30,8 @@ class PieceActionBar extends StatelessWidget {
         children: [
           _ActionButton(
             icon: liked ? Icons.favorite : Icons.favorite_border,
-            label: 'Like',
+            label: liked ? 'Liked' : 'Like',
+            color: liked ? const Color(0xFFFF3040) : HomeFeedTokens.textPrimary,
             onTap: onLike,
           ),
           _ActionButton(
@@ -59,11 +60,13 @@ class _ActionButton extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.color = HomeFeedTokens.textPrimary,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
@@ -73,14 +76,14 @@ class _ActionButton extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 20, color: HomeFeedTokens.textPrimary),
+          Icon(icon, size: 20, color: color),
           const SizedBox(width: 6),
           Text(
             label,
             style: GoogleFonts.inter(
               fontSize: 12,
               fontWeight: FontWeight.w400,
-              color: HomeFeedTokens.textPrimary,
+              color: color,
             ),
           ),
         ],

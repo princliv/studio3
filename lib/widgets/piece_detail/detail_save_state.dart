@@ -9,6 +9,7 @@ mixin DetailSaveState<T extends StatefulWidget> on State<T> {
   final SavedContentStore savedStore = SavedContentStore.instance;
   bool saved = false;
   bool _saveBusy = false;
+  bool _ownStoreWrite = false;
 
   FeedPreviewItem get saveItem;
 
@@ -35,6 +36,7 @@ mixin DetailSaveState<T extends StatefulWidget> on State<T> {
   }
 
   void onSavedStoreChanged() {
+    if (_ownStoreWrite) return;
     final nextSaved = saveItem.isApiBacked
         ? saveItem.isSaved
         : savedStore.isSaved(saveItem.id);
@@ -65,14 +67,18 @@ mixin DetailSaveState<T extends StatefulWidget> on State<T> {
         } else {
           await SocialService.instance.savePiece(item.id);
         }
+        _ownStoreWrite = true;
         savedStore.savePreview(item);
+        _ownStoreWrite = false;
       } else {
         if (item.isScene) {
           await SocialService.instance.unsavePost(item.id);
         } else {
           await SocialService.instance.unsavePiece(item.id);
         }
+        _ownStoreWrite = true;
         savedStore.unsave(item.id);
+        _ownStoreWrite = false;
       }
     } catch (_) {
       if (mounted) setState(() => saved = !nextSaved);

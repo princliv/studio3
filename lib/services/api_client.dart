@@ -54,6 +54,7 @@ class ApiClient {
               final response = await _dio!.fetch(opts);
               return handler.resolve(response);
             } catch (_) {
+              await AuthSession.instance.clear();
               return handler.next(error);
             }
           }

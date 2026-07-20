@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../data/nav_assets.dart';
 import '../../models/feed_preview_item.dart';
 import '../../services/notification_service.dart';
+import '../../services/social_service.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/home_feed_tokens.dart';
 import '../../utils/profile_navigation.dart';
@@ -103,21 +104,29 @@ class _InboxMenuButton extends StatefulWidget {
 
 class _InboxMenuButtonState extends State<_InboxMenuButton> {
   int _unreadCount = 0;
+  int _followRequestCount = 0;
 
   @override
   void initState() {
     super.initState();
-    _refreshUnreadCount();
+    _refreshCounts();
   }
 
-  Future<void> _refreshUnreadCount() async {
-    try {
-      final count = await NotificationService.instance.getUnreadCount();
-      if (!mounted) return;
-      setState(() => _unreadCount = count);
-    } catch (_) {
-      // Keep the last known count if the request fails.
-    }
+  Future<void> _refreshCounts() async {
+    final results = await Future.wait<int>([
+      NotificationService.instance
+          .getUnreadCount()
+          .catchError((_) => _unreadCount),
+      SocialService.instance
+          .listFollowRequests()
+          .then((requests) => requests.length)
+          .catchError((_) => _followRequestCount),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _unreadCount = results[0];
+      _followRequestCount = results[1];
+    });
   }
 
   Future<void> _openMenu(BuildContext context) async {
@@ -145,19 +154,27 @@ class _InboxMenuButtonState extends State<_InboxMenuButton> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppDims.radiusMd),
       ),
-      items: const [
-        PopupMenuItem(
+      items: [
+        const PopupMenuItem(
           value: '/notifications',
           child: _InboxMenuRow(
             icon: Icons.notifications_none_rounded,
             label: 'Notifications',
           ),
         ),
-        PopupMenuItem(
+        const PopupMenuItem(
           value: '/chat',
           child: _InboxMenuRow(
             icon: Icons.chat_bubble_outline_rounded,
             label: 'Chats',
+          ),
+        ),
+        PopupMenuItem(
+          value: '/follow-requests',
+          child: _InboxMenuRow(
+            icon: Icons.person_add_alt_outlined,
+            label: 'Follow requests',
+            count: _followRequestCount,
           ),
         ),
       ],
@@ -165,9 +182,11 @@ class _InboxMenuButtonState extends State<_InboxMenuButton> {
 
     if (selection != null && context.mounted) {
       await Navigator.pushNamed(context, selection);
-      _refreshUnreadCount();
+      _refreshCounts();
     }
   }
+
+  int get _badgeCount => _unreadCount + _followRequestCount;
 
   @override
   Widget build(BuildContext context) {
@@ -180,12 +199,12 @@ class _InboxMenuButtonState extends State<_InboxMenuButton> {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              SvgPicture.asset(
-                NavAssets.bellIcon,
-                width: 18,
-                height: 18,
+              Icon(
+                Icons.inbox_outlined,
+                size: 20,
+                color: HomeFeedTokens.textPrimary,
               ),
-              if (_unreadCount > 0)
+              if (_badgeCount > 0)
                 Positioned(
                   top: -2,
                   right: -2,
@@ -198,7 +217,7 @@ class _InboxMenuButtonState extends State<_InboxMenuButton> {
                     ),
                     alignment: Alignment.center,
                     child: Text(
-                      _unreadCount > 9 ? '9+' : '$_unreadCount',
+                      _badgeCount > 9 ? '9+' : '$_badgeCount',
                       style: GoogleFonts.inter(
                         fontSize: 9,
                         fontWeight: FontWeight.w600,
@@ -216,10 +235,11 @@ class _InboxMenuButtonState extends State<_InboxMenuButton> {
 }
 
 class _InboxMenuRow extends StatelessWidget {
-  const _InboxMenuRow({required this.icon, required this.label});
+  const _InboxMenuRow({required this.icon, required this.label, this.count = 0});
 
   final IconData icon;
   final String label;
+  final int count;
 
   @override
   Widget build(BuildContext context) {
@@ -227,14 +247,34 @@ class _InboxMenuRow extends StatelessWidget {
       children: [
         Icon(icon, size: 18, color: HomeFeedTokens.textPrimary),
         const SizedBox(width: 12),
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: HomeFeedTokens.textPrimary,
+        Expanded(
+          child: Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: HomeFeedTokens.textPrimary,
+            ),
           ),
         ),
+        if (count > 0) ...[
+          const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(
+              color: HomeFeedTokens.textPrimary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              '$count',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: HomeFeedTokens.textPrimary,
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
