@@ -14,13 +14,31 @@ class InquiryService {
 
   final _api = ApiClient.instance;
 
-  Future<InquiryInboxPage> getInbox({String? cursor, int? limit}) async {
+  Future<InquiryInboxPage> getInbox({String? cursor, int? limit}) {
+    return _getInquiryPage('/api/inquiries', cursor: cursor, limit: limit);
+  }
+
+  /// Pending message requests (seller-side) — same shape/pagination as
+  /// [getInbox], routed to a different endpoint.
+  Future<InquiryInboxPage> listRequests({String? cursor, int? limit}) {
+    return _getInquiryPage(
+      '/api/inquiries/requests',
+      cursor: cursor,
+      limit: limit,
+    );
+  }
+
+  Future<InquiryInboxPage> _getInquiryPage(
+    String path, {
+    String? cursor,
+    int? limit,
+  }) async {
     final query = <String, String>{};
     if (cursor != null && cursor.isNotEmpty) query['cursor'] = cursor;
     if (limit != null) query['limit'] = limit.toString();
 
     final json = await _api.get(
-      '/api/inquiries',
+      path,
       query: query.isEmpty ? null : query,
       auth: true,
     );
@@ -32,6 +50,14 @@ class InquiryService {
     final nextCursor =
         data is Map<String, dynamic> ? data['nextCursor'] as String? : null;
     return InquiryInboxPage(items: items, nextCursor: nextCursor);
+  }
+
+  Future<void> acceptRequest(String id) async {
+    await _api.post('/api/inquiries/$id/accept', auth: true);
+  }
+
+  Future<void> declineRequest(String id) async {
+    await _api.post('/api/inquiries/$id/decline', auth: true);
   }
 
   Future<InquiryCreateResult> createInquiry(String pieceId, String message) async {

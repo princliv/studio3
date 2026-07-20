@@ -10,10 +10,10 @@ Postman-ready API documentation for the **Studiothree Discover** backend. Use th
 |------|------|-------------|
 | Setup | [setup.md](./setup.md) | Postman environment, tokens, cookies, response format |
 | Auth | [flows/auth.md](./flows/auth.md) | OTP, register, login, refresh, logout, password reset |
-| User & profile | [flows/user-profile.md](./flows/user-profile.md) | Me, public profile, onboarding, seller mode, saved content |
+| User & profile | [flows/user-profile.md](./flows/user-profile.md) | Me, password/email change, public profile, onboarding, seller mode, privacy settings, saved content |
 | Media | [flows/media.md](./flows/media.md) | Presigned uploads |
 | Pieces & scenes | [flows/pieces-scenes.md](./flows/pieces-scenes.md) | Create, edit, detail, profile tabs |
-| Social | [flows/social.md](./flows/social.md) | Follow, like, save, comments |
+| Social | [flows/social.md](./flows/social.md) | Follow (+ requests for private accounts), block, like, save, comments |
 | Feeds | [flows/feeds.md](./flows/feeds.md) | Following, explore, for-you |
 | Series | [flows/series.md](./flows/series.md) | Piece grouping for profile Series tab |
 | Notifications | [flows/notifications.md](./flows/notifications.md) | Activity feed + push delivery |

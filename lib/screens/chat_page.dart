@@ -6,8 +6,11 @@ import '../services/auth_session.dart';
 import '../services/inquiry_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/home_feed_tokens.dart';
+import '../widgets/accept_decline_buttons.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/home_feed/home_feed_widgets.dart';
+
+enum _InboxTab { all, requests }
 
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key});
@@ -17,11 +20,22 @@ class ChatPage extends StatefulWidget {
 }
 
 class _ChatPageState extends State<ChatPage> {
+  _InboxTab _activeTab = _InboxTab.all;
+
   final List<InquirySummary> _inquiries = [];
   bool _loading = true;
   bool _loadingMore = false;
   String? _nextCursor;
+
+  final List<InquirySummary> _requests = [];
+  bool _requestsLoading = true;
+  bool _requestsLoaded = false;
+  bool _requestsLoadingMore = false;
+  String? _requestsNextCursor;
+  final Set<String> _requestBusy = {};
+
   String? _selectedId;
+  bool _selectedIsRequest = false;
   InquiryThread? _thread;
   bool _threadLoading = false;
   bool _sending = false;
@@ -79,19 +93,70 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
-  void _onScroll() {
-    if (_loadingMore) return;
-    if (_nextCursor == null || _nextCursor!.isEmpty) return;
-    if (!_scrollController.hasClients) return;
-    final pos = _scrollController.position;
-    if (pos.pixels >= pos.maxScrollExtent - 200) {
-      _load(append: true);
+  Future<void> _loadRequests({bool append = false}) async {
+    if (append && (_requestsNextCursor == null || _requestsNextCursor!.isEmpty)) {
+      return;
+    }
+    setState(() {
+      if (append) {
+        _requestsLoadingMore = true;
+      } else {
+        _requestsLoading = true;
+      }
+    });
+    try {
+      final page = await InquiryService.instance.listRequests(
+        cursor: append ? _requestsNextCursor : null,
+      );
+      if (!mounted) return;
+      setState(() {
+        if (append) {
+          _requests.addAll(page.items);
+        } else {
+          _requests
+            ..clear()
+            ..addAll(page.items);
+        }
+        _requestsNextCursor = page.nextCursor;
+        _requestsLoading = false;
+        _requestsLoadingMore = false;
+        _requestsLoaded = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        if (!append) _requests.clear();
+        _requestsLoading = false;
+        _requestsLoadingMore = false;
+        _requestsLoaded = true;
+      });
     }
   }
 
-  Future<void> _openThread(InquirySummary inquiry) async {
+  void _onTabChanged(_InboxTab tab) {
+    setState(() => _activeTab = tab);
+    if (tab == _InboxTab.requests && !_requestsLoaded) _loadRequests();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final pos = _scrollController.position;
+    if (pos.pixels < pos.maxScrollExtent - 200) return;
+    if (_activeTab == _InboxTab.all) {
+      if (_loadingMore) return;
+      if (_nextCursor == null || _nextCursor!.isEmpty) return;
+      _load(append: true);
+    } else {
+      if (_requestsLoadingMore) return;
+      if (_requestsNextCursor == null || _requestsNextCursor!.isEmpty) return;
+      _loadRequests(append: true);
+    }
+  }
+
+  Future<void> _openThread(InquirySummary inquiry, {required bool isRequest}) async {
     setState(() {
       _selectedId = inquiry.id;
+      _selectedIsRequest = isRequest;
       _thread = null;
       _threadLoading = true;
     });
@@ -101,21 +166,11 @@ class _ChatPageState extends State<ChatPage> {
       setState(() {
         _thread = thread;
         _threadLoading = false;
-        final index = _inquiries.indexWhere((i) => i.id == inquiry.id);
-        if (index != -1 && _inquiries[index].unread) {
-          _inquiries[index] = InquirySummary(
-            id: inquiry.id,
-            pieceId: inquiry.pieceId,
-            pieceTitle: inquiry.pieceTitle,
-            pieceThumbnailUrl: inquiry.pieceThumbnailUrl,
-            otherPartyUsername: inquiry.otherPartyUsername,
-            otherPartyName: inquiry.otherPartyName,
-            otherPartyAvatarUrl: inquiry.otherPartyAvatarUrl,
-            preview: inquiry.preview,
-            updatedAt: inquiry.updatedAt,
-            unread: false,
-            status: inquiry.status,
-          );
+        if (!isRequest) {
+          final index = _inquiries.indexWhere((i) => i.id == inquiry.id);
+          if (index != -1 && _inquiries[index].unread) {
+            _inquiries[index] = _inquiries[index].copyWith(unread: false);
+          }
         }
       });
     } catch (_) {
@@ -154,19 +209,69 @@ class _ChatPageState extends State<ChatPage> {
             otherPartyUsername: thread.otherPartyUsername,
             otherPartyName: thread.otherPartyName,
             otherPartyAvatarUrl: thread.otherPartyAvatarUrl,
-            status: thread.status,
+            status: 'open',
             messages: [...thread.messages, message],
           );
         }
         _replyController.clear();
         _sending = false;
       });
+      // Replying to a pending request implicitly accepts it — move it over.
+      if (_selectedIsRequest) _moveRequestToAll(id);
     } catch (e) {
       if (!mounted) return;
       setState(() => _sending = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to send reply: $e')),
       );
+    }
+  }
+
+  void _moveRequestToAll(String id) {
+    final index = _requests.indexWhere((r) => r.id == id);
+    if (index == -1) return;
+    final moved = _requests[index].copyWith(status: 'open');
+    setState(() {
+      _requests.removeAt(index);
+      _inquiries.insert(0, moved);
+      _selectedIsRequest = false;
+    });
+  }
+
+  Future<void> _acceptRequest(InquirySummary request) async {
+    setState(() => _requestBusy.add(request.id));
+    try {
+      await InquiryService.instance.acceptRequest(request.id);
+      if (!mounted) return;
+      _moveRequestToAll(request.id);
+      if (_selectedId == request.id) _closeThread();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to accept: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _requestBusy.remove(request.id));
+    }
+  }
+
+  Future<void> _declineRequest(InquirySummary request) async {
+    setState(() => _requestBusy.add(request.id));
+    try {
+      await InquiryService.instance.declineRequest(request.id);
+    } catch (_) {
+      // Treat as handled either way.
+    } finally {
+      if (mounted) {
+        setState(() {
+          _requests.removeWhere((r) => r.id == request.id);
+          _requestBusy.remove(request.id);
+          if (_selectedId == request.id) {
+            _selectedId = null;
+            _thread = null;
+          }
+        });
+      }
     }
   }
 
@@ -179,7 +284,7 @@ class _ChatPageState extends State<ChatPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
               child: Text(
                 'Inquiries',
                 style: GoogleFonts.inter(
@@ -189,7 +294,30 @@ class _ChatPageState extends State<ChatPage> {
                 ),
               ),
             ),
-            Expanded(child: _buildBody()),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  FeedFilterTab(
+                    label: 'All',
+                    active: _activeTab == _InboxTab.all,
+                    onTap: () => _onTabChanged(_InboxTab.all),
+                  ),
+                  const SizedBox(width: 24),
+                  FeedFilterTab(
+                    label: _requests.isEmpty
+                        ? 'Requests'
+                        : 'Requests (${_requests.length})',
+                    active: _activeTab == _InboxTab.requests,
+                    onTap: () => _onTabChanged(_InboxTab.requests),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: _activeTab == _InboxTab.all ? _buildAllBody() : _buildRequestsBody(),
+            ),
           ],
         ),
       ),
@@ -198,19 +326,30 @@ class _ChatPageState extends State<ChatPage> {
               thread: _thread,
               loading: _threadLoading,
               sending: _sending,
+              isRequest: _selectedIsRequest,
+              busy: _selectedId != null && _requestBusy.contains(_selectedId),
               replyController: _replyController,
               onClose: _closeThread,
               onSend: _sendReply,
+              onAccept: _selectedIsRequest && _thread != null
+                  ? () => _acceptRequest(
+                      _requests.firstWhere((r) => r.id == _selectedId,
+                          orElse: () => _requests.first))
+                  : null,
+              onDecline: _selectedIsRequest && _thread != null
+                  ? () => _declineRequest(
+                      _requests.firstWhere((r) => r.id == _selectedId,
+                          orElse: () => _requests.first))
+                  : null,
             )
           : null,
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildAllBody() {
     if (_loading) {
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     }
-
     if (_inquiries.isEmpty) {
       return Center(
         child: Column(
@@ -252,7 +391,7 @@ class _ChatPageState extends State<ChatPage> {
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                onTap: () => _openThread(inq),
+                onTap: () => _openThread(inq, isRequest: false),
                 borderRadius: BorderRadius.circular(AppDims.radiusMd),
                 child: GlassCard(
                   padding: const EdgeInsets.all(12),
@@ -304,6 +443,98 @@ class _ChatPageState extends State<ChatPage> {
       ),
     );
   }
+
+  Widget _buildRequestsBody() {
+    if (_requestsLoading) {
+      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+    }
+    if (_requests.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.mark_email_unread_outlined, size: 48, color: AppColors.slate200),
+            const SizedBox(height: AppDims.spaceMd),
+            Text(
+              'No message requests',
+              style: GoogleFonts.inter(fontSize: 14, color: AppColors.slate500),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadRequests,
+      child: ListView.builder(
+        controller: _scrollController,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: _requests.length + (_requestsLoadingMore ? 1 : 0),
+        itemBuilder: (context, i) {
+          if (i >= _requests.length) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            );
+          }
+          final inq = _requests[i];
+          final busy = _requestBusy.contains(inq.id);
+          return Padding(
+            padding: const EdgeInsets.only(bottom: AppDims.spaceSm),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => _openThread(inq, isRequest: true),
+                borderRadius: BorderRadius.circular(AppDims.radiusMd),
+                child: GlassCard(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      UserAvatar(
+                        url: inq.otherPartyAvatarUrl,
+                        name: inq.otherPartyDisplayName,
+                        size: 48,
+                      ),
+                      const SizedBox(width: AppDims.spaceSm + 4),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              inq.displayTitle,
+                              style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.slate900),
+                            ),
+                            Text(
+                              '${inq.otherPartyDisplayName} — ${inq.preview ?? 'No messages yet'}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(fontSize: 13, color: AppColors.slate500),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      AcceptDeclineButtons(
+                        busy: busy,
+                        onAccept: () => _acceptRequest(inq),
+                        onDecline: () => _declineRequest(inq),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 }
 
 String _timeAgo(DateTime dt) {
@@ -320,21 +551,30 @@ class _InquiryBottomSheet extends StatelessWidget {
     required this.thread,
     required this.loading,
     required this.sending,
+    required this.isRequest,
+    required this.busy,
     required this.replyController,
     required this.onClose,
     required this.onSend,
+    this.onAccept,
+    this.onDecline,
   });
 
   final InquiryThread? thread;
   final bool loading;
   final bool sending;
+  final bool isRequest;
+  final bool busy;
   final TextEditingController replyController;
   final VoidCallback onClose;
   final VoidCallback onSend;
+  final VoidCallback? onAccept;
+  final VoidCallback? onDecline;
 
   @override
   Widget build(BuildContext context) {
     final myUsername = AuthSession.instance.user?.username;
+    final showPendingActions = isRequest && thread?.status == 'pending';
 
     return Container(
       constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.75),
@@ -403,32 +643,42 @@ class _InquiryBottomSheet extends StatelessWidget {
               ),
             ),
           const SizedBox(height: AppDims.spaceMd),
-          TextField(
-            controller: replyController,
-            maxLines: 3,
-            style: GoogleFonts.inter(fontSize: 14, color: AppColors.slate900),
-            decoration: InputDecoration(
-              hintText: 'Reply...',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppDims.radiusMd)),
+          if (showPendingActions)
+            Center(
+              child: AcceptDeclineButtons(
+                busy: busy,
+                onAccept: onAccept ?? () {},
+                onDecline: onDecline ?? () {},
+              ),
+            )
+          else ...[
+            TextField(
+              controller: replyController,
+              maxLines: 3,
+              style: GoogleFonts.inter(fontSize: 14, color: AppColors.slate900),
+              decoration: InputDecoration(
+                hintText: 'Reply...',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppDims.radiusMd)),
+              ),
             ),
-          ),
-          const SizedBox(height: AppDims.spaceSm + 4),
-          FilledButton(
-            onPressed: sending ? null : onSend,
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.slate900,
-              minimumSize: const Size.fromHeight(AppDims.primaryButtonHeight),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9999)),
-              textStyle: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600),
+            const SizedBox(height: AppDims.spaceSm + 4),
+            FilledButton(
+              onPressed: sending ? null : onSend,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.slate900,
+                minimumSize: const Size.fromHeight(AppDims.primaryButtonHeight),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9999)),
+                textStyle: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600),
+              ),
+              child: sending
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Send Reply'),
             ),
-            child: sending
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                  )
-                : const Text('Send Reply'),
-          ),
+          ],
         ],
       ),
     );

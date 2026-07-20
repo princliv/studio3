@@ -8,6 +8,7 @@ import '../models/user_profile.dart';
 import '../services/user_service.dart';
 import '../theme/home_feed_tokens.dart';
 import '../utils/profile_navigation.dart';
+import '../widgets/settings_tile.dart';
 import '../widgets/studio_loading.dart';
 import 'profile/widgets/profile_seller_insights.dart';
 import 'seller_analytics_page.dart';
@@ -111,191 +112,151 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
         body: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            _SellerToggleTile(
-              enabled: _sellerEnabled,
+            const _SectionHeader('Seller'),
+            SettingsToggleTile(
+              icon: Icons.storefront_outlined,
+              label: 'Seller account',
+              value: _sellerEnabled,
               onChanged: _onSellerToggle,
             ),
-          if (_sellerEnabled) ...[
-            _SettingsTile(
-              icon: Icons.bar_chart_rounded,
-              label: 'Seller analytics',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute<void>(
-                    builder: (_) => SellerAnalyticsPage(
-                      savesCount: _analytics?.savesCount,
-                      likesCount: _analytics?.likesCount,
-                      inquiriesCount: _analytics?.inquiriesCount,
-                      salesCount: _analytics?.salesCount,
+            if (_sellerEnabled) ...[
+              SettingsTile(
+                icon: Icons.bar_chart_rounded,
+                label: 'Seller analytics',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => SellerAnalyticsPage(
+                        savesCount: _analytics?.savesCount,
+                        likesCount: _analytics?.likesCount,
+                        inquiriesCount: _analytics?.inquiriesCount,
+                        salesCount: _analytics?.salesCount,
+                      ),
                     ),
-                  ),
-                );
+                  );
+                },
+              ),
+              SettingsTile(
+                icon: Icons.point_of_sale_outlined,
+                label: 'My sales',
+                onTap: () => Navigator.pushNamed(context, '/sales'),
+              ),
+            ],
+            SettingsTile(
+              icon: Icons.receipt_long_outlined,
+              label: 'My orders',
+              onTap: () => Navigator.pushNamed(context, '/orders'),
+            ),
+
+            const _SectionHeader('Account'),
+            SettingsTile(
+              icon: Icons.person_outline_rounded,
+              label: 'Edit profile',
+              onTap: () => Navigator.pushNamed(context, '/edit-profile'),
+            ),
+            SettingsTile(
+              icon: Icons.collections_bookmark_outlined,
+              label: 'Manage series',
+              onTap: () async {
+                await Navigator.pushNamed(context, '/manage-series');
+                if (!context.mounted) return;
+                // Parent profile reloads when settings is popped; no extra action here.
               },
             ),
-            _SettingsTile(
-              icon: Icons.point_of_sale_outlined,
-              label: 'My sales',
-              onTap: () => Navigator.pushNamed(context, '/sales'),
+            SettingsTile(
+              icon: Icons.local_shipping_outlined,
+              label: 'Shipping addresses',
+              onTap: () => Navigator.pushNamed(context, '/addresses'),
+            ),
+            SettingsTile(
+              icon: Icons.visibility_outlined,
+              label: 'See profile as viewer',
+              onTap: () => openOwnProfileAsViewer(context),
+            ),
+
+            const _SectionHeader('Privacy'),
+            SettingsTile(
+              icon: Icons.person_add_alt_outlined,
+              label: 'Follow requests',
+              onTap: () => Navigator.pushNamed(context, '/follow-requests'),
+            ),
+            SettingsTile(
+              icon: Icons.block_outlined,
+              label: 'Blocked accounts',
+              onTap: () => Navigator.pushNamed(context, '/blocked-users'),
+            ),
+
+            const _SectionHeader('Login & security'),
+            SettingsTile(
+              icon: Icons.lock_outline_rounded,
+              label: 'Password & security',
+              onTap: () => Navigator.pushNamed(context, '/change-password'),
+            ),
+            SettingsTile(
+              icon: Icons.email_outlined,
+              label: 'Change email',
+              onTap: () => Navigator.pushNamed(context, '/change-email'),
+            ),
+            SettingsTile(
+              icon: Icons.devices_other_outlined,
+              label: 'Log out of all devices',
+              onTap: () async {
+                await DeviceService.instance.unregisterCurrentDevice();
+                await AuthService.instance.logoutAllDevices();
+                if (!context.mounted) return;
+                Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
+              },
+            ),
+
+            const _SectionHeader('Notifications'),
+            SettingsTile(
+              icon: Icons.notifications_outlined,
+              label: 'Notifications',
+              onTap: () => Navigator.pushNamed(context, '/notifications'),
+            ),
+            SettingsTile(
+              icon: Icons.tune_rounded,
+              label: 'Notification preferences',
+              onTap: () => Navigator.pushNamed(context, '/notification-preferences'),
+            ),
+
+            const SizedBox(height: 16),
+            SettingsTile(
+              icon: Icons.logout_rounded,
+              label: 'Log out',
+              destructive: true,
+              onTap: () async {
+                await DeviceService.instance.unregisterCurrentDevice();
+                await AuthService.instance.logout();
+                if (!context.mounted) return;
+                Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
+              },
             ),
           ],
-          _SettingsTile(
-            icon: Icons.receipt_long_outlined,
-            label: 'My orders',
-            onTap: () => Navigator.pushNamed(context, '/orders'),
-          ),
-          const SizedBox(height: 8),
-          _SettingsTile(
-            icon: Icons.collections_bookmark_outlined,
-            label: 'Manage series',
-            onTap: () async {
-              await Navigator.pushNamed(context, '/manage-series');
-              if (!context.mounted) return;
-              // Parent profile reloads when settings is popped; no extra action here.
-            },
-          ),
-          _SettingsTile(
-            icon: Icons.person_outline_rounded,
-            label: 'Edit profile',
-            onTap: () => Navigator.pushNamed(context, '/edit-profile'),
-          ),
-          _SettingsTile(
-            icon: Icons.local_shipping_outlined,
-            label: 'Shipping addresses',
-            onTap: () => Navigator.pushNamed(context, '/addresses'),
-          ),
-          _SettingsTile(
-            icon: Icons.visibility_outlined,
-            label: 'See profile as viewer',
-            onTap: () => openOwnProfileAsViewer(context),
-          ),
-          _SettingsTile(
-            icon: Icons.lock_outline_rounded,
-            label: 'Password & security',
-            onTap: () => Navigator.pushNamed(context, '/forgot-password'),
-          ),
-          _SettingsTile(
-            icon: Icons.devices_other_outlined,
-            label: 'Log out of all devices',
-            onTap: () async {
-              await DeviceService.instance.unregisterCurrentDevice();
-              await AuthService.instance.logoutAllDevices();
-              if (!context.mounted) return;
-              Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
-            },
-          ),
-          _SettingsTile(
-            icon: Icons.notifications_outlined,
-            label: 'Notifications',
-            onTap: () => Navigator.pushNamed(context, '/notifications'),
-          ),
-          const SizedBox(height: 16),
-          _SettingsTile(
-            icon: Icons.logout_rounded,
-            label: 'Log out',
-            destructive: true,
-            onTap: () async {
-              await DeviceService.instance.unregisterCurrentDevice();
-              await AuthService.instance.logout();
-              if (!context.mounted) return;
-              Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
-            },
-          ),
-        ],
         ),
       ),
     );
   }
 }
 
-class _SellerToggleTile extends StatelessWidget {
-  const _SellerToggleTile({
-    required this.enabled,
-    required this.onChanged,
-  });
+/// Instagram-style bold section label grouping related settings rows.
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader(this.label);
 
-  final bool enabled;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: HomeFeedTokens.textPrimary.withValues(alpha: 0.1),
-          ),
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.storefront_outlined,
-              size: 22, color: HomeFeedTokens.textPrimary.withValues(alpha: 0.75)),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              'Seller account',
-              style: GoogleFonts.inter(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: HomeFeedTokens.textPrimary,
-              ),
-            ),
-          ),
-          Switch.adaptive(
-            value: enabled,
-            onChanged: onChanged,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SettingsTile extends StatelessWidget {
-  const _SettingsTile({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.destructive = false,
-  });
-
-  final IconData icon;
   final String label;
-  final VoidCallback onTap;
-  final bool destructive;
 
   @override
   Widget build(BuildContext context) {
-    final color =
-        destructive ? const Color(0xFFE05252) : HomeFeedTokens.textPrimary;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
-          child: Row(
-            children: [
-              Icon(icon,
-                  size: 22, color: color.withValues(alpha: destructive ? 1 : 0.75)),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  label,
-                  style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: color,
-                  ),
-                ),
-              ),
-              Icon(Icons.chevron_right_rounded,
-                  color: color.withValues(alpha: 0.35)),
-            ],
-          ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
+      child: Text(
+        label,
+        style: GoogleFonts.inter(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.3,
+          color: HomeFeedTokens.textPrimary.withValues(alpha: 0.45),
         ),
       ),
     );

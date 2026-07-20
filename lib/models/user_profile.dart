@@ -8,6 +8,7 @@ class UserProfile {
     this.phone,
     this.bio,
     this.location,
+    this.pronouns,
     this.latitude,
     this.longitude,
     this.profilePhotoUrl,
@@ -22,8 +23,17 @@ class UserProfile {
     this.collectedCount = 0,
     this.savesCount = 0,
     this.isFollowing = false,
+    this.followRequestPending = false,
     this.tastePreferences,
     this.savedPieces = const [],
+    this.banner,
+    this.bannerTargetType,
+    this.bannerTargetId,
+    this.bannerAutoRule = 'none',
+    this.messagePermission = 'everyone',
+    this.profileVisibility = 'public',
+    this.notificationPreferences,
+    this.isLocked = false,
   });
 
   final String username;
@@ -32,6 +42,7 @@ class UserProfile {
   final String? phone;
   final String? bio;
   final String? location;
+  final String? pronouns;
   final double? latitude;
   final double? longitude;
   final String? profilePhotoUrl;
@@ -46,10 +57,34 @@ class UserProfile {
   final int collectedCount;
   final int savesCount;
   final bool isFollowing;
+  final bool followRequestPending;
   final Map<String, dynamic>? tastePreferences;
   final List<PieceSummary> savedPieces;
+  final ProfileBanner? banner;
+  final String? bannerTargetType;
+  final String? bannerTargetId;
+  final String bannerAutoRule;
+  final String messagePermission;
+  final String profileVisibility;
+  final NotificationPreferences? notificationPreferences;
+
+  /// True when this came from the header-only "locked" response returned
+  /// for a private profile the viewer can't yet see (see `isLocked` check
+  /// in `fromJson`) — pieces/posts/series tabs must not be fetched.
+  final bool isLocked;
+
+  bool get isPrivate => profileVisibility == 'private';
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
+    // The backend returns a header-only subset for a private profile the
+    // viewer can't see yet (no counts, no bio) — detect it by the absence
+    // of any count field alongside a present profileVisibility, rather than
+    // trusting a single flag the backend doesn't explicitly send.
+    final isLocked = json['profileVisibility'] != null &&
+        json['followersCount'] == null &&
+        json['followers'] == null &&
+        json['piecesCount'] == null &&
+        json['pieces'] == null;
     return UserProfile(
       username: json['username'] as String? ?? '',
       name: json['name'] as String? ?? '',
@@ -57,6 +92,7 @@ class UserProfile {
       phone: json['phone'] as String?,
       bio: json['bio'] as String?,
       location: json['location'] as String?,
+      pronouns: json['pronouns'] as String?,
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
       profilePhotoUrl: json['profilePhotoUrl'] as String?,
@@ -73,8 +109,63 @@ class UserProfile {
       collectedCount: _intFrom(json['collectedCount'] ?? json['collected']),
       savesCount: _intFrom(json['savesCount'] ?? json['saves']),
       isFollowing: json['isFollowing'] as bool? ?? false,
+      followRequestPending: json['followRequestPending'] as bool? ?? false,
       tastePreferences: json['tastePreferences'] as Map<String, dynamic>?,
       savedPieces: _parseSavedPieces(json),
+      banner: json['banner'] is Map<String, dynamic>
+          ? ProfileBanner.fromJson(json['banner'] as Map<String, dynamic>)
+          : null,
+      bannerTargetType: json['bannerTargetType'] as String?,
+      bannerTargetId: json['bannerTargetId'] as String?,
+      bannerAutoRule: json['bannerAutoRule'] as String? ?? 'none',
+      messagePermission: json['messagePermission'] as String? ?? 'everyone',
+      profileVisibility: json['profileVisibility'] as String? ?? 'public',
+      notificationPreferences: json['notificationPreferences'] is Map<String, dynamic>
+          ? NotificationPreferences.fromJson(
+              json['notificationPreferences'] as Map<String, dynamic>)
+          : null,
+      isLocked: isLocked,
+    );
+  }
+
+  UserProfile copyWith({
+    bool? isFollowing,
+    bool? followRequestPending,
+    int? followersCount,
+  }) {
+    return UserProfile(
+      username: username,
+      name: name,
+      email: email,
+      phone: phone,
+      bio: bio,
+      location: location,
+      pronouns: pronouns,
+      latitude: latitude,
+      longitude: longitude,
+      profilePhotoUrl: profilePhotoUrl,
+      coverPhotoUrl: coverPhotoUrl,
+      role: role,
+      onboardingComplete: onboardingComplete,
+      sellerEnabled: sellerEnabled,
+      canChangeUsername: canChangeUsername,
+      followingCount: followingCount,
+      followersCount: followersCount ?? this.followersCount,
+      piecesCount: piecesCount,
+      collectedCount: collectedCount,
+      savesCount: savesCount,
+      isFollowing: isFollowing ?? this.isFollowing,
+      followRequestPending: followRequestPending ?? this.followRequestPending,
+      tastePreferences: tastePreferences,
+      savedPieces: savedPieces,
+      banner: banner,
+      bannerTargetType: bannerTargetType,
+      bannerTargetId: bannerTargetId,
+      bannerAutoRule: bannerAutoRule,
+      messagePermission: messagePermission,
+      profileVisibility: profileVisibility,
+      notificationPreferences: notificationPreferences,
+      isLocked: isLocked,
     );
   }
 
@@ -105,6 +196,80 @@ class UserProfile {
 
   String get followingFollowers =>
       '$followingCount following · $followersCount followers';
+}
+
+/// Resolved profile "magnum opus" banner — either a manually-pinned piece/post
+/// or one computed by the backend per `bannerAutoRule`.
+class ProfileBanner {
+  const ProfileBanner({this.targetType, this.targetId, this.mediaUrl});
+
+  final String? targetType;
+  final String? targetId;
+  final String? mediaUrl;
+
+  factory ProfileBanner.fromJson(Map<String, dynamic> json) {
+    return ProfileBanner(
+      targetType: json['targetType'] as String?,
+      targetId: json['targetId'] as String?,
+      mediaUrl: json['mediaUrl'] as String?,
+    );
+  }
+}
+
+/// `notificationPreferences` blob from `GET /api/user/me` /
+/// `PATCH /api/user/me/notification-preferences`.
+class NotificationPreferences {
+  const NotificationPreferences({
+    this.push = const {
+      'follow': true,
+      'like': true,
+      'save': true,
+      'comment': true,
+      'inquiry': true,
+      'purchase': true,
+    },
+    this.dailyDigestEnabled = false,
+    this.dailyDigestTime = '09:00',
+  });
+
+  final Map<String, bool> push;
+  final bool dailyDigestEnabled;
+  final String dailyDigestTime;
+
+  static const _defaultPush = {
+    'follow': true,
+    'like': true,
+    'save': true,
+    'comment': true,
+    'inquiry': true,
+    'purchase': true,
+  };
+
+  factory NotificationPreferences.fromJson(Map<String, dynamic> json) {
+    final pushJson = json['push'] as Map<String, dynamic>?;
+    final digestJson = json['dailyDigest'] as Map<String, dynamic>?;
+    return NotificationPreferences(
+      push: {
+        ..._defaultPush,
+        if (pushJson != null)
+          ...pushJson.map((key, value) => MapEntry(key, value as bool? ?? true)),
+      },
+      dailyDigestEnabled: digestJson?['enabled'] as bool? ?? false,
+      dailyDigestTime: digestJson?['time'] as String? ?? '09:00',
+    );
+  }
+
+  NotificationPreferences copyWith({
+    Map<String, bool>? push,
+    bool? dailyDigestEnabled,
+    String? dailyDigestTime,
+  }) {
+    return NotificationPreferences(
+      push: push ?? this.push,
+      dailyDigestEnabled: dailyDigestEnabled ?? this.dailyDigestEnabled,
+      dailyDigestTime: dailyDigestTime ?? this.dailyDigestTime,
+    );
+  }
 }
 
 class SellerStatus {

@@ -16,6 +16,7 @@ import '../widgets/profile_cover_image.dart';
 import 'profile/models/profile_series_data.dart';
 import 'profile/profile_constants.dart';
 import 'profile/widgets/profile_header.dart';
+import 'profile/widgets/profile_locked_placeholder.dart';
 import 'profile/widgets/profile_tab_content.dart';
 import 'profile/widgets/profile_tabs.dart';
 import 'profile/widgets/profile_viewer_mode_capsule.dart';
@@ -48,6 +49,7 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _listedPiecesLoaded = false;
   bool _seriesLoaded = false;
   String _collectSegment = 'available';
+  bool _followBusy = false;
 
   bool get _isTabContext => widget.username == null;
 
@@ -118,7 +120,10 @@ class _ProfilePageState extends State<ProfilePage> {
         _lastKnownSeller = profile.sellerEnabled;
         if (!profile.sellerEnabled && _tab == 'collect') _tab = 'pieces';
       });
-      if (!silent) _loadActiveTab();
+      // Locked (private, not-yet-approved) profiles never fetch tab content
+      // — the backend gates those endpoints the same way, so there's
+      // nothing to show and no point firing the requests.
+      if (!silent && !profile.isLocked) _loadActiveTab();
     } catch (_) {
       // Keep session-backed shell visible when profile cannot be loaded.
     }
@@ -127,7 +132,9 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _loadProfile() async {
     _resetTabCache();
     await _loadProfileShell();
-    await _loadActiveTab(force: true);
+    if (_profile?.isLocked != true) {
+      await _loadActiveTab(force: true);
+    }
   }
 
   Future<void> _loadActiveTab({bool force = false}) async {
@@ -202,43 +209,50 @@ class _ProfilePageState extends State<ProfilePage> {
     setState(() => _collectSegment = segment);
   }
 
+  FollowState get _followState {
+    final profile = _profile;
+    if (profile == null) return FollowState.none;
+    if (profile.isFollowing) return FollowState.following;
+    if (profile.followRequestPending) return FollowState.pending;
+    return FollowState.none;
+  }
+
   Future<void> _toggleFollow() async {
     final profile = _profile;
-    if (profile == null) return;
-    final nextFollowing = !profile.isFollowing;
-    setState(() {
-      _profile = UserProfile(
-        username: profile.username,
-        name: profile.name,
-        email: profile.email,
-        bio: profile.bio,
-        location: profile.location,
-        profilePhotoUrl: profile.profilePhotoUrl,
-        coverPhotoUrl: profile.coverPhotoUrl,
-        role: profile.role,
-        onboardingComplete: profile.onboardingComplete,
-        sellerEnabled: profile.sellerEnabled,
-        canChangeUsername: profile.canChangeUsername,
-        followingCount: profile.followingCount,
-        followersCount:
-            profile.followersCount + (nextFollowing ? 1 : -1),
-        piecesCount: profile.piecesCount,
-        collectedCount: profile.collectedCount,
-        savesCount: profile.savesCount,
-        isFollowing: nextFollowing,
-        tastePreferences: profile.tastePreferences,
-        savedPieces: profile.savedPieces,
-      );
-    });
+    if (profile == null || _followBusy) return;
+    final wasFollowingOrPending = profile.isFollowing || profile.followRequestPending;
+    setState(() => _followBusy = true);
     try {
-      if (nextFollowing) {
-        await SocialService.instance.follow(profile.username);
-      } else {
+      if (wasFollowingOrPending) {
+        // Unfollow also cancels a still-pending request — same endpoint.
         await SocialService.instance.unfollow(profile.username);
+        if (!mounted) return;
+        setState(() {
+          _profile = profile.copyWith(
+            isFollowing: false,
+            followRequestPending: false,
+            followersCount:
+                profile.isFollowing ? profile.followersCount - 1 : null,
+          );
+        });
+      } else {
+        final result = await SocialService.instance.follow(profile.username);
+        if (!mounted) return;
+        setState(() {
+          _profile = profile.copyWith(
+            isFollowing: result.following,
+            followRequestPending: result.requested,
+            followersCount: result.following ? profile.followersCount + 1 : null,
+          );
+        });
       }
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
-      setState(() => _profile = profile);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Something went wrong: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _followBusy = false);
     }
   }
 
@@ -309,6 +323,73 @@ class _ProfilePageState extends State<ProfilePage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to delete scene: $e')),
+      );
+    }
+  }
+
+  void _showProfileActionsSheet(UserProfile? profile) {
+    if (profile == null) return;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: HomeFeedTokens.background,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.block_outlined, color: Color(0xFFE05252)),
+              title: Text(
+                'Block ${profile.handle}',
+                style: const TextStyle(
+                  color: Color(0xFFE05252),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _confirmBlockUser(profile);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmBlockUser(UserProfile profile) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Block ${profile.handle}?'),
+        content: const Text(
+          "They won't be notified. You can unblock anytime from Settings.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Block', style: TextStyle(color: Color(0xFFE05252))),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await SocialService.instance.blockUser(profile.username);
+      if (!mounted) return;
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to block user: $e')),
       );
     }
   }
@@ -385,6 +466,14 @@ class _ProfilePageState extends State<ProfilePage> {
                           },
                         ),
                       ),
+                    if (!isOwnProfile && !widget.viewerMode && _isPushedRoute)
+                      Positioned(
+                        top: 8,
+                        right: 12,
+                        child: _ProfileOverflowButton(
+                          onPressed: () => _showProfileActionsSheet(profile),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -403,44 +492,58 @@ class _ProfilePageState extends State<ProfilePage> {
                   salesCount: profile?.collectedCount,
                   sellerMode: sellerEnabled,
                   isOwnProfile: !showPublicActions,
-                  isFollowing: profile?.isFollowing ?? false,
-                  onFollow: showPublicActions ? _onFollowTap : null,
+                  followState: _followState,
+                  onFollow: showPublicActions && !_followBusy ? _onFollowTap : null,
                   onMessage: showPublicActions ? _onMessageTap : null,
                   onAvatarTap: () => _onAvatarTap(avatarUrl),
                 ),
               ),
-              SliverToBoxAdapter(
-                child: ProfileTabs(
-                  currentTab: _tab,
-                  showCollect: sellerEnabled,
-                  collectSegment: _collectSegment,
-                  onCollectSegmentChanged: _onCollectSegmentChanged,
-                  onTabChanged: _onTabChanged,
-                ),
-              ),
-              SliverPadding(
-                padding: EdgeInsets.fromLTRB(
-                  kProfileHorizontalPad,
-                  0,
-                  kProfileHorizontalPad,
-                  bottomPad,
-                ),
-                sliver: SliverToBoxAdapter(
-                  child: ProfileTabContent(
+              if (profile != null && profile.isLocked && !isOwnProfile)
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(
+                    kProfileHorizontalPad,
+                    0,
+                    kProfileHorizontalPad,
+                    bottomPad,
+                  ),
+                  sliver: const SliverToBoxAdapter(
+                    child: ProfileLockedPlaceholder(),
+                  ),
+                )
+              else ...[
+                SliverToBoxAdapter(
+                  child: ProfileTabs(
                     currentTab: _tab,
-                    seriesItems: _series,
-                    pieces: _pieces,
-                    scenes: _scenes,
-                    listedPieces: _listedPieces,
+                    showCollect: sellerEnabled,
                     collectSegment: _collectSegment,
-                    sellerMode: sellerEnabled,
-                    loading: _tabContentLoading,
-                    isOwnProfile: isOwnProfile && !widget.viewerMode,
-                    onDeletePiece: _deletePiece,
-                    onDeleteScene: _deleteScene,
+                    onCollectSegmentChanged: _onCollectSegmentChanged,
+                    onTabChanged: _onTabChanged,
                   ),
                 ),
-              ),
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(
+                    kProfileHorizontalPad,
+                    0,
+                    kProfileHorizontalPad,
+                    bottomPad,
+                  ),
+                  sliver: SliverToBoxAdapter(
+                    child: ProfileTabContent(
+                      currentTab: _tab,
+                      seriesItems: _series,
+                      pieces: _pieces,
+                      scenes: _scenes,
+                      listedPieces: _listedPieces,
+                      collectSegment: _collectSegment,
+                      sellerMode: sellerEnabled,
+                      loading: _tabContentLoading,
+                      isOwnProfile: isOwnProfile && !widget.viewerMode,
+                      onDeletePiece: _deletePiece,
+                      onDeleteScene: _deleteScene,
+                    ),
+                  ),
+                ),
+              ],
                 ],
               ),
             ),
@@ -476,6 +579,29 @@ class _ProfileSettingsButton extends StatelessWidget {
           width: 40,
           height: 40,
           child: Icon(Icons.menu_rounded, color: Colors.white, size: 22),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileOverflowButton extends StatelessWidget {
+  const _ProfileOverflowButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black.withValues(alpha: 0.35),
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onPressed,
+        child: const SizedBox(
+          width: 40,
+          height: 40,
+          child: Icon(Icons.more_vert_rounded, color: Colors.white, size: 22),
         ),
       ),
     );

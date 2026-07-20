@@ -1,14 +1,23 @@
 /// Result of `POST /api/inquiries`.
 class InquiryCreateResult {
-  const InquiryCreateResult({required this.id, required this.reused});
+  const InquiryCreateResult({
+    required this.id,
+    required this.reused,
+    this.status = 'open',
+  });
 
   final String id;
   final bool reused;
+
+  /// `"open"` or `"pending"` — pending means it landed in the seller's
+  /// message-requests folder instead of their main inbox.
+  final String status;
 
   factory InquiryCreateResult.fromJson(Map<String, dynamic> json) {
     return InquiryCreateResult(
       id: json['id'] as String? ?? '',
       reused: json['reused'] as bool? ?? false,
+      status: json['status'] as String? ?? 'open',
     );
   }
 }
@@ -67,6 +76,22 @@ class InquirySummary {
       (otherPartyName != null && otherPartyName!.isNotEmpty)
           ? otherPartyName!
           : 'Someone';
+
+  InquirySummary copyWith({bool? unread, String? status}) {
+    return InquirySummary(
+      id: id,
+      pieceId: pieceId,
+      pieceTitle: pieceTitle,
+      pieceThumbnailUrl: pieceThumbnailUrl,
+      otherPartyUsername: otherPartyUsername,
+      otherPartyName: otherPartyName,
+      otherPartyAvatarUrl: otherPartyAvatarUrl,
+      preview: preview,
+      updatedAt: updatedAt,
+      unread: unread ?? this.unread,
+      status: status ?? this.status,
+    );
+  }
 }
 
 /// A single message in an inquiry thread.
