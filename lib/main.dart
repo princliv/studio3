@@ -38,6 +38,7 @@ import 'screens/change_email_page.dart';
 import 'screens/notification_preferences_page.dart';
 import 'screens/follow_requests_page.dart';
 import 'screens/blocked_users_page.dart';
+import 'screens/privacy_settings_page.dart';
 import 'models/auth_user.dart';
 import 'theme/home_feed_tokens.dart';
 
@@ -100,6 +101,7 @@ class Studio3App extends StatelessWidget {
         '/change-password': (context) => const ChangePasswordPage(),
         '/change-email': (context) => const ChangeEmailPage(),
         '/notification-preferences': (context) => const NotificationPreferencesPage(),
+        '/privacy-settings': (context) => const PrivacySettingsPage(),
         '/follow-requests': (context) => const FollowRequestsPage(),
         '/blocked-users': (context) => const BlockedUsersPage(),
         '/profile': (context) {

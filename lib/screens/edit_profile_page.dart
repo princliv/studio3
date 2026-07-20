@@ -11,17 +11,11 @@ import '../services/user_service.dart';
 import '../theme/home_feed_tokens.dart';
 import '../utils/profile_photo_upload.dart';
 import '../widgets/labeled_dropdown.dart';
-import '../widgets/profile_avatar.dart';
-import '../widgets/profile_cover_image.dart';
+import '../widgets/profile_edit_header.dart';
+import '../widgets/profile_field.dart';
 import '../widgets/studio_loading.dart';
 import 'profile_banner_picker_sheet.dart';
 
-const _visibilityOptions = [('public', 'Public'), ('private', 'Private')];
-const _messagePermissionOptions = [
-  ('everyone', 'Everyone'),
-  ('following', 'People I follow'),
-  ('no_one', 'No one'),
-];
 const _bannerRuleOptions = [
   ('most_saved', 'Most saved'),
   ('most_recent', 'Most recent'),
@@ -54,8 +48,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
   Timer? _usernameDebounce;
 
   String _username = '';
-  String _profileVisibility = 'public';
-  String _messagePermission = 'everyone';
   String _bannerAutoRule = 'none';
   String? _bannerTargetType;
   String? _bannerTargetId;
@@ -95,8 +87,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
         _longitude = profile.longitude;
         _canChangeUsername = profile.canChangeUsername;
         _username = profile.username;
-        _profileVisibility = profile.profileVisibility;
-        _messagePermission = profile.messagePermission;
         _bannerAutoRule = profile.bannerAutoRule;
         _bannerTargetType = profile.bannerTargetType;
         _bannerTargetId = profile.bannerTargetId;
@@ -191,8 +181,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
         coverPhotoUrl: _coverPhotoUrl,
         latitude: _latitude,
         longitude: _longitude,
-        profileVisibility: _profileVisibility,
-        messagePermission: _messagePermission,
         bannerAutoRule: _bannerAutoRule,
         updateBannerTarget: _bannerPinChanged,
         bannerTargetType: _bannerTargetType,
@@ -243,196 +231,143 @@ class _EditProfilePageState extends State<EditProfilePage> {
           ],
         ),
         body: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.zero,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: ProfileCoverImage(
-                url: _coverPhotoUrl,
-                width: MediaQuery.sizeOf(context).width - 40,
-                height: 120,
-              ),
+            ProfileEditHeader(
+              coverUrl: _coverPhotoUrl,
+              avatarUrl: _profilePhotoUrl,
+              onChangeCover: () async {
+                final url = await _uploadPhoto('cover');
+                if (url != null) setState(() => _coverPhotoUrl = url);
+              },
+              onChangeAvatar: () async {
+                final url = await _uploadPhoto('profile');
+                if (url != null) setState(() => _profilePhotoUrl = url);
+              },
             ),
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerRight,
-              child: OutlinedButton(
-                onPressed: () async {
-                  final url = await _uploadPhoto('cover');
-                  if (url != null) setState(() => _coverPhotoUrl = url);
-                },
-                child: const Text('Change cover'),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                GestureDetector(
-                  onTap: () async {
-                    final url = await _uploadPhoto('profile');
-                    if (url != null) setState(() => _profilePhotoUrl = url);
-                  },
-                  child: ProfileAvatar(
-                    url: _profilePhotoUrl,
-                    size: 72,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: HomeFeedTokens.detailBackground,
+                      borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
+                      border: Border.all(
+                        color: HomeFeedTokens.textPrimary.withValues(alpha: 0.06),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: HomeFeedTokens.textPrimary.withValues(alpha: 0.04),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 8),
+                        ProfileField(label: 'Name', controller: _nameController),
+                        _fieldDivider(),
+                        ProfileField(
+                          label: 'Username',
+                          controller: _usernameController,
+                          enabled: _canChangeUsername,
+                          onChanged: _onUsernameChanged,
+                          error: _usernameError,
+                        ),
+                        _fieldDivider(),
+                        ProfileField(
+                            label: 'Bio', controller: _bioController, maxLines: 3),
+                        _fieldDivider(),
+                        ProfileField(
+                            label: 'Location', controller: _locationController),
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: _locating ? null : _useCurrentLocation,
+                            icon: _locating
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.my_location, size: 18),
+                            label: Text(
+                              _latitude != null
+                                  ? 'Location captured'
+                                  : 'Use my current location',
+                            ),
+                          ),
+                        ),
+                        _fieldDivider(),
+                        ProfileField(
+                            label: 'Pronouns', controller: _pronounsController),
+                        const SizedBox(height: 8),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Text(
-                    _profilePhotoUrl == null
-                        ? 'Tap photo to add profile picture'
-                        : 'Tap photo to change',
+                  const SizedBox(height: 24),
+                  Text(
+                    'Pinned banner',
                     style: GoogleFonts.inter(
-                      fontSize: 14,
-                      color: HomeFeedTokens.textPrimary.withValues(alpha: 0.65),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: HomeFeedTokens.textPrimary,
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-                _Field(label: 'Name', controller: _nameController),
-                const SizedBox(height: 16),
-                _Field(
-                  label: 'Username',
-                  controller: _usernameController,
-                  enabled: _canChangeUsername,
-                  onChanged: _onUsernameChanged,
-                  error: _usernameError,
-                ),
-                const SizedBox(height: 16),
-                _Field(label: 'Bio', controller: _bioController, maxLines: 3),
-                const SizedBox(height: 16),
-                _Field(label: 'Location', controller: _locationController),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: _locating ? null : _useCurrentLocation,
-                  icon: _locating
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.my_location, size: 18),
-                  label: Text(
-                    _latitude != null
-                        ? 'Location captured'
-                        : 'Use my current location',
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _Field(label: 'Pronouns', controller: _pronounsController),
-                const SizedBox(height: 24),
-                Text(
-                  'Privacy',
-                  style: GoogleFonts.inter(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: HomeFeedTokens.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                LabeledDropdown(
-                  label: 'Profile visibility',
-                  value: _profileVisibility,
-                  options: _visibilityOptions,
-                  onChanged: (v) => setState(() => _profileVisibility = v),
-                ),
-                const SizedBox(height: 16),
-                LabeledDropdown(
-                  label: 'Who can message you',
-                  value: _messagePermission,
-                  options: _messagePermissionOptions,
-                  onChanged: (v) => setState(() => _messagePermission = v),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'Profile banner',
-                  style: GoogleFonts.inter(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: HomeFeedTokens.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                LabeledDropdown(
-                  label: 'Banner rule',
-                  value: _bannerAutoRule,
-                  options: _bannerRuleOptions,
-                  onChanged: (v) => setState(() => _bannerAutoRule = v),
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: _pickBanner,
-                  icon: const Icon(Icons.push_pin_outlined, size: 18),
-                  label: Text(
-                    _bannerTargetId != null
-                        ? 'Change pinned banner'
-                        : 'Pin a piece or post',
-                  ),
-                ),
-                if (_bannerMediaUrl != null) ...[
-                  const SizedBox(height: 10),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      _bannerMediaUrl!,
-                      height: 80,
-                      width: 80,
-                      fit: BoxFit.cover,
+                  const SizedBox(height: 4),
+                  Text(
+                    'A piece or post highlighted on your profile — separate from '
+                    'the cover photo above.',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      color: HomeFeedTokens.textSecondary,
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  LabeledDropdown(
+                    label: 'Banner rule',
+                    value: _bannerAutoRule,
+                    options: _bannerRuleOptions,
+                    onChanged: (v) => setState(() => _bannerAutoRule = v),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: _pickBanner,
+                    icon: const Icon(Icons.push_pin_outlined, size: 18),
+                    label: Text(
+                      _bannerTargetId != null
+                          ? 'Change pinned banner'
+                          : 'Pin a piece or post',
+                    ),
+                  ),
+                  if (_bannerMediaUrl != null) ...[
+                    const SizedBox(height: 10),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        _bannerMediaUrl!,
+                        height: 80,
+                        width: 80,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ],
                 ],
+              ),
+            ),
           ],
         ),
       ),
     );
   }
-}
 
-class _Field extends StatelessWidget {
-  const _Field({
-    required this.label,
-    required this.controller,
-    this.maxLines = 1,
-    this.enabled = true,
-    this.onChanged,
-    this.error,
-  });
-
-  final String label;
-  final TextEditingController controller;
-  final int maxLines;
-  final bool enabled;
-  final ValueChanged<String>? onChanged;
-  final String? error;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: HomeFeedTokens.textPrimary.withValues(alpha: 0.6),
-          ),
-        ),
-        const SizedBox(height: 6),
-        TextField(
-          controller: controller,
-          maxLines: maxLines,
-          enabled: enabled,
-          onChanged: onChanged,
-          decoration: InputDecoration(
-            errorText: error,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        ),
-      ],
-    );
-  }
+  Widget _fieldDivider() => Divider(
+        height: 24,
+        color: HomeFeedTokens.textPrimary.withValues(alpha: 0.08),
+      );
 }

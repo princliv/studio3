@@ -284,14 +284,26 @@ class _ChatPageState extends State<ChatPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: Text(
-                'Inquiries',
-                style: GoogleFonts.inter(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: HomeFeedTokens.textPrimary,
-                ),
+              padding: const EdgeInsets.fromLTRB(4, 8, 16, 12),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      color: HomeFeedTokens.textPrimary,
+                      size: 20,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  Text(
+                    'Inquiries',
+                    style: GoogleFonts.inter(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: HomeFeedTokens.textPrimary,
+                    ),
+                  ),
+                ],
               ),
             ),
             Padding(
