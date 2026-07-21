@@ -71,6 +71,7 @@ class CommentSummary {
     required this.body,
     this.authorUsername,
     this.authorName,
+    this.authorAvatarUrl,
     this.createdAt,
   });
 
@@ -78,6 +79,7 @@ class CommentSummary {
   final String body;
   final String? authorUsername;
   final String? authorName;
+  final String? authorAvatarUrl;
   final String? createdAt;
 
   factory CommentSummary.fromJson(Map<String, dynamic> json) {
@@ -90,6 +92,8 @@ class CommentSummary {
           user?['username'] as String?,
       authorName:
           author?['name'] as String? ?? user?['name'] as String?,
+      authorAvatarUrl: author?['profilePhotoUrl'] as String? ??
+          user?['profilePhotoUrl'] as String?,
       createdAt: json['createdAt'] as String?,
     );
   }

@@ -10,6 +10,7 @@ import '../widgets/home_feed/home_feed_widgets.dart';
 import '../widgets/offline_state.dart';
 import '../services/connectivity_service.dart';
 import '../services/feed_service.dart';
+import 'reels_page.dart' show routeObserver;
 
 class HomeFeedPage extends StatefulWidget {
   /// For You feed — mixed Pieces and Scenes with All / Available filters.
@@ -19,7 +20,7 @@ class HomeFeedPage extends StatefulWidget {
   State<HomeFeedPage> createState() => _HomeFeedPageState();
 }
 
-class _HomeFeedPageState extends State<HomeFeedPage> {
+class _HomeFeedPageState extends State<HomeFeedPage> with RouteAware {
   static const double _loadMoreThreshold = 200;
 
   final List<FeedItem> _apiItems = [];
@@ -45,12 +46,22 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    routeObserver.subscribe(this, ModalRoute.of(context) as PageRoute);
+  }
+
+  @override
   void dispose() {
+    routeObserver.unsubscribe(this);
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     ConnectivityService.instance.removeReconnectHook(_onReconnected);
     super.dispose();
   }
+
+  @override
+  void didPopNext() => _loadFeed(refresh: true);
 
   Future<void> _onReconnected() => _loadFeed(refresh: true);
 

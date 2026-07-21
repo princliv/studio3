@@ -15,11 +15,13 @@ import '../widgets/profile_avatar_preview_sheet.dart';
 import '../widgets/profile_cover_image.dart';
 import 'profile/models/profile_series_data.dart';
 import 'profile/profile_constants.dart';
+import '../widgets/follow_button.dart';
 import 'profile/widgets/profile_header.dart';
 import 'profile/widgets/profile_locked_placeholder.dart';
 import 'profile/widgets/profile_tab_content.dart';
 import 'profile/widgets/profile_tabs.dart';
 import 'profile/widgets/profile_viewer_mode_capsule.dart';
+import 'reels_page.dart' show routeObserver;
 
 /// Artist profile — own tab or pushed public profile by [username].
 class ProfilePage extends StatefulWidget {
@@ -35,7 +37,7 @@ class ProfilePage extends StatefulWidget {
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
-class _ProfilePageState extends State<ProfilePage> {
+class _ProfilePageState extends State<ProfilePage> with RouteAware {
   String _tab = 'pieces';
   UserProfile? _profile;
   List<PieceSummary> _pieces = [];
@@ -72,11 +74,27 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_isTabContext) {
+      routeObserver.subscribe(this, ModalRoute.of(context) as PageRoute);
+    }
+  }
+
+  @override
   void dispose() {
     if (_isTabContext) {
       AuthSession.instance.removeListener(_onSessionChanged);
+      routeObserver.unsubscribe(this);
     }
     super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    _resetTabCache();
+    _loadProfileShell(silent: true);
+    _loadActiveTab(force: true);
   }
 
   void _onSessionChanged() {

@@ -78,6 +78,7 @@ class FeedPreviewItem {
     this.commentCount = 0,
     this.authorName,
     this.authorAvatarUrl,
+    this.authorIsFollowing = false,
     this.status,
   });
 
@@ -107,6 +108,7 @@ class FeedPreviewItem {
   final int commentCount;
   final String? authorName;
   final String? authorAvatarUrl;
+  final bool authorIsFollowing;
   final String? status;
 
   bool get isLive => status == null || status == 'live';
@@ -164,6 +166,7 @@ class FeedPreviewItem {
     int? commentCount,
     String? authorName,
     String? authorAvatarUrl,
+    bool? authorIsFollowing,
     String? status,
   }) {
     return FeedPreviewItem(
@@ -193,6 +196,7 @@ class FeedPreviewItem {
       commentCount: commentCount ?? this.commentCount,
       authorName: authorName ?? this.authorName,
       authorAvatarUrl: authorAvatarUrl ?? this.authorAvatarUrl,
+      authorIsFollowing: authorIsFollowing ?? this.authorIsFollowing,
       status: status ?? this.status,
     );
   }
@@ -236,6 +240,7 @@ class FeedPreviewItem {
       commentCount: piece.commentCount,
       authorName: piece.authorName,
       authorAvatarUrl: piece.authorAvatarUrl,
+      authorIsFollowing: piece.authorIsFollowing,
       status: piece.status,
     );
   }
@@ -270,6 +275,7 @@ class FeedPreviewItem {
       commentCount: post.commentCount,
       authorName: post.authorName,
       authorAvatarUrl: post.authorAvatarUrl,
+      authorIsFollowing: post.authorIsFollowing,
     );
   }
 
@@ -304,6 +310,7 @@ class FeedPreviewItem {
         'commentCount': commentCount,
         if (authorName != null) 'authorName': authorName,
         if (authorAvatarUrl != null) 'authorAvatarUrl': authorAvatarUrl,
+        'authorIsFollowing': authorIsFollowing,
         if (status != null) 'status': status,
       };
 
@@ -342,6 +349,7 @@ class FeedPreviewItem {
       commentCount: json['commentCount'] as int? ?? 0,
       authorName: json['authorName'] as String?,
       authorAvatarUrl: json['authorAvatarUrl'] as String?,
+      authorIsFollowing: json['authorIsFollowing'] as bool? ?? false,
       status: json['status'] as String?,
     );
   }

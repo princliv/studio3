@@ -4,18 +4,19 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../models/feed_preview_item.dart';
 import '../../theme/home_feed_tokens.dart';
 import '../../utils/profile_navigation.dart';
+import '../follow_button.dart';
 import '../home_feed/home_feed_widgets.dart';
 
 class PieceArtistRow extends StatelessWidget {
   const PieceArtistRow({
     super.key,
     required this.item,
-    required this.following,
+    required this.followState,
     required this.onFollowToggle,
   });
 
   final FeedPreviewItem item;
-  final bool following;
+  final FollowState followState;
   final VoidCallback onFollowToggle;
 
   @override
@@ -57,24 +58,10 @@ class PieceArtistRow extends StatelessWidget {
               ],
             ),
           ),
-          OutlinedButton(
+          FollowButton(
+            state: followState,
             onPressed: onFollowToggle,
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(96, 28),
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              side: const BorderSide(color: HomeFeedTokens.neutral800),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(6),
-              ),
-              foregroundColor: HomeFeedTokens.neutral800,
-            ),
-            child: Text(
-              following ? 'Following' : 'Follow',
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                fontWeight: FontWeight.w400,
-              ),
-            ),
+            dense: true,
           ),
         ],
       ),

@@ -52,6 +52,9 @@ dependencies:
   hive_flutter: ^1.1.0
   connectivity_plus: ^6.1.5
   permission_handler: ^12.0.1
+  share_plus: ^13.2.1
+  url_launcher: ^6.3.2
+  flutter_dotenv: ^6.0.1
 
 dev_dependencies:
   flutter_test:
@@ -111,13 +114,13 @@ flutter:
   uses-material-design: true
 
   assets:
+    - .env
     - assets/logo/logo_icon_black.png
     - assets/logo/logo_icon_white.png
     - assets/logo/logo_text_black.png
     - assets/logo/logo_text_white.png
     - assets/post/
     - assets/post/grid/
-    - assets/post/scene_grid/
     - assets/post/crop/
     - assets/post/adjust/
     - assets/post/create/

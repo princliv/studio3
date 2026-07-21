@@ -53,5 +53,15 @@
             <data
                 android:mimeType="text/plain"/>
         </intent>
+        <!-- Required for url_launcher's canLaunchUrl/launchUrl to detect
+             SMS and https handlers on Android 11+ package visibility. -->
+        <intent>
+            <action android:name="android.intent.action.SENDTO"/>
+            <data android:scheme="sms"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
     </queries>
 </manifest>

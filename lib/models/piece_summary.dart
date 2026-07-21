@@ -24,6 +24,7 @@ class PieceSummary {
     this.authorUsername,
     this.authorName,
     this.authorAvatarUrl,
+    this.authorIsFollowing = false,
     this.series,
     this.status,
     this.materials = const [],
@@ -54,6 +55,7 @@ class PieceSummary {
   final String? authorUsername;
   final String? authorName;
   final String? authorAvatarUrl;
+  final bool authorIsFollowing;
   final PieceSeriesInfo? series;
   final String? status;
   final List<String> materials;
@@ -97,6 +99,9 @@ class PieceSummary {
       authorAvatarUrl: author?['profilePhotoUrl'] as String? ??
           user?['profilePhotoUrl'] as String? ??
           json['authorAvatarUrl'] as String?,
+      authorIsFollowing: author?['isFollowing'] as bool? ??
+          user?['isFollowing'] as bool? ??
+          false,
       series: seriesJson is Map<String, dynamic>
           ? PieceSeriesInfo.fromJson(seriesJson)
           : null,
@@ -145,6 +150,7 @@ class PieceSummary {
         if (authorUsername != null) 'authorUsername': authorUsername,
         if (authorName != null) 'authorName': authorName,
         if (authorAvatarUrl != null) 'authorAvatarUrl': authorAvatarUrl,
+        'authorIsFollowing': authorIsFollowing,
         if (series != null) 'series': series!.toJson(),
         if (status != null) 'status': status,
         'materials': materials,

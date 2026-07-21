@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../models/feed_preview_item.dart';
 import '../../theme/collect_detail_tokens.dart';
 import '../../utils/profile_navigation.dart';
+import '../follow_button.dart';
 import '../home_feed/home_feed_widgets.dart';
 
 /// Artist row for collect detail (Figma 2302-1554).
@@ -11,12 +12,12 @@ class CollectArtistRow extends StatelessWidget {
   const CollectArtistRow({
     super.key,
     required this.item,
-    required this.following,
+    required this.followState,
     required this.onFollowToggle,
   });
 
   final FeedPreviewItem item;
-  final bool following;
+  final FollowState followState;
   final VoidCallback onFollowToggle;
 
   @override
@@ -65,25 +66,10 @@ class CollectArtistRow extends StatelessWidget {
               ],
             ),
           ),
-          OutlinedButton(
+          FollowButton(
+            state: followState,
             onPressed: onFollowToggle,
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(96, 28),
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              side: const BorderSide(color: CollectDetailTokens.followBorder),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(6),
-              ),
-              foregroundColor: CollectDetailTokens.followBorder,
-            ),
-            child: Text(
-              following ? 'Following' : 'Follow',
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                fontWeight: FontWeight.w400,
-                height: 15.6 / 12,
-              ),
-            ),
+            dense: true,
           ),
         ],
       ),

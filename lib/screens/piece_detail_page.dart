@@ -12,12 +12,14 @@ import 'edit_piece_page.dart';
 import 'edit_scene_page.dart';
 import '../widgets/piece_detail/ask_about_piece_sheet.dart';
 import '../widgets/piece_detail/detail_hero_image.dart';
+import '../widgets/piece_detail/detail_follow_state.dart';
 import '../widgets/piece_detail/detail_save_state.dart';
 import '../widgets/piece_detail/detail_scroll_handoff.dart';
-import '../widgets/piece_detail/detail_share.dart';
 import '../widgets/piece_detail/piece_action_bar.dart';
 import '../widgets/piece_detail/piece_artist_row.dart';
+import '../widgets/piece_detail/piece_comment_sheet.dart';
 import '../widgets/piece_detail/piece_related_scenes_row.dart';
+import '../widgets/piece_detail/piece_share_sheet.dart';
 import '../widgets/piece_detail/piece_series_row.dart';
 
 class PieceDetailPage extends StatefulWidget {
@@ -41,9 +43,8 @@ class PieceDetailPage extends StatefulWidget {
 }
 
 class _PieceDetailPageState extends State<PieceDetailPage>
-    with DetailSaveState, DetailLikeState {
+    with DetailSaveState, DetailLikeState, DetailFollowState {
   late FeedPreviewItem _item;
-  bool _following = false;
 
   @override
   FeedPreviewItem get saveItem => _item;
@@ -55,6 +56,9 @@ class _PieceDetailPageState extends State<PieceDetailPage>
 
   String get _authorHandle =>
       item.handle.startsWith('@') ? item.handle.substring(1) : item.handle;
+
+  @override
+  String get followUsername => _authorHandle;
 
   bool get _isOwner {
     final viewerUsername = AuthSession.instance.user?.username;
@@ -109,15 +113,17 @@ class _PieceDetailPageState extends State<PieceDetailPage>
     _item = widget.item;
     super.initState();
     liked = _item.isLiked;
+    applyFollowState(_item);
     _loadDetail();
   }
 
   Future<void> _loadDetail() async {
-    final loaded = await ContentDetailLoader.loadPiece(_item);
+    final loaded = await ContentDetailLoader.load(_item);
     if (!mounted) return;
     setState(() => _item = loaded);
     applySaveItem(loaded);
     applyLikeItem(loaded);
+    applyFollowState(loaded);
   }
 
   @override
@@ -178,8 +184,12 @@ class _PieceDetailPageState extends State<PieceDetailPage>
                   liked: liked,
                   saved: saved,
                   onLike: toggleLike,
-                  onComment: () {},
-                  onShare: () => shareFeedPreviewItem(
+                  onComment: () => PieceCommentSheet.show(
+                    context,
+                    contentId: item.id,
+                    isScene: item.isScene,
+                  ),
+                  onShare: () => PieceShareSheet.show(
                     context,
                     item,
                     imageIndex: widget.initialImageIndex,
@@ -189,9 +199,8 @@ class _PieceDetailPageState extends State<PieceDetailPage>
                 const Divider(height: 1, color: Color(0xFFE8E5DF)),
                 PieceArtistRow(
                   item: item,
-                  following: _following,
-                  onFollowToggle: () =>
-                      setState(() => _following = !_following),
+                  followState: followState,
+                  onFollowToggle: toggleFollow,
                 ),
                 if (_canAskAboutPiece)
                   Padding(

@@ -8,6 +8,7 @@ import '../services/media_service.dart';
 import '../services/permission_service.dart';
 import '../services/user_service.dart';
 import '../widgets/permission_denied_sheet.dart';
+import '../widgets/uploading_dialog.dart';
 
 final _picker = ImagePicker();
 
@@ -31,9 +32,11 @@ Future<String?> pickAndUploadPhoto(
   if (outcome == GalleryPermissionOutcome.denied) {
     return null;
   }
+  final picked = await _picker.pickImage(source: ImageSource.gallery);
+  if (picked == null) return null;
+  if (!context.mounted) return null;
+  showUploadingDialog(context);
   try {
-    final picked = await _picker.pickImage(source: ImageSource.gallery);
-    if (picked == null) return null;
     final url = await MediaService.instance.uploadFile(
       purpose: purpose,
       file: File(picked.path),
@@ -48,6 +51,8 @@ Future<String?> pickAndUploadPhoto(
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
     return null;
+  } finally {
+    if (context.mounted) hideUploadingDialog(context);
   }
 }
 

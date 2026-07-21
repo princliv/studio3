@@ -15,6 +15,7 @@ class PostSummary {
     this.authorUsername,
     this.authorName,
     this.authorAvatarUrl,
+    this.authorIsFollowing = false,
     this.linkedPiece,
   });
 
@@ -31,6 +32,7 @@ class PostSummary {
   final String? authorUsername;
   final String? authorName;
   final String? authorAvatarUrl;
+  final bool authorIsFollowing;
   final PieceSummary? linkedPiece;
 
   factory PostSummary.fromJson(Map<String, dynamic> json) {
@@ -57,6 +59,9 @@ class PostSummary {
       authorAvatarUrl: author?['profilePhotoUrl'] as String? ??
           user?['profilePhotoUrl'] as String? ??
           json['authorAvatarUrl'] as String?,
+      authorIsFollowing: author?['isFollowing'] as bool? ??
+          user?['isFollowing'] as bool? ??
+          false,
       linkedPiece: pieceJson is Map<String, dynamic>
           ? PieceSummary.fromJson(pieceJson)
           : null,
@@ -84,6 +89,7 @@ class PostSummary {
         if (authorUsername != null) 'authorUsername': authorUsername,
         if (authorName != null) 'authorName': authorName,
         if (authorAvatarUrl != null) 'authorAvatarUrl': authorAvatarUrl,
+        'authorIsFollowing': authorIsFollowing,
         if (linkedPiece != null) 'piece': linkedPiece!.toJson(),
       };
 

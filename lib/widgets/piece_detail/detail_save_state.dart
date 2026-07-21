@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/feed_preview_item.dart';
 import '../../services/saved_content_store.dart';
 import '../../services/social_service.dart';
+import '../collection_saved_toast.dart';
 
 /// Shared save-state wiring for piece detail pages.
 mixin DetailSaveState<T extends StatefulWidget> on State<T> {
@@ -12,6 +13,10 @@ mixin DetailSaveState<T extends StatefulWidget> on State<T> {
   bool _ownStoreWrite = false;
 
   FeedPreviewItem get saveItem;
+
+  /// Bottom margin for the "Added to Collection" toast — override to clear
+  /// any bottom bar/overlay sitting above the default SnackBar position.
+  double get saveToastBottomMargin => 16;
 
   @override
   void initState() {
@@ -79,6 +84,14 @@ mixin DetailSaveState<T extends StatefulWidget> on State<T> {
         _ownStoreWrite = true;
         savedStore.unsave(item.id);
         _ownStoreWrite = false;
+      }
+      if (mounted) {
+        showCollectionSavedToast(
+          context,
+          saved: nextSaved,
+          thumbnailUrl: item.heroImageUrl,
+          bottomMargin: saveToastBottomMargin,
+        );
       }
     } catch (_) {
       if (mounted) setState(() => saved = !nextSaved);

@@ -12,12 +12,14 @@ import '../widgets/piece_detail/ask_about_piece_sheet.dart';
 import '../widgets/piece_detail/available_collect_bar.dart';
 import '../widgets/piece_detail/collect_artist_row.dart';
 import '../widgets/piece_detail/collect_piece_sheet.dart';
+import '../widgets/piece_detail/detail_follow_state.dart';
 import '../widgets/piece_detail/detail_hero_image.dart';
 import '../widgets/piece_detail/detail_save_state.dart';
 import '../widgets/piece_detail/detail_scroll_handoff.dart';
-import '../widgets/piece_detail/detail_share.dart';
 import '../widgets/piece_detail/piece_action_bar.dart';
+import '../widgets/piece_detail/piece_comment_sheet.dart';
 import '../widgets/piece_detail/piece_related_scenes_row.dart';
+import '../widgets/piece_detail/piece_share_sheet.dart';
 import '../widgets/piece_detail/piece_series_row.dart';
 
 /// Collect / buy detail for available pieces (Figma 2302-1554).
@@ -43,23 +45,33 @@ class AvailablePieceDetailPage extends StatefulWidget {
 }
 
 class _AvailablePieceDetailPageState extends State<AvailablePieceDetailPage>
-    with DetailSaveState, DetailLikeState {
+    with DetailSaveState, DetailLikeState, DetailFollowState {
   late FeedPreviewItem _item;
-  bool _following = false;
 
   @override
   FeedPreviewItem get saveItem => _item;
+
+  @override
+  double get saveToastBottomMargin =>
+      AvailableCollectBar.totalHeight(context) + 16;
 
   @override
   FeedPreviewItem get likeItem => _item;
 
   FeedPreviewItem get item => _item;
 
+  String get _authorHandle =>
+      item.handle.startsWith('@') ? item.handle.substring(1) : item.handle;
+
+  @override
+  String get followUsername => _authorHandle;
+
   @override
   void initState() {
     _item = widget.item;
     super.initState();
     liked = _item.isLiked;
+    applyFollowState(_item);
     _loadDetail();
   }
 
@@ -69,14 +81,12 @@ class _AvailablePieceDetailPageState extends State<AvailablePieceDetailPage>
     setState(() => _item = loaded);
     applySaveItem(loaded);
     applyLikeItem(loaded);
+    applyFollowState(loaded);
   }
 
   void _onCollect() {
     CollectPieceSheet.show(context, item: item);
   }
-
-  String get _authorHandle =>
-      item.handle.startsWith('@') ? item.handle.substring(1) : item.handle;
 
   bool get _isOwner {
     final viewerUsername = AuthSession.instance.user?.username;
@@ -192,8 +202,12 @@ class _AvailablePieceDetailPageState extends State<AvailablePieceDetailPage>
                       liked: liked,
                       saved: saved,
                       onLike: toggleLike,
-                      onComment: () {},
-                      onShare: () => shareFeedPreviewItem(
+                      onComment: () => PieceCommentSheet.show(
+                        context,
+                        contentId: item.id,
+                        isScene: item.isScene,
+                      ),
+                      onShare: () => PieceShareSheet.show(
                         context,
                         item,
                         imageIndex: widget.initialImageIndex,
@@ -207,9 +221,8 @@ class _AvailablePieceDetailPageState extends State<AvailablePieceDetailPage>
                     ),
                     CollectArtistRow(
                       item: item,
-                      following: _following,
-                      onFollowToggle: () =>
-                          setState(() => _following = !_following),
+                      followState: followState,
+                      onFollowToggle: toggleFollow,
                     ),
                     if (_canAskAboutPiece)
                       Padding(
