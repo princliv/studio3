@@ -1,4 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -166,6 +167,28 @@ class _AuthGateState extends State<AuthGate> {
       return;
     }
     if (!session.isOnboarded) {
+      if (kDebugMode) {
+        final u = session.user;
+        debugPrint(
+          '[AuthGate] Redirecting to /onboarding — '
+          'user.onboardingComplete=${u?.onboardingComplete}, '
+          'username=${u?.username}, isLoggedIn=${session.isLoggedIn}',
+        );
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: Colors.red.shade900,
+              duration: const Duration(seconds: 6),
+              content: Text(
+                'DEBUG: bounced to onboarding — '
+                'onboardingComplete=${u?.onboardingComplete} '
+                'for ${u?.username}',
+              ),
+            ),
+          );
+        });
+      }
       Navigator.pushNamedAndRemoveUntil(context, '/onboarding', (_) => false);
     }
   }
@@ -182,7 +205,9 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
-  late int _selectedNavIndex = AppStateStore.instance.lastNavIndex;
+  // Always start on the For You/Home tab, regardless of which tab was last
+  // open — matching Instagram's "always opens to the main feed" behavior.
+  int _selectedNavIndex = BottomNavIndex.home;
 
   List<Widget> _buildTabs() => [
         const HomeFeedPage(),

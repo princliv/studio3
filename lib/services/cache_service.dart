@@ -69,6 +69,21 @@ class CacheService {
     }
   }
 
+  /// Synchronous cache read — for seeding a screen's initial state (e.g. in
+  /// `initState`) before the first frame, so cached content paints instantly
+  /// instead of an empty/loading state while [fetchWithCache]'s (necessarily
+  /// `Future`-wrapped) read resolves. Returns `null` on a cache miss;
+  /// staleness is ignored here on purpose — showing slightly-stale content
+  /// immediately and refreshing silently is the whole point.
+  T? peekCache<T>({
+    required String key,
+    required T Function(Map<String, dynamic> raw) parse,
+  }) {
+    final raw = _readEnvelopeData(key);
+    if (raw == null) return null;
+    return parse(raw);
+  }
+
   /// Whether [key] has any cached value at all, regardless of staleness —
   /// lets a screen decide between "show stale cache" and "show offline
   /// empty state" when there's truly nothing to display.

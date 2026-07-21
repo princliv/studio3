@@ -40,6 +40,15 @@ class _HomeFeedPageState extends State<HomeFeedPage> with RouteAware {
   @override
   void initState() {
     super.initState();
+    // Paint instantly from whatever's already cached (if anything) instead
+    // of starting from an empty spinner — _loadFeed() below still runs to
+    // silently refresh in the background.
+    final cached = FeedService.instance.peekForYouCached();
+    if (cached != null && cached.items.isNotEmpty) {
+      _apiItems.addAll(cached.items);
+      _nextCursor = cached.nextCursor;
+      _loading = false;
+    }
     _scrollController.addListener(_onScroll);
     ConnectivityService.instance.addReconnectHook(_onReconnected);
     _loadFeed();
@@ -72,7 +81,10 @@ class _HomeFeedPageState extends State<HomeFeedPage> with RouteAware {
     setState(() {
       if (append) {
         _loadingMore = true;
-      } else {
+      } else if (_apiItems.isEmpty) {
+        // Only block with a spinner when there's truly nothing to show yet
+        // — a refresh with existing (cached or previously-loaded) content
+        // already on screen updates silently in place instead.
         _loading = true;
       }
     });
@@ -98,7 +110,10 @@ class _HomeFeedPageState extends State<HomeFeedPage> with RouteAware {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        if (!append) _apiItems.clear();
+        // Keep whatever's already showing (cached or previously-loaded) on
+        // a failed refresh — a silent background failure shouldn't blank a
+        // screen that already has content, only a genuinely empty one
+        // falls through to the offline state below.
         _loading = false;
         _loadingMore = false;
         _showOfflineState =

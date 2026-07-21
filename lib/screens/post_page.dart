@@ -23,13 +23,11 @@ class PostPage extends StatefulWidget {
 
 class _PostPageState extends State<PostPage> {
   static const _bannerHeight = 64.0;
-  static const _gridGap = 3.0;
   static const _bottomControlsOffset = 42.0;
   static const _maxSelection = 10;
 
   _PostFlowStep _step = _PostFlowStep.gallery;
   String _postType = 'piece';
-  final List<int> _selectedIndices = [];
   List<String>? _pickedImagePaths;
   String? _pickedVideoPath;
   final _picker = ImagePicker();
@@ -38,61 +36,25 @@ class _PostPageState extends State<PostPage> {
   List<PostImageTransform> _editTransforms = [];
   int _previewImageIndex = 0;
 
+  @override
+  void initState() {
+    super.initState();
+    // Open the system photo picker as soon as the flow starts, so the user
+    // lands directly on their own photos rather than an empty screen.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _openGalleryPicker();
+    });
+  }
+
   void _exitFlow() => Navigator.pop(context);
 
   void _onPostTypeChanged(String type) {
     if (type == _postType) return;
     setState(() {
       _postType = type;
-      _selectedIndices.clear();
       _pickedImagePaths = null;
       _pickedVideoPath = null;
     });
-  }
-
-  void _onCellTap(int cellIndex) {
-    final position = _selectedIndices.indexOf(cellIndex);
-    if (position >= 0) {
-      setState(() => _selectedIndices.removeAt(position));
-      return;
-    }
-    if (_selectedIndices.length >= _maxSelection) {
-      _showMaxSelectionMessage();
-      return;
-    }
-    setState(() => _selectedIndices.add(cellIndex));
-  }
-
-  void _showMaxSelectionMessage() {
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          elevation: 0,
-          padding: EdgeInsets.zero,
-          backgroundColor: Colors.transparent,
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-          duration: const Duration(seconds: 2),
-          content: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.75),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              'You can select up to 10 photos at a time.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: Colors.white,
-                height: 1.3,
-              ),
-            ),
-          ),
-        ),
-      );
   }
 
   Future<bool> _ensureGalleryAccess({required bool forVideo}) async {
@@ -110,17 +72,24 @@ class _PostPageState extends State<PostPage> {
     return false;
   }
 
-  Future<void> _pickFromGallery() async {
+  /// System photo picker (Android Photo Picker / iOS PHPicker) — native OS
+  /// UI, includes its own Recents/album browsing for free.
+  Future<void> _openGalleryPicker() async {
     if (!await _ensureGalleryAccess(forVideo: false)) return;
     final images = await _picker.pickMultiImage(limit: _maxSelection);
     if (images.isEmpty || !mounted) return;
     setState(() {
       _pickedImagePaths = images.map((x) => x.path).toList();
       _pickedVideoPath = null;
-      _selectedIndices.clear();
-      for (var i = 0; i < _pickedImagePaths!.length; i++) {
-        _selectedIndices.add(i);
-      }
+    });
+  }
+
+  Future<void> _openCamera() async {
+    final photo = await _picker.pickImage(source: ImageSource.camera);
+    if (photo == null || !mounted) return;
+    setState(() {
+      _pickedImagePaths = [photo.path];
+      _pickedVideoPath = null;
     });
   }
 
@@ -131,7 +100,6 @@ class _PostPageState extends State<PostPage> {
     setState(() {
       _pickedVideoPath = video.path;
       _pickedImagePaths = null;
-      _selectedIndices.clear();
     });
   }
 
@@ -141,7 +109,7 @@ class _PostPageState extends State<PostPage> {
       return;
     }
     final isPicked = _pickedImagePaths != null && _pickedImagePaths!.isNotEmpty;
-    if (!isPicked && _selectedIndices.isEmpty) return;
+    if (!isPicked) return;
     setState(() => _step = _PostFlowStep.edit);
   }
 
@@ -193,11 +161,6 @@ class _PostPageState extends State<PostPage> {
     }
   }
 
-  int? _selectionOrder(int cellIndex) {
-    final position = _selectedIndices.indexOf(cellIndex);
-    return position >= 0 ? position + 1 : null;
-  }
-
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -218,7 +181,8 @@ class _PostPageState extends State<PostPage> {
     final topInset = MediaQuery.paddingOf(context).top;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     final hasSelection =
-        _selectedIndices.isNotEmpty || _pickedVideoPath != null;
+        (_pickedImagePaths != null && _pickedImagePaths!.isNotEmpty) ||
+            _pickedVideoPath != null;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -229,10 +193,11 @@ class _PostPageState extends State<PostPage> {
             left: 0,
             right: 0,
             bottom: 0,
-            child: _MediaGrid(
-              postType: _postType,
-              selectionOrderFor: _selectionOrder,
-              onSelect: _onCellTap,
+            child: _GalleryLauncher(
+              hasSelection: hasSelection,
+              selectedCount: _pickedImagePaths?.length ?? 0,
+              onChoosePhotos: _openGalleryPicker,
+              onTakePhoto: _openCamera,
             ),
           ),
           Positioned(
@@ -244,7 +209,6 @@ class _PostPageState extends State<PostPage> {
               onClose: _exitFlow,
               hasSelection: hasSelection,
               onNext: hasSelection ? _goToEdit : null,
-              onPickGallery: _pickFromGallery,
               onPickVideo: _postType == 'scene' ? _pickVideo : null,
             ),
           ),
@@ -279,9 +243,9 @@ class _PostPageState extends State<PostPage> {
   Widget _buildEdit() {
     final isPicked = _pickedImagePaths != null && _pickedImagePaths!.isNotEmpty;
     return PostEditPage(
-      key: ValueKey('edit-$_postType-${_selectedIndices.join(",")}'),
+      key: ValueKey('edit-$_postType-${(_pickedImagePaths ?? const []).join(",")}'),
       postType: _postType,
-      selectedCellIndices: List<int>.from(_selectedIndices),
+      selectedCellIndices: const [],
       customImagePaths: isPicked ? _pickedImagePaths : null,
       initialImageIndex: _previewImageIndex,
       initialTransforms:
@@ -295,7 +259,7 @@ class _PostPageState extends State<PostPage> {
     return PostCreatePage(
       key: const ValueKey('details'),
       postType: _postType,
-      selectedCellIndices: List<int>.from(_selectedIndices),
+      selectedCellIndices: const [],
       imagePaths: _editImagePaths,
       transforms: _editTransforms,
       previewImageIndex: _previewImageIndex,
@@ -307,13 +271,96 @@ class _PostPageState extends State<PostPage> {
   }
 }
 
+class _GalleryLauncher extends StatelessWidget {
+  const _GalleryLauncher({
+    required this.hasSelection,
+    required this.selectedCount,
+    required this.onChoosePhotos,
+    required this.onTakePhoto,
+  });
+
+  final bool hasSelection;
+  final int selectedCount;
+  final VoidCallback onChoosePhotos;
+  final VoidCallback onTakePhoto;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            hasSelection
+                ? Icons.check_circle_rounded
+                : Icons.photo_library_outlined,
+            color: Colors.white,
+            size: 56,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            hasSelection
+                ? '$selectedCount photo${selectedCount == 1 ? '' : 's'} selected'
+                : 'Add photos to your post',
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              OutlinedButton.icon(
+                onPressed: onTakePhoto,
+                icon: const Icon(Icons.camera_alt_rounded, color: Colors.white),
+                label: Text(
+                  'Camera',
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.white54),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              FilledButton(
+                onPressed: onChoosePhotos,
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                ),
+                child: Text(
+                  hasSelection ? 'Change selection' : 'Choose Photos',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _PostingBanner extends StatelessWidget {
   const _PostingBanner({
     required this.topInset,
     required this.onClose,
     required this.hasSelection,
     required this.onNext,
-    this.onPickGallery,
     this.onPickVideo,
   });
 
@@ -323,7 +370,6 @@ class _PostingBanner extends StatelessWidget {
   final VoidCallback onClose;
   final bool hasSelection;
   final VoidCallback? onNext;
-  final VoidCallback? onPickGallery;
   final VoidCallback? onPickVideo;
 
   @override
@@ -349,27 +395,12 @@ class _PostingBanner extends StatelessWidget {
                 ),
                 Expanded(
                   child: Center(
-                    child: GestureDetector(
-                      onTap: onPickGallery,
-                      behavior: HitTestBehavior.opaque,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Recents',
-                            style: GoogleFonts.inter(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                              color: HomeFeedTokens.textInverse,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          SvgPicture.asset(
-                            PostMediaAssets.chevronDown,
-                            width: 9,
-                            height: 5,
-                          ),
-                        ],
+                    child: Text(
+                      'New post',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: HomeFeedTokens.textInverse,
                       ),
                     ),
                   ),
@@ -425,112 +456,6 @@ class _PostingBanner extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _MediaGrid extends StatelessWidget {
-  const _MediaGrid({
-    required this.postType,
-    required this.selectionOrderFor,
-    required this.onSelect,
-  });
-
-  final String postType;
-  final int? Function(int cellIndex) selectionOrderFor;
-  final ValueChanged<int> onSelect;
-
-  bool get _isScene => postType == 'scene';
-
-  List<PostMediaGridRow> get _rows =>
-      _isScene ? PostMediaAssets.sceneGridRows : PostMediaAssets.pieceGridRows;
-
-  List<String> get _thumbs =>
-      _isScene ? PostMediaAssets.sceneGridThumbs : PostMediaAssets.pieceGridThumbs;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView.builder(
-      padding: EdgeInsets.zero,
-      itemCount: _rows.length,
-      itemBuilder: (context, rowIndex) {
-        final row = _rows[rowIndex];
-        final rowStartIndex = rowIndex * 3;
-
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: rowIndex < _rows.length - 1 ? _PostPageState._gridGap : 0,
-          ),
-          child: SizedBox(
-            height: row.height,
-            child: Row(
-              children: [
-                for (var col = 0; col < row.thumbIndices.length; col++) ...[
-                  if (col > 0) const SizedBox(width: _PostPageState._gridGap),
-                  Expanded(
-                    child: _MediaCell(
-                      thumbs: _thumbs,
-                      thumbIndex: row.thumbIndices[col],
-                      cellIndex: rowStartIndex + col,
-                      selectionOrder: selectionOrderFor(rowStartIndex + col),
-                      onTap: onSelect,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _MediaCell extends StatelessWidget {
-  const _MediaCell({
-    required this.thumbs,
-    required this.thumbIndex,
-    required this.cellIndex,
-    required this.selectionOrder,
-    required this.onTap,
-  });
-
-  final List<String> thumbs;
-  final int thumbIndex;
-  final int cellIndex;
-  final int? selectionOrder;
-  final ValueChanged<int> onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final selected = selectionOrder != null;
-
-    return GestureDetector(
-      onTap: () => onTap(cellIndex),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.asset(
-            thumbs[thumbIndex],
-            fit: BoxFit.cover,
-          ),
-          if (selected)
-            ColoredBox(
-              color: Colors.white.withValues(alpha: 0.5),
-              child: Center(
-                child: Text(
-                  '$selectionOrder',
-                  style: GoogleFonts.inter(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w400,
-                    color: HomeFeedTokens.textPrimary,
-                    height: 1,
-                  ),
-                ),
-              ),
-            ),
-        ],
       ),
     );
   }

@@ -81,6 +81,17 @@ class FeedService {
     );
   }
 
+  /// Synchronous peek at whatever "For You" page is already cached (if any)
+  /// — for seeding the feed screen's initial state instantly instead of
+  /// starting from an empty spinner while the real (possibly-cached)
+  /// network round trip resolves.
+  FeedPage? peekForYouCached() {
+    return CacheService.instance.peekCache<FeedPage>(
+      key: 'feed.forYou',
+      parse: _parseFeedPage,
+    );
+  }
+
   /// Cache-first Explore feed, keyed per medium filter so "All"/"Video"/etc
   /// each cache independently.
   Future<FeedPage> getExploreCached({

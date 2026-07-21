@@ -28,8 +28,13 @@ class ApiClient {
       );
       _dio = Dio(BaseOptions(
         baseUrl: ApiConfig.baseUrl,
-        connectTimeout: const Duration(seconds: 30),
-        receiveTimeout: const Duration(seconds: 30),
+        // The deployed backend (Render free tier) spins down after
+        // inactivity and can take 30-60s to wake back up on the next
+        // request — 30s was too tight and tripped on exactly that cold
+        // start, especially on the first request of a session (e.g. sign-up
+        // OTP generation).
+        connectTimeout: const Duration(seconds: 60),
+        receiveTimeout: const Duration(seconds: 60),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -53,8 +58,16 @@ class ApiClient {
                   'Bearer ${AuthSession.instance.accessToken}';
               final response = await _dio!.fetch(opts);
               return handler.resolve(response);
-            } catch (_) {
-              await AuthSession.instance.clear();
+            } catch (e) {
+              // Only a genuine 401 from the refresh call itself means the
+              // refresh token was actually rejected — a network error,
+              // timeout, or backend 5xx during refresh is a transient
+              // hiccup, not a real logout, so the session is left intact
+              // to retry later.
+              final refreshRejected = e is ApiException && e.statusCode == 401;
+              if (refreshRejected) {
+                await AuthSession.instance.clear();
+              }
               return handler.next(error);
             }
           }
@@ -222,10 +235,17 @@ class ApiClient {
           'Request failed (${response.statusCode})';
       return ApiException(message, statusCode: response.statusCode);
     }
-    if (e.type == DioExceptionType.connectionError ||
-        e.type == DioExceptionType.connectionTimeout) {
+    if (e.type == DioExceptionType.connectionError) {
       return ApiException(
         'Cannot reach server at ${ApiConfig.baseUrl}. Is the API running?',
+      );
+    }
+    if (e.type == DioExceptionType.connectionTimeout ||
+        e.type == DioExceptionType.receiveTimeout ||
+        e.type == DioExceptionType.sendTimeout) {
+      return ApiException(
+        'Server is taking longer than usual to respond — it may be waking '
+        'up from inactivity. Please try again in a moment.',
       );
     }
     return ApiException(

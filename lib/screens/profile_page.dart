@@ -457,6 +457,7 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
                       url: coverUrl,
                       height: heroH,
                       width: width,
+                      showDefaultWhenEmpty: profile != null,
                     ),
                     if (_isPushedRoute)
                       Positioned(

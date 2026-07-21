@@ -1,4 +1,7 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+
+import '../theme/home_feed_tokens.dart';
 
 /// Profile cover banner — network URL or bundled art default.
 class ProfileCoverImage extends StatelessWidget {
@@ -9,6 +12,7 @@ class ProfileCoverImage extends StatelessWidget {
     required this.height,
     this.fit = BoxFit.cover,
     this.alignment = Alignment.topCenter,
+    this.showDefaultWhenEmpty = true,
   });
 
   static const defaultAsset = 'assets/profile/default_cover.jpg';
@@ -19,6 +23,11 @@ class ProfileCoverImage extends StatelessWidget {
   final BoxFit fit;
   final Alignment alignment;
 
+  /// When false and [url] is empty, renders a neutral placeholder instead of
+  /// the bundled default cover — for callers still waiting on the real
+  /// profile to load, so "no data yet" isn't shown as "no cover set".
+  final bool showDefaultWhenEmpty;
+
   bool get _hasUrl => url != null && url!.isNotEmpty;
 
   @override
@@ -26,19 +35,22 @@ class ProfileCoverImage extends StatelessWidget {
     return SizedBox(
       width: width,
       height: height,
-      child: _hasUrl ? _networkImage() : _defaultImage(),
+      child: _hasUrl
+          ? _networkImage()
+          : (showDefaultWhenEmpty ? _defaultImage() : _neutralPlaceholder()),
     );
   }
 
   Widget _networkImage() {
-    return Image.network(
-      url!,
+    return CachedNetworkImage(
+      imageUrl: url!,
       fit: fit,
       alignment: alignment,
       width: width,
       height: height,
-      gaplessPlayback: true,
-      errorBuilder: (context, error, stackTrace) => _defaultImage(),
+      fadeInDuration: const Duration(milliseconds: 280),
+      placeholder: (context, url) => _neutralPlaceholder(),
+      errorWidget: (context, url, error) => _defaultImage(),
     );
   }
 
@@ -60,4 +72,7 @@ class ProfileCoverImage extends StatelessWidget {
       ),
     );
   }
+
+  Widget _neutralPlaceholder() =>
+      const ColoredBox(color: HomeFeedTokens.background);
 }

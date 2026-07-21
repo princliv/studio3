@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../models/auth_user.dart';
 import '../models/piece_summary.dart';
 import '../models/user_profile.dart';
 import 'api_client.dart';
@@ -105,10 +106,23 @@ class UserService {
     required String currentPassword,
     required String newPassword,
   }) async {
-    await _api.patch('/api/user/me/password', body: {
+    final json = await _api.patch('/api/user/me/password', body: {
       'currentPassword': currentPassword,
       'newPassword': newPassword,
     });
+    // The backend revokes every session (including this one) and reissues
+    // a fresh session/token pair for this request — pick it up so this
+    // device stays logged in instead of getting logged out on its own
+    // next API call.
+    final data = json['data'] as Map<String, dynamic>? ?? {};
+    final token = data['accessToken'] as String?;
+    final userJson = data['user'] as Map<String, dynamic>?;
+    if (token != null && userJson != null) {
+      await _session.saveSession(
+        token: token,
+        authUser: AuthUser.fromJson(userJson),
+      );
+    }
   }
 
   /// Step 1 of authenticated email change: sends an OTP to [newEmail].
@@ -280,7 +294,12 @@ class UserService {
       username: profile.username,
       name: profile.name,
       email: profile.email ?? user.email,
-      onboardingComplete: profile.onboardingComplete,
+      // Monotonic: once onboarding is complete locally, never let a
+      // subsequent profile fetch un-set it — a backend read that lands
+      // just after `onboarding/complete` returns can otherwise still
+      // reflect the pre-completion state and bounce the user right back
+      // to the onboarding flow.
+      onboardingComplete: user.onboardingComplete || profile.onboardingComplete,
       role: profile.role,
       sellerEnabled: profile.sellerEnabled,
       profilePhotoUrl: profile.profilePhotoUrl,
