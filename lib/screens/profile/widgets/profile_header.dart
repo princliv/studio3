@@ -50,7 +50,7 @@ class ProfileHeader extends StatelessWidget {
   final VoidCallback? onTapFollowing;
   final VoidCallback? onTapFollowers;
 
-  static const _avatarSize = 44.0;
+  static const _avatarSize = 86.0;
 
   String _formatCount(int? value) {
     if (value == null) return '—';
@@ -93,63 +93,26 @@ class ProfileHeader extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      GestureDetector(
-                        onTap: onAvatarTap,
-                        behavior: onAvatarTap != null
-                            ? HitTestBehavior.opaque
-                            : HitTestBehavior.deferToChild,
-                        child: ProfileAvatar(
-                          url: avatarUrl,
-                          size: _avatarSize,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.inter(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: HomeFeedTokens.textPrimary,
-                                height: 1.15,
-                              ),
-                            ),
-                            Text(
-                              handle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w400,
-                                color: kProfileTextMuted,
-                                height: 1.15,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                GestureDetector(
+                  onTap: onAvatarTap,
+                  behavior: onAvatarTap != null
+                      ? HitTestBehavior.opaque
+                      : HitTestBehavior.deferToChild,
+                  child: ProfileAvatar(
+                    url: avatarUrl,
+                    size: _avatarSize,
                   ),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 20),
                 Expanded(
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerRight,
+                    alignment: Alignment.center,
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         for (var i = 0; i < stats.length; i++) ...[
-                          if (i > 0) const SizedBox(width: 8),
+                          if (i > 0) const SizedBox(width: 18),
                           _StatBlock(
                             value: stats[i].value,
                             label: stats[i].label,
@@ -162,7 +125,31 @@ class ProfileHeader extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 14),
+            Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: HomeFeedTokens.textPrimary,
+                height: 1.2,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              handle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w400,
+                color: kProfileTextMuted,
+                height: 1.2,
+              ),
+            ),
+            const SizedBox(height: 8),
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -174,7 +161,7 @@ class ProfileHeader extends StatelessWidget {
                 Text(
                   '  ·  ',
                   style: GoogleFonts.inter(
-                    fontSize: 11,
+                    fontSize: 13,
                     fontWeight: FontWeight.w400,
                     color: kProfileTextMuted,
                   ),
@@ -191,7 +178,7 @@ class ProfileHeader extends StatelessWidget {
               Text(
                 bioLine1,
                 style: GoogleFonts.inter(
-                  fontSize: 13,
+                  fontSize: 14,
                   fontWeight: FontWeight.w500,
                   color: HomeFeedTokens.textPrimary,
                   height: 1.35,
@@ -202,7 +189,7 @@ class ProfileHeader extends StatelessWidget {
               Text(
                 bioLine2,
                 style: GoogleFonts.inter(
-                  fontSize: 13,
+                  fontSize: 14,
                   fontWeight: FontWeight.w400,
                   color: HomeFeedTokens.textPrimary,
                   height: 1.4,
@@ -253,18 +240,18 @@ class _StatBlock extends StatelessWidget {
           value,
           textAlign: TextAlign.center,
           style: GoogleFonts.inter(
-            fontSize: compact ? 12 : 13,
+            fontSize: compact ? 15 : 17,
             fontWeight: FontWeight.w700,
             color: HomeFeedTokens.textPrimary,
             height: 1.0,
           ),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 3),
         Text(
           label,
           textAlign: TextAlign.center,
           style: GoogleFonts.inter(
-            fontSize: compact ? 8 : 9,
+            fontSize: compact ? 11 : 12,
             fontWeight: FontWeight.w400,
             color: kProfileTextMuted,
             height: 1.0,
@@ -294,7 +281,7 @@ class _FollowStatText extends StatelessWidget {
       child: Text(
         '$count $label',
         style: GoogleFonts.inter(
-          fontSize: 11,
+          fontSize: 13,
           fontWeight: FontWeight.w400,
           color: kProfileTextMuted,
           height: 1.35,
