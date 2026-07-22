@@ -10,6 +10,7 @@ import '../services/series_service.dart';
 import '../services/social_service.dart';
 import '../services/user_service.dart';
 import '../theme/home_feed_tokens.dart';
+import 'follow_list_page.dart';
 import '../widgets/delete_confirmation_dialog.dart';
 import '../widgets/profile_avatar_preview_sheet.dart';
 import '../widgets/profile_cover_image.dart';
@@ -375,6 +376,18 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
     );
   }
 
+  void _onTapFollowStat(FollowListTab tab) {
+    final username = _profile?.username ??
+        widget.username ??
+        AuthSession.instance.user?.username;
+    if (username == null || username.isEmpty) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => FollowListPage(username: username, initialTab: tab),
+      ),
+    );
+  }
+
   void _onMessageTap() {
     if (widget.viewerMode) {
       _showViewerModePreviewSnackBar();
@@ -614,8 +627,8 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
                 child: ProfileHeader(
                   name: name,
                   handle: handle,
-                  followingFollowers: profile?.followingFollowers ??
-                      '0 following · 0 followers',
+                  followingCount: profile?.followingCount ?? 0,
+                  followersCount: profile?.followersCount ?? 0,
                   bioLine1: profile?.location ?? '',
                   bioLine2: profile?.bio ?? '',
                   avatarUrl: avatarUrl,
@@ -629,6 +642,8 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
                   onFollow: showPublicActions && !_followBusy ? _onFollowTap : null,
                   onMessage: showPublicActions ? _onMessageTap : null,
                   onAvatarTap: () => _onAvatarTap(avatarUrl),
+                  onTapFollowing: () => _onTapFollowStat(FollowListTab.following),
+                  onTapFollowers: () => _onTapFollowStat(FollowListTab.followers),
                 ),
               ),
               if (profile != null && profile.isLocked && !isOwnProfile)

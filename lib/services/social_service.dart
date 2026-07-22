@@ -2,6 +2,7 @@ import '../models/blocked_user.dart';
 import '../models/comment_page.dart';
 import '../models/feed_item.dart';
 import '../models/follow_request.dart';
+import '../models/follow_user_summary.dart';
 import 'api_client.dart';
 import 'auth_session.dart';
 
@@ -59,6 +60,54 @@ class SocialService {
   Future<List<BlockedUser>> listBlocked() async {
     final json = await _api.get('/api/users/blocked', auth: true);
     return _api.extractList(json).map(BlockedUser.fromJson).toList();
+  }
+
+  Future<FollowUserPage> listFollowers(
+    String username, {
+    String? cursor,
+    int? limit,
+  }) {
+    return _getFollowUserPage(
+      '/api/users/$username/followers',
+      cursor: cursor,
+      limit: limit,
+    );
+  }
+
+  Future<FollowUserPage> listFollowing(
+    String username, {
+    String? cursor,
+    int? limit,
+  }) {
+    return _getFollowUserPage(
+      '/api/users/$username/following',
+      cursor: cursor,
+      limit: limit,
+    );
+  }
+
+  Future<FollowUserPage> _getFollowUserPage(
+    String path, {
+    String? cursor,
+    int? limit,
+  }) async {
+    final query = <String, String>{};
+    if (cursor != null && cursor.isNotEmpty) query['cursor'] = cursor;
+    if (limit != null) query['limit'] = limit.toString();
+
+    final json = await _api.get(
+      path,
+      query: query.isEmpty ? null : query,
+      auth: AuthSession.instance.isLoggedIn,
+    );
+    final data = _api.extractData(json);
+    final items = _api
+        .extractList(json)
+        .map(FollowUserSummary.fromJson)
+        .toList(growable: false);
+    final nextCursor =
+        data is Map<String, dynamic> ? data['nextCursor'] as String? : null;
+    return FollowUserPage(items: items, nextCursor: nextCursor);
   }
 
   Future<void> blockUser(String username) async {

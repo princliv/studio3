@@ -11,7 +11,8 @@ class ProfileHeader extends StatelessWidget {
     super.key,
     required this.name,
     required this.handle,
-    required this.followingFollowers,
+    required this.followingCount,
+    required this.followersCount,
     required this.bioLine1,
     required this.bioLine2,
     this.avatarUrl,
@@ -25,11 +26,14 @@ class ProfileHeader extends StatelessWidget {
     this.onFollow,
     this.onMessage,
     this.onAvatarTap,
+    this.onTapFollowing,
+    this.onTapFollowers,
   });
 
   final String name;
   final String handle;
-  final String followingFollowers;
+  final int followingCount;
+  final int followersCount;
   final String bioLine1;
   final String bioLine2;
   final String? avatarUrl;
@@ -43,6 +47,8 @@ class ProfileHeader extends StatelessWidget {
   final VoidCallback? onFollow;
   final VoidCallback? onMessage;
   final VoidCallback? onAvatarTap;
+  final VoidCallback? onTapFollowing;
+  final VoidCallback? onTapFollowers;
 
   static const _avatarSize = 44.0;
 
@@ -157,14 +163,28 @@ class ProfileHeader extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            Text(
-              followingFollowers,
-              style: GoogleFonts.inter(
-                fontSize: 11,
-                fontWeight: FontWeight.w400,
-                color: kProfileTextMuted,
-                height: 1.35,
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _FollowStatText(
+                  count: followingCount,
+                  label: 'following',
+                  onTap: onTapFollowing,
+                ),
+                Text(
+                  '  ·  ',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w400,
+                    color: kProfileTextMuted,
+                  ),
+                ),
+                _FollowStatText(
+                  count: followersCount,
+                  label: 'followers',
+                  onTap: onTapFollowers,
+                ),
+              ],
             ),
             const SizedBox(height: 8),
             if (bioLine1.isNotEmpty)
@@ -251,6 +271,35 @@ class _StatBlock extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _FollowStatText extends StatelessWidget {
+  const _FollowStatText({
+    required this.count,
+    required this.label,
+    this.onTap,
+  });
+
+  final int count;
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: onTap != null ? HitTestBehavior.opaque : HitTestBehavior.deferToChild,
+      child: Text(
+        '$count $label',
+        style: GoogleFonts.inter(
+          fontSize: 11,
+          fontWeight: FontWeight.w400,
+          color: kProfileTextMuted,
+          height: 1.35,
+        ),
+      ),
     );
   }
 }

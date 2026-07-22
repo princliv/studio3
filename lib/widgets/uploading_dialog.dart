@@ -12,6 +12,10 @@ Future<void> showUploadingDialog(
   BuildContext context, {
   String message = 'Uploading…',
 }) {
+  // A still-focused text field's IME composing region can otherwise bleed
+  // its underline through the dialog barrier (seen as stray yellow lines
+  // under the message on some keyboards).
+  FocusScope.of(context).unfocus();
   return showDialog<void>(
     context: context,
     barrierDismissible: false,
