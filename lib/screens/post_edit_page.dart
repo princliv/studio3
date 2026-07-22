@@ -10,7 +10,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../data/post_media_assets.dart';
 import '../models/post_image_transform.dart';
 import '../theme/home_feed_tokens.dart';
-import '../utils/crop_cover_math.dart' show CropAspectRatio;
+import '../utils/crop_cover_math.dart'
+    show CropAspectRatio, CropCoverMath, CropFitMode;
 import '../utils/image_adjust_math.dart';
 import '../widgets/post_crop_preview.dart';
 /// Image edit step — posting flow (Figma 1961:1453 / 1973:1223 / 1986:1416).
@@ -133,6 +134,16 @@ class _PostEditPageState extends State<PostEditPage> {
   void _applyRotation(double degrees) {
     setState(() {
       _currentTransform.rotationDegrees = degrees;
+      if (_currentTransform.fitMode == CropFitMode.fill) {
+        final imageAspect = _aspectForPath(_imagePaths[_activeImageIndex]);
+        _currentTransform.pan = CropCoverMath.clampPan(
+          pan: _currentTransform.pan,
+          scale: _currentTransform.effectiveScale(imageAspect),
+          rotationDegrees: degrees,
+          cropAspect: _currentTransform.aspectRatio.value,
+          imageAspect: imageAspect,
+        );
+      }
       _showRotationValue = true;
     });
   }
@@ -286,13 +297,33 @@ class _PostEditPageState extends State<PostEditPage> {
                                 _currentTransform.rotationDegrees;
                             _gestureBaseZoom = _currentTransform.zoomFactor;
                           },
-                          onScaleUpdate: (rotationDelta, scaleDelta) {
+                          onScaleUpdate:
+                              (rotationDelta, scaleDelta, focalPointDelta) {
                             setState(() {
                               _currentTransform.rotationDegrees =
                                   _gestureBaseRotation + rotationDelta;
-                              _currentTransform.zoomFactor =
-                                  (_gestureBaseZoom * scaleDelta)
-                                      .clamp(1.0, 4.0);
+                              if (_currentTransform.fitMode ==
+                                  CropFitMode.fill) {
+                                _currentTransform.zoomFactor =
+                                    (_gestureBaseZoom * scaleDelta)
+                                        .clamp(1.0, 4.0);
+                                final frameWidth = cropSize.width;
+                                final rawPan = _currentTransform.pan +
+                                    Offset(
+                                      focalPointDelta.dx / frameWidth,
+                                      focalPointDelta.dy / frameWidth,
+                                    );
+                                _currentTransform.pan = CropCoverMath.clampPan(
+                                  pan: rawPan,
+                                  scale: _currentTransform
+                                      .effectiveScale(imageAspect),
+                                  rotationDegrees:
+                                      _currentTransform.rotationDegrees,
+                                  cropAspect:
+                                      _currentTransform.aspectRatio.value,
+                                  imageAspect: imageAspect,
+                                );
+                              }
                               if (rotationDelta.abs() > 0.01) {
                                 _showRotationValue = true;
                               }
@@ -370,15 +401,33 @@ class _PostEditPageState extends State<PostEditPage> {
           ],
           const Spacer(),
           if (_isCropMode) ...[
+            _CropFitSelector(
+              selected: _currentTransform.fitMode,
+              onSelected: (mode) {
+                setState(() => _currentTransform.fitMode = mode);
+              },
+            ),
+            const SizedBox(height: 8),
             _CropAspectSelector(
               selected: _currentTransform.aspectRatio,
               onSelected: (ratio) {
-                setState(() => _currentTransform.aspectRatio = ratio);
+                setState(() {
+                  _currentTransform.aspectRatio = ratio;
+                  if (_currentTransform.fitMode == CropFitMode.fill) {
+                    _currentTransform.pan = CropCoverMath.clampPan(
+                      pan: _currentTransform.pan,
+                      scale: _currentTransform.effectiveScale(imageAspect),
+                      rotationDegrees: _currentTransform.rotationDegrees,
+                      cropAspect: ratio.value,
+                      imageAspect: imageAspect,
+                    );
+                  }
+                });
               },
             ),
             const SizedBox(height: 16),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.symmetric(horizontal: 28),
               child: _EditResetDoneRow(
                 onReset: _resetForCurrentMode,
                 onDone: _finishEditing,
@@ -405,7 +454,7 @@ class _PostEditPageState extends State<PostEditPage> {
             if (_activeAdjustSubTool != null) ...[
               const SizedBox(height: 8),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
+                padding: const EdgeInsets.symmetric(horizontal: 28),
                 child: _EditResetDoneRow(
                   onReset: _resetForCurrentMode,
                   onDone: _finishEditing,
@@ -514,10 +563,10 @@ class _EditResetDoneRow extends StatelessWidget {
           child: Text(
             'RESET',
             style: GoogleFonts.inter(
-              fontSize: 9,
+              fontSize: 11,
               fontWeight: FontWeight.w500,
               color: _errorRed,
-              letterSpacing: 0.2,
+              letterSpacing: 0.3,
             ),
           ),
         ),
@@ -527,10 +576,10 @@ class _EditResetDoneRow extends StatelessWidget {
           child: Text(
             'DONE',
             style: GoogleFonts.inter(
-              fontSize: 9,
+              fontSize: 11,
               fontWeight: FontWeight.w500,
               color: HomeFeedTokens.textInverse,
-              letterSpacing: 0.2,
+              letterSpacing: 0.3,
             ),
           ),
         ),
@@ -589,7 +638,11 @@ class _EditPreviewImage extends StatelessWidget {
   final double imageAspect;
   final bool gesturesEnabled;
   final VoidCallback onScaleStart;
-  final void Function(double rotationDelta, double scaleDelta) onScaleUpdate;
+  final void Function(
+    double rotationDelta,
+    double scaleDelta,
+    Offset focalPointDelta,
+  ) onScaleUpdate;
   final VoidCallback? onScaleEnd;
 
   @override
@@ -609,6 +662,7 @@ class _EditPreviewImage extends StatelessWidget {
         onScaleUpdate(
           details.rotation * 180 / math.pi,
           details.scale,
+          details.focalPointDelta,
         );
       },
       onScaleEnd: (_) => onScaleEnd?.call(),
@@ -676,9 +730,9 @@ class _AdjustTransformBar extends StatelessWidget {
     required this.onToolTap,
   });
 
-  static const _iconSize = 24.0;
-  static const _barWidth = 140.0;
-  static const _barHeight = 32.0;
+  static const _iconSize = 30.0;
+  static const _barWidth = 170.0;
+  static const _barHeight = 40.0;
 
   final AdjustSubTool? selectedTool;
   final ValueChanged<AdjustSubTool> onToolTap;
@@ -691,7 +745,7 @@ class _AdjustTransformBar extends StatelessWidget {
         child: SizedBox(
           width: _barWidth,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -776,7 +830,7 @@ class _CropAspectSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Container(
-        height: 38,
+        height: 46,
         padding: const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(
           color: _selectorBg,
@@ -820,7 +874,7 @@ class _CropAspectChip extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         decoration: BoxDecoration(
           color: selected
               ? Colors.white.withValues(alpha: 0.12)
@@ -830,10 +884,52 @@ class _CropAspectChip extends StatelessWidget {
         child: Text(
           label,
           style: GoogleFonts.inter(
-            fontSize: 13,
+            fontSize: 15,
             fontWeight: selected ? FontWeight.w500 : FontWeight.w400,
             color: selected ? HomeFeedTokens.textInverse : _textSecondary,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CropFitSelector extends StatelessWidget {
+  const _CropFitSelector({
+    required this.selected,
+    required this.onSelected,
+  });
+
+  static const _selectorBg = Color(0xE6231F1B);
+
+  final CropFitMode selected;
+  final ValueChanged<CropFitMode> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        height: 46,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(
+          color: _selectorBg,
+          borderRadius: BorderRadius.circular(100),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _CropAspectChip(
+              label: 'Fill',
+              selected: selected == CropFitMode.fill,
+              onTap: () => onSelected(CropFitMode.fill),
+            ),
+            const SizedBox(width: 4),
+            _CropAspectChip(
+              label: 'Fit',
+              selected: selected == CropFitMode.fit,
+              onTap: () => onSelected(CropFitMode.fit),
+            ),
+          ],
         ),
       ),
     );
@@ -998,9 +1094,9 @@ class _CropTransformBar extends StatelessWidget {
     required this.onToolTap,
   });
 
-  static const _iconSize = 24.0;
-  static const _barWidth = 140.0;
-  static const _barHeight = 32.0;
+  static const _iconSize = 30.0;
+  static const _barWidth = 170.0;
+  static const _barHeight = 40.0;
 
   final CropSubTool? selectedTool;
   final ValueChanged<CropSubTool> onToolTap;
@@ -1013,7 +1109,7 @@ class _CropTransformBar extends StatelessWidget {
         child: SizedBox(
           width: _barWidth,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -1136,8 +1232,8 @@ class _EditBanner extends StatelessWidget {
                     onTap: onNext,
                     borderRadius: BorderRadius.circular(100),
                     child: Container(
-                      width: 60,
-                      height: 32,
+                      width: 76,
+                      height: 40,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color: _neutral300,
@@ -1146,7 +1242,7 @@ class _EditBanner extends StatelessWidget {
                       child: Text(
                         'Next',
                         style: GoogleFonts.inter(
-                          fontSize: 12,
+                          fontSize: 14,
                           fontWeight: FontWeight.w500,
                           color: HomeFeedTokens.textPrimary,
                         ),
@@ -1177,8 +1273,8 @@ class _EditToolSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 160,
-      height: 38,
+      width: 200,
+      height: 46,
       padding: const EdgeInsets.symmetric(horizontal: 30),
       alignment: Alignment.center,
       decoration: BoxDecoration(
@@ -1225,7 +1321,7 @@ class _EditToolTab extends StatelessWidget {
       child: Text(
         label,
         style: GoogleFonts.inter(
-          fontSize: 13,
+          fontSize: 15,
           fontWeight: selected ? FontWeight.w500 : FontWeight.w400,
           color: selected ? HomeFeedTokens.textInverse : _textSecondary,
         ),

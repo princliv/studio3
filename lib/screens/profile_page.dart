@@ -51,6 +51,7 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
   bool _listedPiecesLoaded = false;
   bool _seriesLoaded = false;
   String _collectSegment = 'available';
+  String _sceneFilter = 'all';
   bool _followBusy = false;
 
   bool get _isTabContext => widget.username == null;
@@ -225,6 +226,10 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
 
   void _onCollectSegmentChanged(String segment) {
     setState(() => _collectSegment = segment);
+  }
+
+  void _onSceneFilterChanged(String filter) {
+    setState(() => _sceneFilter = filter);
   }
 
   FollowState get _followState {
@@ -559,6 +564,8 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
                       isOwnProfile: isOwnProfile && !widget.viewerMode,
                       onDeletePiece: _deletePiece,
                       onDeleteScene: _deleteScene,
+                      sceneFilter: _sceneFilter,
+                      onSceneFilterChanged: _onSceneFilterChanged,
                     ),
                   ),
                 ),

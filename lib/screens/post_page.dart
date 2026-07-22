@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:photo_manager/photo_manager.dart';
 
 import '../data/post_media_assets.dart';
 import '../models/post_image_transform.dart';
-import '../services/permission_service.dart';
 import '../theme/home_feed_tokens.dart';
 import '../widgets/permission_denied_sheet.dart';
+import '../widgets/post_gallery/post_gallery_picker.dart';
 import 'post_create_page.dart';
 import 'post_edit_page.dart';
 
@@ -28,22 +28,20 @@ class _PostPageState extends State<PostPage> {
 
   _PostFlowStep _step = _PostFlowStep.gallery;
   String _postType = 'piece';
+  List<AssetEntity> _pickedAssets = [];
   List<String>? _pickedImagePaths;
   String? _pickedVideoPath;
-  final _picker = ImagePicker();
+  final ValueNotifier<bool> _albumMenuOpen = ValueNotifier(false);
+  String _selectedAlbumName = 'Recents';
 
   List<String> _editImagePaths = [];
   List<PostImageTransform> _editTransforms = [];
   int _previewImageIndex = 0;
 
   @override
-  void initState() {
-    super.initState();
-    // Open the system photo picker as soon as the flow starts, so the user
-    // lands directly on their own photos rather than an empty screen.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _openGalleryPicker();
-    });
+  void dispose() {
+    _albumMenuOpen.dispose();
+    super.dispose();
   }
 
   void _exitFlow() => Navigator.pop(context);
@@ -52,65 +50,41 @@ class _PostPageState extends State<PostPage> {
     if (type == _postType) return;
     setState(() {
       _postType = type;
+      _pickedAssets = [];
       _pickedImagePaths = null;
       _pickedVideoPath = null;
     });
   }
 
-  Future<bool> _ensureGalleryAccess({required bool forVideo}) async {
-    final outcome = await PermissionService.instance
-        .requestGalleryAccess(forVideo: forVideo);
-    if (outcome == GalleryPermissionOutcome.granted) return true;
-    if (outcome == GalleryPermissionOutcome.deniedForever && mounted) {
-      await showPermissionDeniedSheet(
-        context,
-        title: forVideo ? 'Video access needed' : 'Photo access needed',
-        message:
-            'Enable ${forVideo ? 'video' : 'photo'} library access in Settings to continue.',
-      );
+  Future<void> _goToEdit() async {
+    if (_pickedAssets.isEmpty) return;
+    AssetEntity? video;
+    for (final asset in _pickedAssets) {
+      if (asset.type == AssetType.video) {
+        video = asset;
+        break;
+      }
     }
-    return false;
-  }
-
-  /// System photo picker (Android Photo Picker / iOS PHPicker) — native OS
-  /// UI, includes its own Recents/album browsing for free.
-  Future<void> _openGalleryPicker() async {
-    if (!await _ensureGalleryAccess(forVideo: false)) return;
-    final images = await _picker.pickMultiImage(limit: _maxSelection);
-    if (images.isEmpty || !mounted) return;
-    setState(() {
-      _pickedImagePaths = images.map((x) => x.path).toList();
-      _pickedVideoPath = null;
-    });
-  }
-
-  Future<void> _openCamera() async {
-    final photo = await _picker.pickImage(source: ImageSource.camera);
-    if (photo == null || !mounted) return;
-    setState(() {
-      _pickedImagePaths = [photo.path];
-      _pickedVideoPath = null;
-    });
-  }
-
-  Future<void> _pickVideo() async {
-    if (!await _ensureGalleryAccess(forVideo: true)) return;
-    final video = await _picker.pickVideo(source: ImageSource.gallery);
-    if (video == null || !mounted) return;
-    setState(() {
-      _pickedVideoPath = video.path;
-      _pickedImagePaths = null;
-    });
-  }
-
-  void _goToEdit() {
-    if (_pickedVideoPath != null) {
+    if (video != null) {
+      final file = await video.file;
+      if (file == null || !mounted) return;
+      setState(() {
+        _pickedVideoPath = file.path;
+        _pickedImagePaths = null;
+      });
       _goToDetailsFromVideo();
       return;
     }
-    final isPicked = _pickedImagePaths != null && _pickedImagePaths!.isNotEmpty;
-    if (!isPicked) return;
-    setState(() => _step = _PostFlowStep.edit);
+    final paths = <String>[];
+    for (final asset in _pickedAssets) {
+      final file = await asset.file;
+      if (file != null) paths.add(file.path);
+    }
+    if (!mounted || paths.isEmpty) return;
+    setState(() {
+      _pickedImagePaths = paths;
+      _step = _PostFlowStep.edit;
+    });
   }
 
   void _goToDetailsFromVideo() {
@@ -180,9 +154,7 @@ class _PostPageState extends State<PostPage> {
   Widget _buildGallery() {
     final topInset = MediaQuery.paddingOf(context).top;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
-    final hasSelection =
-        (_pickedImagePaths != null && _pickedImagePaths!.isNotEmpty) ||
-            _pickedVideoPath != null;
+    final hasSelection = _pickedAssets.isNotEmpty || _pickedVideoPath != null;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -193,11 +165,23 @@ class _PostPageState extends State<PostPage> {
             left: 0,
             right: 0,
             bottom: 0,
-            child: _GalleryLauncher(
-              hasSelection: hasSelection,
-              selectedCount: _pickedImagePaths?.length ?? 0,
-              onChoosePhotos: _openGalleryPicker,
-              onTakePhoto: _openCamera,
+            child: PostGalleryPicker(
+              key: ValueKey(_postType),
+              openNotifier: _albumMenuOpen,
+              maxSelection: _maxSelection,
+              allowVideos: _postType == 'scene',
+              onAlbumChanged: (name) =>
+                  setState(() => _selectedAlbumName = name),
+              onSelectionChanged: (assets) =>
+                  setState(() => _pickedAssets = assets),
+              onPermissionPermanentlyDenied: () {
+                showPermissionDeniedSheet(
+                  context,
+                  title: 'Photo access needed',
+                  message:
+                      'Enable photo library access in Settings to continue.',
+                );
+              },
             ),
           ),
           Positioned(
@@ -209,30 +193,25 @@ class _PostPageState extends State<PostPage> {
               onClose: _exitFlow,
               hasSelection: hasSelection,
               onNext: hasSelection ? _goToEdit : null,
-              onPickVideo: _postType == 'scene' ? _pickVideo : null,
+              albumName: _selectedAlbumName,
+              menuOpen: _albumMenuOpen,
             ),
           ),
           Positioned(
             left: 0,
             right: 0,
             bottom: bottomInset + _bottomControlsOffset,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _PostingSelector(
-                  postType: _postType,
-                  onChanged: _onPostTypeChanged,
-                ),
-                const SizedBox(width: 12),
-                GestureDetector(
-                  onTap: () {},
-                  child: SvgPicture.asset(
-                    PostMediaAssets.filterButton,
-                    width: 38,
-                    height: 38,
+            child: ValueListenableBuilder<bool>(
+              valueListenable: _albumMenuOpen,
+              builder: (context, open, _) {
+                if (open) return const SizedBox.shrink();
+                return Center(
+                  child: _PostingSelector(
+                    postType: _postType,
+                    onChanged: _onPostTypeChanged,
                   ),
-                ),
-              ],
+                );
+              },
             ),
           ),
         ],
@@ -271,97 +250,14 @@ class _PostPageState extends State<PostPage> {
   }
 }
 
-class _GalleryLauncher extends StatelessWidget {
-  const _GalleryLauncher({
-    required this.hasSelection,
-    required this.selectedCount,
-    required this.onChoosePhotos,
-    required this.onTakePhoto,
-  });
-
-  final bool hasSelection;
-  final int selectedCount;
-  final VoidCallback onChoosePhotos;
-  final VoidCallback onTakePhoto;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            hasSelection
-                ? Icons.check_circle_rounded
-                : Icons.photo_library_outlined,
-            color: Colors.white,
-            size: 56,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            hasSelection
-                ? '$selectedCount photo${selectedCount == 1 ? '' : 's'} selected'
-                : 'Add photos to your post',
-            style: GoogleFonts.inter(
-              fontSize: 15,
-              fontWeight: FontWeight.w500,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              OutlinedButton.icon(
-                onPressed: onTakePhoto,
-                icon: const Icon(Icons.camera_alt_rounded, color: Colors.white),
-                label: Text(
-                  'Camera',
-                  style: GoogleFonts.inter(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Colors.white54),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(100),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              FilledButton(
-                onPressed: onChoosePhotos,
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(100),
-                  ),
-                ),
-                child: Text(
-                  hasSelection ? 'Change selection' : 'Choose Photos',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _PostingBanner extends StatelessWidget {
   const _PostingBanner({
     required this.topInset,
     required this.onClose,
     required this.hasSelection,
     required this.onNext,
-    this.onPickVideo,
+    required this.albumName,
+    required this.menuOpen,
   });
 
   static const _neutral300 = Color(0xFFC8C5BC);
@@ -370,7 +266,8 @@ class _PostingBanner extends StatelessWidget {
   final VoidCallback onClose;
   final bool hasSelection;
   final VoidCallback? onNext;
-  final VoidCallback? onPickVideo;
+  final String albumName;
+  final ValueNotifier<bool> menuOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -382,76 +279,84 @@ class _PostingBanner extends StatelessWidget {
           height: _PostPageState._bannerHeight,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-            child: Row(
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                GestureDetector(
-                  onTap: onClose,
-                  behavior: HitTestBehavior.opaque,
-                  child: SvgPicture.asset(
-                    PostMediaAssets.closeIcon,
-                    width: 14,
-                    height: 14,
-                  ),
-                ),
-                Expanded(
-                  child: Center(
-                    child: Text(
-                      'New post',
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: HomeFeedTokens.textInverse,
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap: onClose,
+                      behavior: HitTestBehavior.opaque,
+                      child: SvgPicture.asset(
+                        PostMediaAssets.closeIcon,
+                        width: 14,
+                        height: 14,
                       ),
                     ),
-                  ),
-                ),
-                Opacity(
-                  opacity: hasSelection ? 1 : 0.3,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: onNext,
-                      borderRadius: BorderRadius.circular(100),
-                      child: Container(
-                        width: 60,
-                        height: 32,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: _neutral300,
+                    const Spacer(),
+                    Opacity(
+                      opacity: hasSelection ? 1 : 0.3,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: onNext,
                           borderRadius: BorderRadius.circular(100),
-                        ),
-                        child: Text(
-                          'Next',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: HomeFeedTokens.textPrimary,
+                          child: Container(
+                            width: 60,
+                            height: 32,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: _neutral300,
+                              borderRadius: BorderRadius.circular(100),
+                            ),
+                            child: Text(
+                              'Next',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: HomeFeedTokens.textPrimary,
+                              ),
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
-                if (onPickVideo != null) ...[
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: onPickVideo,
+                ValueListenableBuilder<bool>(
+                  valueListenable: menuOpen,
+                  builder: (context, open, _) => GestureDetector(
+                    onTap: () => menuOpen.value = !open,
                     behavior: HitTestBehavior.opaque,
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.12),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.videocam_rounded,
-                        color: Colors.white,
-                        size: 18,
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          albumName,
+                          style: GoogleFonts.inter(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: HomeFeedTokens.textInverse,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        AnimatedRotation(
+                          turns: open ? 0.5 : 0,
+                          duration: const Duration(milliseconds: 150),
+                          child: SvgPicture.asset(
+                            PostMediaAssets.chevronDown,
+                            width: 9,
+                            height: 9,
+                            colorFilter: ColorFilter.mode(
+                              HomeFeedTokens.textInverse,
+                              BlendMode.srcIn,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ],
             ),
           ),
@@ -477,8 +382,8 @@ class _PostingSelector extends StatelessWidget {
     const options = ['piece', 'scene'];
 
     return Container(
-      width: 160,
-      height: 38,
+      width: 200,
+      height: 46,
       padding: const EdgeInsets.symmetric(horizontal: 30),
       alignment: Alignment.center,
       decoration: BoxDecoration(
@@ -521,7 +426,7 @@ class _SelectorTab extends StatelessWidget {
       child: Text(
         label,
         style: GoogleFonts.inter(
-          fontSize: 13,
+          fontSize: 15,
           fontWeight: selected ? FontWeight.w500 : FontWeight.w400,
           color: selected ? HomeFeedTokens.textInverse : _textSecondary,
         ),

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/post_image_transform.dart';
+import '../utils/crop_cover_math.dart' show CropFitMode;
 import '../utils/image_adjust_math.dart';
 
 /// True-to-output preview of a post image: same rotation/flip/zoom/aspect
@@ -32,37 +33,48 @@ class PostCropPreview extends StatefulWidget {
     required PostImageTransform transform,
     required double imageAspect,
   }) {
-    final scale = transform.effectiveScale(imageAspect);
-    final radians = transform.rotationDegrees * math.pi / 180;
-    final sx = (transform.flipHorizontal ? -1.0 : 1.0) * scale;
-    final sy = (transform.flipVertical ? -1.0 : 1.0) * scale;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final scale = transform.effectiveScale(imageAspect);
+        final radians = transform.rotationDegrees * math.pi / 180;
+        final sx = (transform.flipHorizontal ? -1.0 : 1.0) * scale;
+        final sy = (transform.flipVertical ? -1.0 : 1.0) * scale;
+        final frameWidth = constraints.maxWidth;
+        final pan = transform.fitMode == CropFitMode.fill
+            ? transform.pan
+            : Offset.zero;
+        final px = pan.dx * frameWidth;
+        final py = pan.dy * frameWidth;
 
-    Widget image = Transform(
-      alignment: Alignment.center,
-      transform: Matrix4.identity()
-        ..rotateZ(radians)
-        ..scaleByDouble(sx, sy, 1.0, 1),
-      child: sourceImage(imagePath),
+        Widget image = Transform(
+          alignment: Alignment.center,
+          transform: Matrix4.identity()
+            ..translateByDouble(px, py, 0.0, 1.0)
+            ..rotateZ(radians)
+            ..scaleByDouble(sx, sy, 1.0, 1),
+          child: sourceImage(imagePath),
+        );
+
+        if (!ImageAdjustMath.isNeutral(
+          brightness: transform.brightness,
+          contrast: transform.contrast,
+          exposure: transform.exposure,
+        )) {
+          image = ColorFiltered(
+            colorFilter: ColorFilter.matrix(
+              ImageAdjustMath.combinedMatrix(
+                brightness: transform.brightness,
+                contrast: transform.contrast,
+                exposure: transform.exposure,
+              ),
+            ),
+            child: image,
+          );
+        }
+
+        return ColoredBox(color: Colors.black, child: image);
+      },
     );
-
-    if (!ImageAdjustMath.isNeutral(
-      brightness: transform.brightness,
-      contrast: transform.contrast,
-      exposure: transform.exposure,
-    )) {
-      image = ColorFiltered(
-        colorFilter: ColorFilter.matrix(
-          ImageAdjustMath.combinedMatrix(
-            brightness: transform.brightness,
-            contrast: transform.contrast,
-            exposure: transform.exposure,
-          ),
-        ),
-        child: image,
-      );
-    }
-
-    return ColoredBox(color: Colors.black, child: image);
   }
 
   /// Loads [path] as an asset (bundled dummy grid images) or a real file

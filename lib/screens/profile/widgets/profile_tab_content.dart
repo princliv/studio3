@@ -5,10 +5,16 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../models/piece_summary.dart';
 import '../../../models/post_summary.dart';
 import '../../../widgets/feed_skeleton.dart';
+import '../../../widgets/pill_chip.dart';
 import '../profile_constants.dart';
 import 'profile_masonry_grid.dart';
 import 'profile_series_grid.dart';
 import '../models/profile_series_data.dart';
+
+bool _isVideoPost(PostSummary p) {
+  final m = p.mediaType?.toLowerCase();
+  return m == 'video' || m == 'reel' || m == 'reels';
+}
 
 class ProfileTabContent extends StatelessWidget {
   const ProfileTabContent({
@@ -24,6 +30,8 @@ class ProfileTabContent extends StatelessWidget {
     this.isOwnProfile = false,
     this.onDeletePiece,
     this.onDeleteScene,
+    this.sceneFilter = 'all',
+    this.onSceneFilterChanged,
   });
 
   final String currentTab;
@@ -37,6 +45,8 @@ class ProfileTabContent extends StatelessWidget {
   final bool isOwnProfile;
   final void Function(PieceSummary piece)? onDeletePiece;
   final void Function(PostSummary post)? onDeleteScene;
+  final String sceneFilter;
+  final ValueChanged<String>? onSceneFilterChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -73,15 +83,43 @@ class ProfileTabContent extends StatelessWidget {
     }
 
     if (currentTab == 'scenes') {
-      if (scenes.isNotEmpty) {
-        return ProfileContentGrid.fromPosts(
-          scenes,
-          onPostTap: (post) => openProfileScene(context, scenes, post),
-          onDeletePost: onDeleteScene,
-          showOwnerActions: isOwnProfile,
-        );
-      }
-      return const _EmptyState(label: 'No scenes yet');
+      final visibleScenes =
+          sceneFilter == 'videos' ? scenes.where(_isVideoPost).toList() : scenes;
+      final grid = visibleScenes.isNotEmpty
+          ? ProfileContentGrid.fromPosts(
+              visibleScenes,
+              onPostTap: (post) => openProfileScene(context, visibleScenes, post),
+              onDeletePost: onDeleteScene,
+              showOwnerActions: isOwnProfile,
+            )
+          : _EmptyState(
+              label: sceneFilter == 'videos' ? 'No videos yet' : 'No scenes yet',
+            );
+      if (scenes.isEmpty) return grid;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                PillChip(
+                  label: 'All',
+                  selected: sceneFilter != 'videos',
+                  onTap: () => onSceneFilterChanged?.call('all'),
+                ),
+                const SizedBox(width: 8),
+                PillChip(
+                  label: 'Videos',
+                  selected: sceneFilter == 'videos',
+                  onTap: () => onSceneFilterChanged?.call('videos'),
+                ),
+              ],
+            ),
+          ),
+          grid,
+        ],
+      );
     }
 
     if (currentTab == 'collect') {
