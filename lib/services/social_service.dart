@@ -3,6 +3,7 @@ import '../models/comment_page.dart';
 import '../models/feed_item.dart';
 import '../models/follow_request.dart';
 import 'api_client.dart';
+import 'auth_session.dart';
 
 /// Result of `POST`/`DELETE /api/users/:username/follow`. Private accounts
 /// return `requested: true` instead of following immediately.
@@ -107,7 +108,7 @@ class SocialService {
       auth: true,
     );
     final data = _api.extractData(json) as Map<String, dynamic>;
-    return CommentSummary.fromJson(data);
+    return _withCurrentAuthor(CommentSummary.fromJson(data));
   }
 
   Future<CommentSummary> commentOnPost(String id, String body) async {
@@ -117,7 +118,27 @@ class SocialService {
       auth: true,
     );
     final data = _api.extractData(json) as Map<String, dynamic>;
-    return CommentSummary.fromJson(data);
+    return _withCurrentAuthor(CommentSummary.fromJson(data));
+  }
+
+  /// The create-comment endpoints don't return an enriched `author`/`user`
+  /// object the way the comment-list endpoint does — the author is always
+  /// the caller, so fill it in from the session instead of showing a blank
+  /// name for a comment that was just successfully posted.
+  CommentSummary _withCurrentAuthor(CommentSummary comment) {
+    if (comment.authorUsername != null || comment.authorName != null) {
+      return comment;
+    }
+    final user = AuthSession.instance.user;
+    if (user == null) return comment;
+    return CommentSummary(
+      id: comment.id,
+      body: comment.body,
+      authorUsername: user.username,
+      authorName: user.name,
+      authorAvatarUrl: user.profilePhotoUrl,
+      createdAt: comment.createdAt,
+    );
   }
 
   Future<CommentPage> getPieceComments(

@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -11,7 +10,7 @@ import '../data/post_media_assets.dart';
 import '../models/post_image_transform.dart';
 import '../theme/home_feed_tokens.dart';
 import '../utils/crop_cover_math.dart'
-    show CropAspectRatio, CropCoverMath, CropFitMode;
+    show Corner, CropAspectRatio, CropCoverMath, CropFitMode;
 import '../utils/image_adjust_math.dart';
 import '../widgets/post_crop_preview.dart';
 /// Image edit step — posting flow (Figma 1961:1453 / 1973:1223 / 1986:1416).
@@ -52,6 +51,7 @@ class _PostEditPageState extends State<PostEditPage> {
   static const _thumbStripTopGap = 12.0;
   static const _bottomControlsOffset = 42.0;
   static const _cropToolsGapAboveSelector = 12.0;
+  static const _gapAboveAspectSelector = 20.0;
   static const _maxCropHeightFraction = 0.52;
 
   late final List<String> _imagePaths;
@@ -63,8 +63,6 @@ class _PostEditPageState extends State<PostEditPage> {
   CropSubTool? _activeCropSubTool;
   AdjustSubTool? _activeAdjustSubTool;
 
-  double _gestureBaseRotation = 0;
-  double _gestureBaseZoom = 1;
   bool _showAdjustValue = false;
   bool _showRotationValue = false;
 
@@ -134,17 +132,72 @@ class _PostEditPageState extends State<PostEditPage> {
   void _applyRotation(double degrees) {
     setState(() {
       _currentTransform.rotationDegrees = degrees;
-      if (_currentTransform.fitMode == CropFitMode.fill) {
-        final imageAspect = _aspectForPath(_imagePaths[_activeImageIndex]);
-        _currentTransform.pan = CropCoverMath.clampPan(
-          pan: _currentTransform.pan,
-          scale: _currentTransform.effectiveScale(imageAspect),
-          rotationDegrees: degrees,
+      final imageAspect = _aspectForPath(_imagePaths[_activeImageIndex]);
+      _currentTransform.cropRect = CropCoverMath.clampBoxWithinRotatedImage(
+        box: _currentTransform.resolvedCropRect(imageAspect),
+        rotationDegrees: degrees,
+        imageAspect: imageAspect,
+      );
+      _showRotationValue = true;
+    });
+  }
+
+  void _onHandleDrag(Corner corner, Offset deltaNorm) {
+    final imageAspect = _aspectForPath(_imagePaths[_activeImageIndex]);
+    setState(() {
+      final base = _currentTransform.resolvedCropRect(imageAspect);
+      final resized = _currentTransform.fitMode == CropFitMode.fill
+          ? CropCoverMath.resizeAspectLocked(
+              box: base,
+              corner: corner,
+              deltaNorm: deltaNorm,
+              cropAspect: _currentTransform.aspectRatio.value,
+              imageAspect: imageAspect,
+            )
+          : CropCoverMath.resizeFree(
+              box: base,
+              corner: corner,
+              deltaNorm: deltaNorm,
+            );
+      _currentTransform.cropRect = CropCoverMath.clampBoxWithinRotatedImage(
+        box: resized,
+        rotationDegrees: _currentTransform.rotationDegrees,
+        imageAspect: imageAspect,
+      );
+    });
+  }
+
+  /// Dragging inside the box pans the *photo*, not the box — the box
+  /// stays visually fixed at the viewport center (see `build()`'s Fill
+  /// branch), so the crop rect moves opposite to the finger: dragging
+  /// right visually slides the photo right, revealing more of its left
+  /// side under the still-centered box.
+  void _onInteriorDrag(Offset deltaNorm) {
+    final imageAspect = _aspectForPath(_imagePaths[_activeImageIndex]);
+    setState(() {
+      final base = _currentTransform.resolvedCropRect(imageAspect);
+      _currentTransform.cropRect =
+          CropCoverMath.translateBox(box: base, deltaNorm: -deltaNorm);
+    });
+  }
+
+  void _toggleFitMode() {
+    final imageAspect = _aspectForPath(_imagePaths[_activeImageIndex]);
+    final base = _currentTransform.resolvedCropRect(imageAspect);
+    setState(() {
+      if (_currentTransform.fitMode == CropFitMode.fit) {
+        // Fit → Fill: re-lock the current box to the aspect ratio, centered.
+        _currentTransform.fitMode = CropFitMode.fill;
+        _currentTransform.cropRect = CropCoverMath.relockToAspect(
+          box: base,
           cropAspect: _currentTransform.aspectRatio.value,
           imageAspect: imageAspect,
         );
+      } else {
+        // Fill → Fit: keep the box remembered for later, Fit itself
+        // always shows the whole image regardless (see resolvedCropRect).
+        _currentTransform.fitMode = CropFitMode.fit;
       }
-      _showRotationValue = true;
     });
   }
 
@@ -235,6 +288,22 @@ class _PostEditPageState extends State<PostEditPage> {
     });
   }
 
+  /// Fill mode's display box is shaped to the image's own aspect ratio (not
+  /// the crop aspect) — the aspect ratio is expressed by the draggable box
+  /// drawn on top, not by the container itself.
+  Size _imageDisplaySize(double maxWidth, double maxHeight, double imageAspect) {
+    var width = maxWidth;
+    var height = width / imageAspect;
+    if (height > maxHeight) {
+      height = maxHeight;
+      width = height * imageAspect;
+    }
+    return Size(width, height);
+  }
+
+  /// Fit mode has no interactive box, so its preview is just shaped to the
+  /// selected crop aspect ratio directly and shows the true letterboxed
+  /// output (see `PostCropPreview.buildTransformedContent`).
   Size _cropFrameSize(double maxWidth, double maxHeight, CropAspectRatio ratio) {
     var width = maxWidth;
     var height = width / ratio.value;
@@ -254,12 +323,20 @@ class _PostEditPageState extends State<PostEditPage> {
     final maxCropWidth =
         MediaQuery.sizeOf(context).width - (_previewHorizontalInset * 2);
     final maxCropHeight = screenHeight * _maxCropHeightFraction;
-    final cropSize = _cropFrameSize(
-      maxCropWidth,
-      maxCropHeight,
-      _currentTransform.aspectRatio,
-    );
     final imageAspect = _aspectForPath(_imagePaths[_activeImageIndex]);
+    final isFillMode = _currentTransform.fitMode == CropFitMode.fill;
+    // The full photo + draggable box only appear while Crop is actively
+    // open — everywhere else (the default landing view, Adjust mode)
+    // shows the real cropped result, matching what will be uploaded.
+    final showBoxEditor = isFillMode && _isCropMode;
+    final viewportSize = showBoxEditor
+        ? _imageDisplaySize(maxCropWidth, maxCropHeight, imageAspect)
+        : _cropFrameSize(maxCropWidth, maxCropHeight, _currentTransform.aspectRatio);
+    final resolvedRect = _currentTransform.resolvedCropRect(imageAspect);
+    final boxSize = Size(
+      resolvedRect.width * viewportSize.width,
+      resolvedRect.height * viewportSize.height,
+    );
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -282,55 +359,44 @@ class _PostEditPageState extends State<PostEditPage> {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(_previewRadius),
                   child: SizedBox(
-                    width: cropSize.width,
-                    height: cropSize.height,
+                    width: viewportSize.width,
+                    height: viewportSize.height,
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        _EditPreviewImage(
-                          assetPath: _imagePaths[_activeImageIndex],
-                          transform: _currentTransform,
-                          imageAspect: imageAspect,
-                          gesturesEnabled: _isCropMode,
-                          onScaleStart: () {
-                            _gestureBaseRotation =
-                                _currentTransform.rotationDegrees;
-                            _gestureBaseZoom = _currentTransform.zoomFactor;
-                          },
-                          onScaleUpdate:
-                              (rotationDelta, scaleDelta, focalPointDelta) {
-                            setState(() {
-                              _currentTransform.rotationDegrees =
-                                  _gestureBaseRotation + rotationDelta;
-                              if (_currentTransform.fitMode ==
-                                  CropFitMode.fill) {
-                                _currentTransform.zoomFactor =
-                                    (_gestureBaseZoom * scaleDelta)
-                                        .clamp(1.0, 4.0);
-                                final frameWidth = cropSize.width;
-                                final rawPan = _currentTransform.pan +
-                                    Offset(
-                                      focalPointDelta.dx / frameWidth,
-                                      focalPointDelta.dy / frameWidth,
-                                    );
-                                _currentTransform.pan = CropCoverMath.clampPan(
-                                  pan: rawPan,
-                                  scale: _currentTransform
-                                      .effectiveScale(imageAspect),
-                                  rotationDegrees:
-                                      _currentTransform.rotationDegrees,
-                                  cropAspect:
-                                      _currentTransform.aspectRatio.value,
-                                  imageAspect: imageAspect,
-                                );
-                              }
-                              if (rotationDelta.abs() > 0.01) {
-                                _showRotationValue = true;
-                              }
-                            });
-                          },
-                          onScaleEnd: _onRotationDragEnd,
-                        ),
+                        if (showBoxEditor) ...[
+                          IgnorePointer(
+                            child: PostCropPreview.buildCenteredOnPivot(
+                              imagePath: _imagePaths[_activeImageIndex],
+                              transform: _currentTransform,
+                              pivotFraction: resolvedRect.center,
+                              viewportSize: viewportSize,
+                            ),
+                          ),
+                          _CropBoxOverlay(
+                            boxSize: boxSize,
+                            viewportSize: viewportSize,
+                            interactive: _isCropMode,
+                            onHandleDrag: _onHandleDrag,
+                            onInteriorDrag: _onInteriorDrag,
+                          ),
+                        ] else
+                          IgnorePointer(
+                            child: PostCropPreview.buildTransformedContent(
+                              imagePath: _imagePaths[_activeImageIndex],
+                              transform: _currentTransform,
+                              imageAspect: imageAspect,
+                            ),
+                          ),
+                        if (_isCropMode)
+                          Positioned(
+                            left: 12,
+                            bottom: 12,
+                            child: _FitFillToggleButton(
+                              fitMode: _currentTransform.fitMode,
+                              onTap: _toggleFitMode,
+                            ),
+                          ),
                         if (_isAdjustMode &&
                             _activeAdjustSubTool != null &&
                             _showAdjustValue)
@@ -352,8 +418,6 @@ class _PostEditPageState extends State<PostEditPage> {
                                   '${_rotationTurnPercent(_currentTransform.rotationDegrees)}%',
                             ),
                           ),
-                        if (_isCropMode)
-                          const IgnorePointer(child: _RuleOfThirdsGrid()),
                       ],
                     ),
                   ),
@@ -401,26 +465,28 @@ class _PostEditPageState extends State<PostEditPage> {
           ],
           const Spacer(),
           if (_isCropMode) ...[
-            _CropFitSelector(
-              selected: _currentTransform.fitMode,
-              onSelected: (mode) {
-                setState(() => _currentTransform.fitMode = mode);
-              },
-            ),
-            const SizedBox(height: 8),
+            const SizedBox(height: _gapAboveAspectSelector),
             _CropAspectSelector(
               selected: _currentTransform.aspectRatio,
               onSelected: (ratio) {
+                // Applies to every image in the post, not just the active
+                // one — a multi-image post should share one output aspect
+                // ratio. Each image's own Fill/Fit mode and box position
+                // stay independent; only images currently in Fill get
+                // their box relocked (using their own imageAspect).
                 setState(() {
-                  _currentTransform.aspectRatio = ratio;
-                  if (_currentTransform.fitMode == CropFitMode.fill) {
-                    _currentTransform.pan = CropCoverMath.clampPan(
-                      pan: _currentTransform.pan,
-                      scale: _currentTransform.effectiveScale(imageAspect),
-                      rotationDegrees: _currentTransform.rotationDegrees,
-                      cropAspect: ratio.value,
-                      imageAspect: imageAspect,
-                    );
+                  for (var i = 0; i < _transforms.length; i++) {
+                    final t = _transforms[i];
+                    final imgAspect = _aspectForPath(_imagePaths[i]);
+                    final base = t.resolvedCropRect(imgAspect);
+                    t.aspectRatio = ratio;
+                    if (t.fitMode == CropFitMode.fill) {
+                      t.cropRect = CropCoverMath.relockToAspect(
+                        box: base,
+                        cropAspect: ratio.value,
+                        imageAspect: imgAspect,
+                      );
+                    }
                   }
                 });
               },
@@ -622,51 +688,134 @@ class _EditThumbPreview extends StatelessWidget {
   }
 }
 
-class _EditPreviewImage extends StatelessWidget {
-  const _EditPreviewImage({
-    required this.assetPath,
-    required this.transform,
-    required this.imageAspect,
-    required this.gesturesEnabled,
-    required this.onScaleStart,
-    required this.onScaleUpdate,
-    this.onScaleEnd,
+/// The draggable/resizable crop box (Fill mode only) — a border always
+/// drawn centered within [viewportSize] at [boxSize], with 4 corner
+/// handles for resizing (aspect-locked, since only Fill uses this overlay)
+/// and a drag-anywhere-inside gesture for repositioning. The box's screen
+/// position never changes (dragging pans the photo underneath it instead —
+/// see `_onInteriorDrag`); only its size follows [boxSize]. The border
+/// stays visible outside crop mode (so the framing is always visible at a
+/// glance) but only [interactive] (crop mode) mounts the gesture detectors.
+class _CropBoxOverlay extends StatelessWidget {
+  const _CropBoxOverlay({
+    required this.boxSize,
+    required this.viewportSize,
+    required this.interactive,
+    required this.onHandleDrag,
+    required this.onInteriorDrag,
   });
 
-  final String assetPath;
-  final PostImageTransform transform;
-  final double imageAspect;
-  final bool gesturesEnabled;
-  final VoidCallback onScaleStart;
-  final void Function(
-    double rotationDelta,
-    double scaleDelta,
-    Offset focalPointDelta,
-  ) onScaleUpdate;
-  final VoidCallback? onScaleEnd;
+  static const _handleHitSize = 44.0;
+  static const _handleVisualSize = 16.0;
+
+  final Size boxSize;
+  final Size viewportSize;
+  final bool interactive;
+  final void Function(Corner corner, Offset deltaNorm) onHandleDrag;
+  final void Function(Offset deltaNorm) onInteriorDrag;
+
+  Offset _normalize(Offset pixelDelta) => Offset(
+        pixelDelta.dx / viewportSize.width,
+        pixelDelta.dy / viewportSize.height,
+      );
+
+  Widget _handle(Corner corner, double fx, double fy, double left, double top,
+      double width, double height) {
+    return Positioned(
+      left: left + fx * width - _handleHitSize / 2,
+      top: top + fy * height - _handleHitSize / 2,
+      width: _handleHitSize,
+      height: _handleHitSize,
+      child: !interactive
+          ? const SizedBox.shrink()
+          : GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onPanUpdate: (details) =>
+                  onHandleDrag(corner, _normalize(details.delta)),
+              child: Center(
+                child: Container(
+                  width: _handleVisualSize,
+                  height: _handleVisualSize,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.black26, width: 1),
+                  ),
+                ),
+              ),
+            ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final image = PostCropPreview.buildTransformedContent(
-      imagePath: assetPath,
-      transform: transform,
-      imageAspect: imageAspect,
+    final left = (viewportSize.width - boxSize.width) / 2;
+    final top = (viewportSize.height - boxSize.height) / 2;
+    final width = boxSize.width;
+    final height = boxSize.height;
+
+    return Stack(
+      children: [
+        Positioned(
+          left: left,
+          top: top,
+          width: width,
+          height: height,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onPanUpdate: interactive
+                ? (details) => onInteriorDrag(_normalize(details.delta))
+                : null,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.white, width: 1.5),
+              ),
+            ),
+          ),
+        ),
+        if (interactive) ...[
+          _handle(Corner.tl, 0, 0, left, top, width, height),
+          _handle(Corner.tr, 1, 0, left, top, width, height),
+          _handle(Corner.bl, 0, 1, left, top, width, height),
+          _handle(Corner.br, 1, 1, left, top, width, height),
+        ],
+      ],
     );
+  }
+}
 
-    if (!gesturesEnabled) return image;
+/// Bottom-left circular toggle: shows the icon for the mode a tap would
+/// switch *to* (Fit mode shows the Fill icon, and vice versa) — no
+/// existing custom SVG for this, so plain Material icons.
+class _FitFillToggleButton extends StatelessWidget {
+  const _FitFillToggleButton({
+    required this.fitMode,
+    required this.onTap,
+  });
 
+  final CropFitMode fitMode;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final switchingToFill = fitMode == CropFitMode.fit;
     return GestureDetector(
+      onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      onScaleStart: (_) => onScaleStart(),
-      onScaleUpdate: (details) {
-        onScaleUpdate(
-          details.rotation * 180 / math.pi,
-          details.scale,
-          details.focalPointDelta,
-        );
-      },
-      onScaleEnd: (_) => onScaleEnd?.call(),
-      child: image,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.55),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white24, width: 1),
+        ),
+        child: Icon(
+          switchingToFill ? Icons.fullscreen_rounded : Icons.fit_screen_outlined,
+          color: Colors.white,
+          size: 20,
+        ),
+      ),
     );
   }
 }
@@ -894,48 +1043,6 @@ class _CropAspectChip extends StatelessWidget {
   }
 }
 
-class _CropFitSelector extends StatelessWidget {
-  const _CropFitSelector({
-    required this.selected,
-    required this.onSelected,
-  });
-
-  static const _selectorBg = Color(0xE6231F1B);
-
-  final CropFitMode selected;
-  final ValueChanged<CropFitMode> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        height: 46,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        decoration: BoxDecoration(
-          color: _selectorBg,
-          borderRadius: BorderRadius.circular(100),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _CropAspectChip(
-              label: 'Fill',
-              selected: selected == CropFitMode.fill,
-              onTap: () => onSelected(CropFitMode.fill),
-            ),
-            const SizedBox(width: 4),
-            _CropAspectChip(
-              label: 'Fit',
-              selected: selected == CropFitMode.fit,
-              onTap: () => onSelected(CropFitMode.fit),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _RotationDial extends StatelessWidget {
   const _RotationDial({
     required this.rotationDegrees,
@@ -1055,37 +1162,6 @@ class _TickDialPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _TickDialPainter oldDelegate) =>
       oldDelegate.offsetX != offsetX;
-}
-
-class _RuleOfThirdsGrid extends StatelessWidget {
-  const _RuleOfThirdsGrid();
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _RuleOfThirdsPainter(),
-      size: Size.infinite,
-    );
-  }
-}
-
-class _RuleOfThirdsPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.85)
-      ..strokeWidth = 1;
-
-    for (var i = 1; i <= 2; i++) {
-      final x = size.width * i / 3;
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
-      final y = size.height * i / 3;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _CropTransformBar extends StatelessWidget {

@@ -1,4 +1,4 @@
-import 'dart:ui' show Offset;
+import 'dart:ui' show Rect;
 
 import '../utils/crop_cover_math.dart';
 
@@ -7,8 +7,7 @@ class PostImageTransform {
   PostImageTransform({
     this.aspectRatio = CropAspectRatio.ratio3x4,
     this.rotationDegrees = 0,
-    this.zoomFactor = 1,
-    this.pan = Offset.zero,
+    this.cropRect,
     this.fitMode = CropFitMode.fill,
     this.flipVertical = false,
     this.flipHorizontal = false,
@@ -19,12 +18,18 @@ class PostImageTransform {
 
   CropAspectRatio aspectRatio;
   double rotationDegrees;
-  /// User pinch zoom multiplier applied on top of auto cover scale (min 1.0).
-  double zoomFactor;
-  /// Translation in Fill mode, normalized to crop-frame width (frame axes).
-  /// Ignored in Fit mode. Always kept within [CropCoverMath.clampPan] bounds.
-  Offset pan;
-  /// Fill crops to cover the frame; Fit shows the whole image, letterboxed.
+  /// The draggable crop box, normalized to the displayed image's own
+  /// bounds (`left`/`right` as fractions of image width, `top`/`bottom` as
+  /// fractions of image height — see `crop_cover_math.dart`'s doc comment
+  /// for the full coordinate contract). `null` means "use the computed
+  /// default for the current [fitMode]/[aspectRatio]" — see
+  /// [resolvedCropRect] — so a fresh [PostImageTransform] always has a
+  /// sensible box without every call site needing to know `imageAspect`
+  /// up front.
+  Rect? cropRect;
+  /// Fill locks the box to [aspectRatio] (content fills the output frame
+  /// edge-to-edge); Fit lets the box take any shape (content is
+  /// letterboxed into the output frame, preserving the box's own aspect).
   CropFitMode fitMode;
   bool flipVertical;
   bool flipHorizontal;
@@ -41,8 +46,7 @@ class PostImageTransform {
   void resetCrop() {
     aspectRatio = CropAspectRatio.ratio3x4;
     rotationDegrees = 0;
-    zoomFactor = 1;
-    pan = Offset.zero;
+    cropRect = null;
     fitMode = CropFitMode.fill;
     flipVertical = false;
     flipHorizontal = false;
@@ -57,8 +61,7 @@ class PostImageTransform {
   PostImageTransform copy() => PostImageTransform(
         aspectRatio: aspectRatio,
         rotationDegrees: rotationDegrees,
-        zoomFactor: zoomFactor,
-        pan: pan,
+        cropRect: cropRect,
         fitMode: fitMode,
         flipVertical: flipVertical,
         flipHorizontal: flipHorizontal,
@@ -85,20 +88,13 @@ class PostImageTransform {
     }
   }
 
-  double effectiveScale(double imageAspect) {
-    if (fitMode == CropFitMode.fit) {
-      return CropCoverMath.maxContainScale(
-        rotationDegrees: rotationDegrees,
-        cropAspect: aspectRatio.value,
-        imageAspect: imageAspect,
-      );
-    }
-    final cover = CropCoverMath.minCoverScale(
-      rotationDegrees: rotationDegrees,
-      cropAspect: aspectRatio.value,
-      imageAspect: imageAspect,
-    );
-    return cover * zoomFactor;
+  /// The crop box currently in effect. Fit is always the whole image —
+  /// fully static, no user adjustment — so any stored [cropRect] is only
+  /// used in Fill mode; it's preserved (not cleared) across a trip through
+  /// Fit so switching back to Fill restores exactly where the user left it.
+  Rect resolvedCropRect(double imageAspect) {
+    if (fitMode == CropFitMode.fit) return CropCoverMath.defaultFitBox();
+    return cropRect ?? CropCoverMath.defaultFillBox(aspectRatio.value, imageAspect);
   }
 }
 

@@ -6,6 +6,7 @@ import '../../models/feed_item.dart';
 import '../../services/auth_session.dart';
 import '../../services/social_service.dart';
 import '../../theme/home_feed_tokens.dart';
+import '../../utils/profile_navigation.dart';
 import '../profile_avatar.dart';
 
 /// Instagram-style comment list + add-comment bottom sheet for a piece or
@@ -317,12 +318,22 @@ class _CommentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canNavigate = comment.authorUsername != null &&
+        comment.authorUsername!.trim().isNotEmpty;
+    void onTapAuthor() => openUserProfile(context, comment.authorUsername);
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ProfileAvatar(url: comment.authorAvatarUrl, size: 32),
+          GestureDetector(
+            onTap: canNavigate ? onTapAuthor : null,
+            behavior: canNavigate
+                ? HitTestBehavior.opaque
+                : HitTestBehavior.deferToChild,
+            child: ProfileAvatar(url: comment.authorAvatarUrl, size: 32),
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -330,15 +341,21 @@ class _CommentTile extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(
-                      (comment.authorName != null &&
-                              comment.authorName!.isNotEmpty)
-                          ? comment.authorName!
-                          : (comment.authorUsername ?? 'User'),
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: HomeFeedTokens.textPrimary,
+                    GestureDetector(
+                      onTap: canNavigate ? onTapAuthor : null,
+                      behavior: canNavigate
+                          ? HitTestBehavior.opaque
+                          : HitTestBehavior.deferToChild,
+                      child: Text(
+                        (comment.authorName != null &&
+                                comment.authorName!.isNotEmpty)
+                            ? comment.authorName!
+                            : (comment.authorUsername ?? 'User'),
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: HomeFeedTokens.textPrimary,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),

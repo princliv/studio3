@@ -26,7 +26,10 @@ class UserService {
 
   /// Cache-first own-profile fetch — short TTL since profile fields can
   /// change from other devices/sessions.
-  Future<UserProfile> getMeCached({bool forceRefresh = false}) {
+  Future<UserProfile> getMeCached({
+    bool forceRefresh = false,
+    void Function(UserProfile fresh)? onBackgroundUpdate,
+  }) {
     return CacheService.instance.fetchWithCache<UserProfile>(
       key: 'user.me',
       ttl: const Duration(minutes: 2),
@@ -43,6 +46,7 @@ class UserService {
         unawaited(_syncSessionFromProfile(profile, data));
         return profile;
       },
+      onBackgroundUpdate: onBackgroundUpdate,
     );
   }
 
@@ -282,6 +286,34 @@ class UserService {
       final profile = await getMe();
       return profile.savedPieces;
     }
+  }
+
+  /// Cache-first saved pieces (Saved page) — cold-start instant paint.
+  Future<List<PieceSummary>> getSavedPiecesCached({
+    bool forceRefresh = false,
+    void Function(List<PieceSummary> fresh)? onBackgroundUpdate,
+  }) {
+    const key = 'saved.pieces';
+    return CacheService.instance.fetchWithCache<List<PieceSummary>>(
+      key: key,
+      ttl: const Duration(minutes: 3),
+      forceRefresh: forceRefresh,
+      fetchRaw: () {
+        if (!ConnectivityService.instance.isOnline) {
+          throw const CacheMiss(key);
+        }
+        return _api.get('/api/user/me/saved/pieces', auth: true);
+      },
+      parse: (json) => _api.extractList(json).map(PieceSummary.fromJson).toList(),
+      onBackgroundUpdate: onBackgroundUpdate,
+    );
+  }
+
+  List<PieceSummary>? peekSavedPiecesCached() {
+    return CacheService.instance.peekCache<List<PieceSummary>>(
+      key: 'saved.pieces',
+      parse: (json) => _api.extractList(json).map(PieceSummary.fromJson).toList(),
+    );
   }
 
   Future<void> _syncSessionFromProfile(

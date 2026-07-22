@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -190,10 +191,10 @@ class _ManageSeriesCard extends StatelessWidget {
                   width: 56,
                   height: 56,
                   child: previewUrl != null
-                      ? Image.network(
-                          previewUrl,
+                      ? CachedNetworkImage(
+                          imageUrl: previewUrl,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => ColoredBox(
+                          errorWidget: (context, url, error) => ColoredBox(
                             color: Colors.grey.shade300,
                             child: const Icon(Icons.image_outlined),
                           ),

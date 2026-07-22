@@ -2,10 +2,12 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../models/feed_item.dart';
+import '../models/feed_page.dart';
 import '../models/feed_preview_item.dart' show FeedAvailabilityFilter;
 import '../theme/home_feed_tokens.dart';
 import '../utils/explore_detail_route.dart';
 import '../utils/image_aspect_ratio_resolver.dart';
+import '../widgets/feed_skeleton.dart';
 import '../widgets/home_feed/home_feed_widgets.dart';
 import '../widgets/offline_state.dart';
 import '../services/connectivity_service.dart';
@@ -91,7 +93,13 @@ class _HomeFeedPageState extends State<HomeFeedPage> with RouteAware {
     try {
       final page = append
           ? await FeedService.instance.getForYou(cursor: _nextCursor)
-          : await FeedService.instance.getForYouCached(forceRefresh: refresh);
+          : await FeedService.instance.getForYouCached(
+              forceRefresh: refresh,
+              // Stale cache paints immediately (see _loadFeed's caller);
+              // this silently merges the background-refreshed page in
+              // place once it lands, with no spinner or flicker.
+              onBackgroundUpdate: _mergeBackgroundPage,
+            );
       if (!mounted) return;
       setState(() {
         if (append) {
@@ -120,6 +128,22 @@ class _HomeFeedPageState extends State<HomeFeedPage> with RouteAware {
             _apiItems.isEmpty && !ConnectivityService.instance.isOnline;
       });
     }
+  }
+
+  /// Applies a page fetched silently in the background (see
+  /// [CacheService.fetchWithCache]'s `onBackgroundUpdate`) — same
+  /// replace-from-page-1 convention `_loadFeed`'s foreground refresh
+  /// already uses, just without ever showing a spinner for it.
+  void _mergeBackgroundPage(FeedPage page) {
+    if (!mounted) return;
+    setState(() {
+      _apiItems
+        ..clear()
+        ..addAll(page.items);
+      _nextCursor = page.nextCursor;
+      _showOfflineState =
+          _apiItems.isEmpty && !ConnectivityService.instance.isOnline;
+    });
   }
 
   void _onScroll() {
@@ -175,7 +199,10 @@ class _HomeFeedPageState extends State<HomeFeedPage> with RouteAware {
       return OfflineState(onRetry: () => _loadFeed(refresh: true));
     }
     if (_loading && _apiItems.isEmpty) {
-      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+      // First-load only — a revisit (cache hit) never reaches this branch
+      // since _loading is seeded false whenever peekForYouCached() finds
+      // something in initState.
+      return const FeedListSkeleton();
     }
 
     final visible = _visibleItems;

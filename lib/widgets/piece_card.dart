@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'glass_card.dart';
@@ -56,7 +57,7 @@ class _PieceCardState extends State<PieceCard> {
                 child: Container(
                   color: AppColors.slate100,
                   child: widget.imageUrl != null
-                      ? Image.network(widget.imageUrl!, fit: BoxFit.cover)
+                      ? CachedNetworkImage(imageUrl: widget.imageUrl!, fit: BoxFit.cover)
                       : null,
                 ),
               ),

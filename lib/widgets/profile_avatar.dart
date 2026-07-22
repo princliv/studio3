@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 /// Circular profile photo with network URL or Instagram-style empty placeholder.
@@ -19,12 +20,12 @@ class ProfileAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final child = _hasUrl
-        ? Image.network(
-            url!,
+        ? CachedNetworkImage(
+            imageUrl: url!,
             width: size,
             height: size,
             fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) => _emptyAvatar(),
+            errorWidget: (context, url, error) => _emptyAvatar(),
           )
         : _emptyAvatar();
 

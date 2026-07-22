@@ -1,6 +1,8 @@
 import '../models/post_summary.dart';
 import 'api_client.dart';
 import 'auth_session.dart';
+import 'cache_service.dart';
+import 'connectivity_service.dart';
 
 class PostService {
   PostService._();
@@ -34,9 +36,67 @@ class PostService {
     return _api.extractList(json).map(PostSummary.fromJson).toList();
   }
 
+  /// Cache-first user posts (Profile "Scenes" tab) — see
+  /// [PieceService.getUserPiecesCached] for the rationale.
+  Future<List<PostSummary>> getUserPostsCached(
+    String username, {
+    bool forceRefresh = false,
+    void Function(List<PostSummary> fresh)? onBackgroundUpdate,
+  }) {
+    final key = 'profile.posts.$username';
+    return CacheService.instance.fetchWithCache<List<PostSummary>>(
+      key: key,
+      ttl: const Duration(minutes: 3),
+      forceRefresh: forceRefresh,
+      fetchRaw: () {
+        if (!ConnectivityService.instance.isOnline) {
+          throw CacheMiss(key);
+        }
+        return _api.get('/api/users/$username/posts');
+      },
+      parse: (json) => _api.extractList(json).map(PostSummary.fromJson).toList(),
+      onBackgroundUpdate: onBackgroundUpdate,
+    );
+  }
+
+  List<PostSummary>? peekUserPostsCached(String username) {
+    return CacheService.instance.peekCache<List<PostSummary>>(
+      key: 'profile.posts.$username',
+      parse: (json) => _api.extractList(json).map(PostSummary.fromJson).toList(),
+    );
+  }
+
   Future<List<PostSummary>> getSavedPosts() async {
     final json = await _api.get('/api/user/me/saved/posts', auth: true);
     return _api.extractList(json).map(PostSummary.fromJson).toList();
+  }
+
+  /// Cache-first saved posts (Saved page) — cold-start instant paint.
+  Future<List<PostSummary>> getSavedPostsCached({
+    bool forceRefresh = false,
+    void Function(List<PostSummary> fresh)? onBackgroundUpdate,
+  }) {
+    const key = 'saved.posts';
+    return CacheService.instance.fetchWithCache<List<PostSummary>>(
+      key: key,
+      ttl: const Duration(minutes: 3),
+      forceRefresh: forceRefresh,
+      fetchRaw: () {
+        if (!ConnectivityService.instance.isOnline) {
+          throw const CacheMiss(key);
+        }
+        return _api.get('/api/user/me/saved/posts', auth: true);
+      },
+      parse: (json) => _api.extractList(json).map(PostSummary.fromJson).toList(),
+      onBackgroundUpdate: onBackgroundUpdate,
+    );
+  }
+
+  List<PostSummary>? peekSavedPostsCached() {
+    return CacheService.instance.peekCache<List<PostSummary>>(
+      key: 'saved.posts',
+      parse: (json) => _api.extractList(json).map(PostSummary.fromJson).toList(),
+    );
   }
 
   Future<void> delete(String id) => _api.delete('/api/posts/$id');

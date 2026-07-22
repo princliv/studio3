@@ -9,10 +9,9 @@ import '../models/post_image_transform.dart';
 import '../utils/crop_cover_math.dart' show CropFitMode;
 import '../utils/image_adjust_math.dart';
 
-/// True-to-output preview of a post image: same rotation/flip/zoom/aspect
-/// ratio/color-adjust math as the edit screen's live preview, so every
-/// "review" step in the posting flow honestly reflects what will be
-/// uploaded — not a fixed-size, color-filter-only stand-in.
+/// True-to-output preview of a post image: same rotation/flip/crop-box/
+/// color-adjust math as the edit screen, so every "review" step in the
+/// posting flow honestly reflects what will be uploaded.
 class PostCropPreview extends StatefulWidget {
   const PostCropPreview({
     super.key,
@@ -25,9 +24,14 @@ class PostCropPreview extends StatefulWidget {
   final PostImageTransform transform;
   final BorderRadius borderRadius;
 
-  /// The transformed (rotated/flipped/scaled/color-adjusted) image content,
-  /// without any outer sizing — shared by the edit screen's gesture-enabled
-  /// live preview and this read-only preview so the math lives in one place.
+  /// The final cropped/output look: resolves the transform's crop box and
+  /// renders exactly what will be uploaded — Fill maps the box to fill the
+  /// frame edge-to-edge; Fit letterboxes the box (preserving its own
+  /// aspect) centered in the frame. Shared by every read-only preview in
+  /// the posting flow (thumbnails, review screen) and by the live editor's
+  /// Fit-mode preview (which has no interactive box, so it just shows this
+  /// same final look directly) — see [buildCenteredOnPivot] for the live
+  /// editor's Fill-mode view instead, which needs the image pannable.
   static Widget buildTransformedContent({
     required String imagePath,
     required PostImageTransform transform,
@@ -35,45 +39,171 @@ class PostCropPreview extends StatefulWidget {
   }) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final scale = transform.effectiveScale(imageAspect);
-        final radians = transform.rotationDegrees * math.pi / 180;
-        final sx = (transform.flipHorizontal ? -1.0 : 1.0) * scale;
-        final sy = (transform.flipVertical ? -1.0 : 1.0) * scale;
-        final frameWidth = constraints.maxWidth;
-        final pan = transform.fitMode == CropFitMode.fill
-            ? transform.pan
-            : Offset.zero;
-        final px = pan.dx * frameWidth;
-        final py = pan.dy * frameWidth;
+        final frameSize = Size(constraints.maxWidth, constraints.maxHeight);
+        final rect = transform.resolvedCropRect(imageAspect);
+        final refSize = Size(frameSize.width, frameSize.width / imageAspect);
 
-        Widget image = Transform(
-          alignment: Alignment.center,
-          transform: Matrix4.identity()
-            ..translateByDouble(px, py, 0.0, 1.0)
-            ..rotateZ(radians)
-            ..scaleByDouble(sx, sy, 1.0, 1),
-          child: sourceImage(imagePath),
+        final Size windowSize;
+        if (transform.fitMode == CropFitMode.fill) {
+          windowSize = frameSize;
+        } else {
+          final subimageAspect = (rect.width / rect.height) * imageAspect;
+          final cropAspect = frameSize.width / frameSize.height;
+          if (subimageAspect >= cropAspect) {
+            windowSize = Size(frameSize.width, frameSize.width / subimageAspect);
+          } else {
+            windowSize = Size(frameSize.height * subimageAspect, frameSize.height);
+          }
+        }
+
+        final scale = windowSize.width / (rect.width * refSize.width);
+        final pivotInRef = Offset(
+          rect.center.dx * refSize.width,
+          rect.center.dy * refSize.height,
         );
 
-        if (!ImageAdjustMath.isNeutral(
+        final image = _renderWindow(
+          refImage: _flippedImage(imagePath, transform),
+          refSize: refSize,
+          pivotInRef: pivotInRef,
+          scale: scale,
+          rotationRadians: transform.rotationDegrees * math.pi / 180,
+          windowSize: windowSize,
+          frameSize: frameSize,
+        );
+
+        return ColoredBox(
+          color: Colors.black,
+          child: _applyColorAdjust(image, transform),
+        );
+      },
+    );
+  }
+
+  /// The live editor's Fill-mode base layer: the whole image, translated so
+  /// [pivotFraction] (the crop box's center, in image-fraction coordinates)
+  /// lands at the center of [viewportSize] — this is what makes the crop
+  /// box appear visually fixed in place while dragging instead pans the
+  /// photo underneath it. [viewportSize] must already be sized to the
+  /// image's own aspect ratio (e.g. via the editor's `_imageDisplaySize`),
+  /// so the image is shown undistorted before this translation is applied.
+  static Widget buildCenteredOnPivot({
+    required String imagePath,
+    required PostImageTransform transform,
+    required Offset pivotFraction,
+    required Size viewportSize,
+  }) {
+    final refSize = viewportSize;
+    final pivotInRef = Offset(
+      pivotFraction.dx * refSize.width,
+      pivotFraction.dy * refSize.height,
+    );
+    final image = _renderWindow(
+      refImage: _flippedImage(imagePath, transform),
+      refSize: refSize,
+      pivotInRef: pivotInRef,
+      scale: 1.0,
+      rotationRadians: transform.rotationDegrees * math.pi / 180,
+      windowSize: viewportSize,
+      frameSize: viewportSize,
+    );
+    return ColoredBox(
+      color: Colors.black,
+      child: _applyColorAdjust(image, transform),
+    );
+  }
+
+  /// Renders [refImage] (already flipped, not yet rotated) scaled by
+  /// [scale] and rotated by [rotationRadians] about [pivotInRef], mapping
+  /// that pivot to the center of a [windowSize] window, clipped to that
+  /// window, itself centered within [frameSize] (letterbox bars show
+  /// through as whatever background the caller paints behind this).
+  ///
+  /// Coordinates: [refSize] is the whole source image laid out at
+  /// `frameSize.width` wide, at its own natural aspect ratio — a fixed,
+  /// arbitrary reference scale used only so every distance in this
+  /// function is a concrete pixel value. [OverflowBox] lets the
+  /// [refSize]-sized child lay out at its full (usually larger-than-window)
+  /// size despite the tight constraints flowing down from [frameSize];
+  /// [ClipRect] then crops the transformed paint to the visible window.
+  static Widget _renderWindow({
+    required Widget refImage,
+    required Size refSize,
+    required Offset pivotInRef,
+    required double scale,
+    required double rotationRadians,
+    required Size windowSize,
+    required Size frameSize,
+  }) {
+    final matrix = Matrix4.identity()
+      ..translateByDouble(windowSize.width / 2, windowSize.height / 2, 0, 1)
+      ..rotateZ(rotationRadians)
+      ..scaleByDouble(scale, scale, 1.0, 1)
+      ..translateByDouble(-pivotInRef.dx, -pivotInRef.dy, 0, 1);
+
+    final windowed = ClipRect(
+      child: OverflowBox(
+        minWidth: 0,
+        maxWidth: double.infinity,
+        minHeight: 0,
+        maxHeight: double.infinity,
+        alignment: Alignment.topLeft,
+        child: Transform(
+          alignment: Alignment.topLeft,
+          transform: matrix,
+          child: SizedBox(
+            width: refSize.width,
+            height: refSize.height,
+            child: refImage,
+          ),
+        ),
+      ),
+    );
+
+    return Center(
+      child: SizedBox(
+        width: windowSize.width,
+        height: windowSize.height,
+        child: windowed,
+      ),
+    );
+  }
+
+  /// The source image with flip applied — rotation is handled by
+  /// [_renderWindow]'s matrix (about the crop-box pivot), not here, so it
+  /// stays consistent between the windowed (output) and full-image
+  /// (editor) render paths.
+  static Widget _flippedImage(
+    String imagePath,
+    PostImageTransform transform,
+  ) {
+    final flipX = transform.flipHorizontal ? -1.0 : 1.0;
+    final flipY = transform.flipVertical ? -1.0 : 1.0;
+    if (flipX == 1.0 && flipY == 1.0) return sourceImage(imagePath);
+    return Transform(
+      alignment: Alignment.center,
+      transform: Matrix4.identity()..scaleByDouble(flipX, flipY, 1.0, 1),
+      child: sourceImage(imagePath),
+    );
+  }
+
+  static Widget _applyColorAdjust(Widget image, PostImageTransform transform) {
+    if (ImageAdjustMath.isNeutral(
+      brightness: transform.brightness,
+      contrast: transform.contrast,
+      exposure: transform.exposure,
+    )) {
+      return image;
+    }
+    return ColorFiltered(
+      colorFilter: ColorFilter.matrix(
+        ImageAdjustMath.combinedMatrix(
           brightness: transform.brightness,
           contrast: transform.contrast,
           exposure: transform.exposure,
-        )) {
-          image = ColorFiltered(
-            colorFilter: ColorFilter.matrix(
-              ImageAdjustMath.combinedMatrix(
-                brightness: transform.brightness,
-                contrast: transform.contrast,
-                exposure: transform.exposure,
-              ),
-            ),
-            child: image,
-          );
-        }
-
-        return ColoredBox(color: Colors.black, child: image);
-      },
+        ),
+      ),
+      child: image,
     );
   }
 

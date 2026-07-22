@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 
 import '../../../models/feed_item.dart';
 import '../../../models/feed_preview_item.dart';
@@ -116,123 +117,45 @@ class ProfileContentGrid extends StatelessWidget {
     );
   }
 
+  /// A sliver — must be placed directly in a `CustomScrollView.slivers` list
+  /// (or a `SliverPadding`'s `sliver:`), not wrapped in `SliverToBoxAdapter`.
+  /// Uses `SliverMasonryGrid.count`'s builder delegate so off-screen tiles
+  /// are never built/laid out/painted — unlike the previous plain-`Column`
+  /// implementation, which built every tile eagerly regardless of scroll
+  /// position, this scales to large collections without the up-front cost.
   @override
   Widget build(BuildContext context) {
     if (items.isEmpty) {
-      return const SizedBox.shrink();
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
     }
 
-    final left = <
-        ({
-          String? url,
-          double height,
-          bool forSale,
-          String? price,
-          bool isVideo,
-          PostSummary? post,
-          PieceSummary? piece,
-        })>[];
-    final right = <
-        ({
-          String? url,
-          double height,
-          bool forSale,
-          String? price,
-          bool isVideo,
-          PostSummary? post,
-          PieceSummary? piece,
-        })>[];
-    for (var i = 0; i < items.length; i++) {
-      if (i.isEven) {
-        left.add(items[i]);
-      } else {
-        right.add(items[i]);
-      }
-    }
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: _MasonryColumn(
-            items: left,
-            onPostTap: onPostTap,
-            onPieceTap: onPieceTap,
-            onDeletePost: onDeletePost,
-            onDeletePiece: onDeletePiece,
-            showOwnerActions: showOwnerActions,
-          ),
-        ),
-        const SizedBox(width: kProfileGutter),
-        Expanded(
-          child: _MasonryColumn(
-            items: right,
-            onPostTap: onPostTap,
-            onPieceTap: onPieceTap,
-            onDeletePost: onDeletePost,
-            onDeletePiece: onDeletePiece,
-            showOwnerActions: showOwnerActions,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _MasonryColumn extends StatelessWidget {
-  const _MasonryColumn({
-    required this.items,
-    this.onPostTap,
-    this.onPieceTap,
-    this.onDeletePost,
-    this.onDeletePiece,
-    this.showOwnerActions = false,
-  });
-
-  final List<
-      ({
-        String? url,
-        double height,
-        bool forSale,
-        String? price,
-        bool isVideo,
-        PostSummary? post,
-        PieceSummary? piece,
-      })> items;
-  final void Function(PostSummary post)? onPostTap;
-  final void Function(PieceSummary piece)? onPieceTap;
-  final void Function(PostSummary post)? onDeletePost;
-  final void Function(PieceSummary piece)? onDeletePiece;
-  final bool showOwnerActions;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (var i = 0; i < items.length; i++) ...[
-          if (i > 0) const SizedBox(height: kProfileGutter),
-          _MasonryTile(
-            url: items[i].url,
-            height: items[i].height,
-            forSale: items[i].forSale,
-            price: items[i].price,
-            isVideo: items[i].isVideo,
-            onTap: items[i].post != null
-                ? () => onPostTap?.call(items[i].post!)
-                : items[i].piece != null
-                    ? () => onPieceTap?.call(items[i].piece!)
-                    : null,
-            onDelete: !showOwnerActions
-                ? null
-                : items[i].post != null
-                    ? () => onDeletePost?.call(items[i].post!)
-                    : items[i].piece != null
-                        ? () => onDeletePiece?.call(items[i].piece!)
-                        : null,
-          ),
-        ],
-      ],
+    return SliverMasonryGrid.count(
+      crossAxisCount: 2,
+      mainAxisSpacing: kProfileGutter,
+      crossAxisSpacing: kProfileGutter,
+      childCount: items.length,
+      itemBuilder: (context, index) {
+        final item = items[index];
+        return _MasonryTile(
+          url: item.url,
+          height: item.height,
+          forSale: item.forSale,
+          price: item.price,
+          isVideo: item.isVideo,
+          onTap: item.post != null
+              ? () => onPostTap?.call(item.post!)
+              : item.piece != null
+                  ? () => onPieceTap?.call(item.piece!)
+                  : null,
+          onDelete: !showOwnerActions
+              ? null
+              : item.post != null
+                  ? () => onDeletePost?.call(item.post!)
+                  : item.piece != null
+                      ? () => onDeletePiece?.call(item.piece!)
+                      : null,
+        );
+      },
     );
   }
 }

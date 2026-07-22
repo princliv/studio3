@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -176,10 +177,10 @@ class _Thumb extends StatelessWidget {
       borderRadius: BorderRadius.circular(8),
       child: url == null
           ? Container(color: HomeFeedTokens.textPrimary.withValues(alpha: 0.08))
-          : Image.network(
-              url!,
+          : CachedNetworkImage(
+              imageUrl: url!,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) =>
+              errorWidget: (context, url, error) =>
                   Container(color: HomeFeedTokens.textPrimary.withValues(alpha: 0.08)),
             ),
     );

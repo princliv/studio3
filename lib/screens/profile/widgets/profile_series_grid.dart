@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../theme/home_feed_tokens.dart';
@@ -214,13 +215,13 @@ class _SeriesPaletteCard extends StatelessWidget {
     final image = ClipRRect(
       borderRadius: borderRadius,
       child: imageUrl != null && imageUrl!.isNotEmpty
-          ? Image.network(
-              imageUrl!,
+          ? CachedNetworkImage(
+              imageUrl: imageUrl!,
               fit: BoxFit.cover,
               width: double.infinity,
               height: double.infinity,
-              cacheWidth: imagePx,
-              errorBuilder: (context, error, stackTrace) =>
+              memCacheWidth: imagePx,
+              errorWidget: (context, url, error) =>
                   const _SeriesCoverPlaceholder(),
             )
           : const _SeriesCoverPlaceholder(),

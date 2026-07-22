@@ -59,6 +59,10 @@ class AuthSession {
     await _prefs?.setString(_tokenKey, token);
     await _prefs?.setString(_userKey, jsonEncode(authUser.toJson()));
     await _prefs?.setBool(_sellerKey, sellerEnabled);
+    // A prior session's cached profile can still be within its TTL if this
+    // login follows one that ended without a clean logout (app killed,
+    // etc.) — invalidate it so this session always fetches a live profile.
+    await CacheService.instance.invalidate('user.me');
     notifyListeners();
   }
 

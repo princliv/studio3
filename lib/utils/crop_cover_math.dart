@@ -1,5 +1,5 @@
 import 'dart:math' as math;
-import 'dart:ui' show Offset;
+import 'dart:ui' show Offset, Rect;
 
 /// Crop frame aspect ratios (width / height).
 enum CropAspectRatio {
@@ -12,109 +12,202 @@ enum CropAspectRatio {
   final String label;
 }
 
-/// How the image fills the crop frame: [fill] crops to cover the frame
-/// (existing behavior), [fit] shows the whole image, letterboxed.
+/// How the crop box behaves: [fill] locks the box to the selected
+/// [CropAspectRatio] (its content fills the output frame edge-to-edge);
+/// [fit] lets the box take any shape/size (its content is letterboxed into
+/// the output frame, preserving the box's own aspect, nothing cropped).
 enum CropFitMode { fill, fit }
 
-/// Shared geometry for the crop transform — cover scale, contain scale, and
-/// pan bounds — all normalized so the crop frame has unit width (cropW=1.0).
+/// Which corner of the crop box a drag gesture is resizing.
+enum Corner { tl, tr, bl, br }
+
+/// Geometry for the draggable/resizable crop box.
+///
+/// All rects here are normalized to the **displayed image's own bounds**:
+/// `left`/`right` are fractions of the image's width, `top`/`bottom` are
+/// fractions of its height (both in `[0,1]`) — independent of screen pixel
+/// size, so the same rect means the same crop whether it's being dragged
+/// in the editor or resolved for a thumbnail or the final render.
+///
+/// Because `x` fractions and `y` fractions scale by different physical
+/// units (image width vs. image height), a box's on-screen aspect ratio is
+/// `(box.width * imageAspect) / box.height` — not `box.width / box.height`
+/// directly. Aspect-locking math below accounts for this via
+/// `k = cropAspect / imageAspect`, the box's *fraction-space* aspect that
+/// corresponds to a true on-screen `cropAspect`.
 abstract final class CropCoverMath {
   CropCoverMath._();
 
-  /// Pre-rotation size (crop-frame-width units) an image of [imageAspect]
-  /// must be drawn at so it exactly covers a [cropAspect] frame — the
-  /// baseline both cover- and contain-scale, and the pan clamp, build on.
-  static (double imgW, double imgH) _coverImageSize(
-    double cropAspect,
-    double imageAspect,
-  ) {
-    const cropW = 1.0;
-    final cropH = 1.0 / cropAspect;
-    if (imageAspect >= cropAspect) {
-      return (cropH * imageAspect, cropH);
+  static const double minBoxFraction = 0.12;
+
+  /// Largest aspect-locked box centered in the image — the default framing
+  /// for Fill mode (equivalent to the old cover-scale's role, expressed as
+  /// a rect instead of a scale).
+  static Rect defaultFillBox(double cropAspect, double imageAspect) {
+    final k = cropAspect / imageAspect;
+    final double w, h;
+    if (k <= 1) {
+      w = k;
+      h = 1;
+    } else {
+      w = 1;
+      h = 1 / k;
     }
-    return (cropW, cropW / imageAspect);
+    return Rect.fromCenter(center: const Offset(0.5, 0.5), width: w, height: h);
   }
 
-  static (double bboxW, double bboxH) _rotatedBounds({
-    required double imgW,
-    required double imgH,
-    required double rotationDegrees,
+  /// The whole image — Fit mode defaults to "show everything."
+  static Rect defaultFitBox() => const Rect.fromLTRB(0, 0, 1, 1);
+
+  /// Resizes [box] by dragging [corner], keeping the opposite corner fixed
+  /// and preserving the fraction-space aspect ratio `cropAspect/imageAspect`
+  /// (Fill mode). [deltaNorm] is this gesture event's movement, already
+  /// normalized (dx as a fraction of the displayed image's width, dy as a
+  /// fraction of its height). Clamped to a minimum size and to stay fully
+  /// inside `[0,1]²`.
+  static Rect resizeAspectLocked({
+    required Rect box,
+    required Corner corner,
+    required Offset deltaNorm,
+    required double cropAspect,
+    required double imageAspect,
   }) {
+    final k = cropAspect / imageAspect;
+    final (fixed, draggedOld) = _cornerPoints(box, corner);
+    final draggedNew = draggedOld + deltaNorm;
+
+    final rawW = (draggedNew.dx - fixed.dx).abs();
+    final rawH = (draggedNew.dy - fixed.dy).abs();
+    // Follow whichever axis the user dragged further (in aspect-consistent
+    // terms) so the box tracks the finger instead of lagging on one axis.
+    var w = math.max(rawW, rawH * k);
+
+    final signX = draggedNew.dx >= fixed.dx ? 1.0 : -1.0;
+    final signY = draggedNew.dy >= fixed.dy ? 1.0 : -1.0;
+
+    // Clamp so the box stays inside [0,1]² without breaking the lock: cap
+    // width by whichever bound (x or y-derived-via-k) is tighter.
+    final maxWFromX = signX > 0 ? (1.0 - fixed.dx) : fixed.dx;
+    final maxHFromY = signY > 0 ? (1.0 - fixed.dy) : fixed.dy;
+    final maxW = math.min(maxWFromX, maxHFromY * k);
+    w = w.clamp(0.0, maxW <= 0 ? minBoxFraction : maxW);
+    w = math.max(w, math.min(minBoxFraction, maxW <= 0 ? minBoxFraction : maxW));
+    final h = w / k;
+
+    final newDraggedX = fixed.dx + signX * w;
+    final newDraggedY = fixed.dy + signY * h;
+    return Rect.fromPoints(fixed, Offset(newDraggedX, newDraggedY));
+  }
+
+  /// Resizes [box] by dragging [corner] freely (Fit mode) — no aspect
+  /// lock, the opposite corner stays fixed, clamped to a minimum size and
+  /// to stay fully inside `[0,1]²`.
+  static Rect resizeFree({
+    required Rect box,
+    required Corner corner,
+    required Offset deltaNorm,
+  }) {
+    final (fixed, draggedOld) = _cornerPoints(box, corner);
+    var dx = (draggedOld.dx + deltaNorm.dx).clamp(0.0, 1.0);
+    var dy = (draggedOld.dy + deltaNorm.dy).clamp(0.0, 1.0);
+
+    if ((dx - fixed.dx).abs() < minBoxFraction) {
+      final sign = dx >= fixed.dx ? 1.0 : -1.0;
+      dx = (fixed.dx + sign * minBoxFraction).clamp(0.0, 1.0);
+    }
+    if ((dy - fixed.dy).abs() < minBoxFraction) {
+      final sign = dy >= fixed.dy ? 1.0 : -1.0;
+      dy = (fixed.dy + sign * minBoxFraction).clamp(0.0, 1.0);
+    }
+    return Rect.fromPoints(fixed, Offset(dx, dy));
+  }
+
+  /// Repositions [box] by [deltaNorm] (normalized like above), clamped so
+  /// it can't be dragged outside the image.
+  static Rect translateBox({required Rect box, required Offset deltaNorm}) {
+    final shifted = box.shift(deltaNorm);
+    var dx = 0.0, dy = 0.0;
+    if (shifted.left < 0) dx = -shifted.left;
+    if (shifted.right > 1) dx = 1 - shifted.right;
+    if (shifted.top < 0) dy = -shifted.top;
+    if (shifted.bottom > 1) dy = 1 - shifted.bottom;
+    return shifted.shift(Offset(dx, dy));
+  }
+
+  /// Re-locks [box] to `cropAspect/imageAspect`, preserving its center and
+  /// shrinking as little as possible, clamped inside `[0,1]²`. Used when
+  /// switching aspect ratios in Fill mode, or switching Fit→Fill.
+  static Rect relockToAspect({
+    required Rect box,
+    required double cropAspect,
+    required double imageAspect,
+  }) {
+    final k = cropAspect / imageAspect;
+    final center = box.center;
+    var w = box.width;
+    var h = w / k;
+    if (h > box.height) {
+      h = box.height;
+      w = h * k;
+    }
+    var rect = Rect.fromCenter(center: center, width: w, height: h);
+    if (rect.width > 1 || rect.height > 1) {
+      return defaultFillBox(cropAspect, imageAspect);
+    }
+    var dx = 0.0, dy = 0.0;
+    if (rect.left < 0) dx = -rect.left;
+    if (rect.right > 1) dx = 1 - rect.right;
+    if (rect.top < 0) dy = -rect.top;
+    if (rect.bottom > 1) dy = 1 - rect.bottom;
+    return rect.shift(Offset(dx, dy));
+  }
+
+  /// Keeps [box] valid while the straighten dial rotates the image content
+  /// about the box's own center: repositions (never resizes) [box] so its
+  /// rotated footprint stays within the image bounds. This is an exact
+  /// solution to "does a rotated rect of this size fit, positioned
+  /// somewhere, inside an axis-aligned image" (not an approximation) —
+  /// it computes the box's own rotated bounding box and clamps the box's
+  /// center to keep that bounding box inside the image. If the box's
+  /// rotated bounding box is simply larger than the image on some axis (an
+  /// oversized box at a steep angle), that axis falls back to centering
+  /// rather than leaving the box in an unresolvable position.
+  static Rect clampBoxWithinRotatedImage({
+    required Rect box,
+    required double rotationDegrees,
+    required double imageAspect,
+  }) {
+    if (rotationDegrees % 360 == 0) return box;
+
+    final boxWMetric = box.width * imageAspect;
+    final boxHMetric = box.height;
     final rad = rotationDegrees * math.pi / 180;
     final c = math.cos(rad).abs();
     final s = math.sin(rad).abs();
-    return (imgW * c + imgH * s, imgW * s + imgH * c);
+    final bboxW = boxWMetric * c + boxHMetric * s;
+    final bboxH = boxWMetric * s + boxHMetric * c;
+
+    final centerXMetric = box.center.dx * imageAspect;
+    final centerYMetric = box.center.dy;
+
+    final minCx = bboxW / 2, maxCx = imageAspect - bboxW / 2;
+    final minCy = bboxH / 2, maxCy = 1.0 - bboxH / 2;
+
+    final clampedCx =
+        minCx <= maxCx ? centerXMetric.clamp(minCx, maxCx) : imageAspect / 2;
+    final clampedCy = minCy <= maxCy ? centerYMetric.clamp(minCy, maxCy) : 0.5;
+
+    final dxFrac = (clampedCx - centerXMetric) / imageAspect;
+    final dyFrac = clampedCy - centerYMetric;
+    return box.shift(Offset(dxFrac, dyFrac));
   }
 
-  /// Minimum scale so a rotated image covers the crop frame with no gaps.
-  static double minCoverScale({
-    required double rotationDegrees,
-    required double cropAspect,
-    required double imageAspect,
-  }) {
-    const cropW = 1.0;
-    final cropH = 1.0 / cropAspect;
-    final (imgW, imgH) = _coverImageSize(cropAspect, imageAspect);
-    final (bboxW, bboxH) =
-        _rotatedBounds(imgW: imgW, imgH: imgH, rotationDegrees: rotationDegrees);
-    return math.max(cropW / bboxW, cropH / bboxH);
-  }
-
-  /// Maximum scale so a rotated image still fits entirely inside the crop
-  /// frame with no cropping ("Fit" mode) — the complement of [minCoverScale].
-  static double maxContainScale({
-    required double rotationDegrees,
-    required double cropAspect,
-    required double imageAspect,
-  }) {
-    const cropW = 1.0;
-    final cropH = 1.0 / cropAspect;
-    final (imgW, imgH) = _coverImageSize(cropAspect, imageAspect);
-    final (bboxW, bboxH) =
-        _rotatedBounds(imgW: imgW, imgH: imgH, rotationDegrees: rotationDegrees);
-    return math.min(cropW / bboxW, cropH / bboxH);
-  }
-
-  /// Clamps a proposed pan (translation, crop-frame-width units, frame axes)
-  /// so the image — rendered at [scale] and [rotationDegrees] — always fully
-  /// covers the crop rect. Clamps independently along the image's own
-  /// (rotated) axes: exact at rotation 0, and a close approximation of true
-  /// rotated-rectangle containment at the small rotations this editor's
-  /// dial supports. Validate visually at extreme rotation + max zoom if this
-  /// is ever loosened, since it could in theory admit a sliver of gap.
-  static Offset clampPan({
-    required Offset pan,
-    required double scale,
-    required double rotationDegrees,
-    required double cropAspect,
-    required double imageAspect,
-  }) {
-    final cropH = 1.0 / cropAspect;
-    final (imgW, imgH) = _coverImageSize(cropAspect, imageAspect);
-    final rad = rotationDegrees * math.pi / 180;
-    final c = math.cos(rad);
-    final s = math.sin(rad);
-    final cAbs = c.abs();
-    final sAbs = s.abs();
-
-    final halfImgW = imgW * scale / 2;
-    final halfImgH = imgH * scale / 2;
-    final halfCropOnImgX = 0.5 * cAbs + (cropH / 2) * sAbs;
-    final halfCropOnImgY = 0.5 * sAbs + (cropH / 2) * cAbs;
-
-    final limitX = math.max(0.0, halfImgW - halfCropOnImgX);
-    final limitY = math.max(0.0, halfImgH - halfCropOnImgY);
-
-    // Rotate the requested pan into the image's local axes, clamp, rotate back.
-    final localX = pan.dx * c + pan.dy * s;
-    final localY = -pan.dx * s + pan.dy * c;
-    final clampedX = localX.clamp(-limitX, limitX);
-    final clampedY = localY.clamp(-limitY, limitY);
-
-    return Offset(
-      clampedX * c - clampedY * s,
-      clampedX * s + clampedY * c,
-    );
+  static (Offset fixed, Offset dragged) _cornerPoints(Rect box, Corner corner) {
+    return switch (corner) {
+      Corner.tl => (box.bottomRight, box.topLeft),
+      Corner.tr => (box.bottomLeft, box.topRight),
+      Corner.bl => (box.topRight, box.bottomLeft),
+      Corner.br => (box.topLeft, box.bottomRight),
+    };
   }
 }

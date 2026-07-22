@@ -1,5 +1,7 @@
 import '../models/series_summary.dart';
 import 'api_client.dart';
+import 'cache_service.dart';
+import 'connectivity_service.dart';
 
 class SeriesService {
   SeriesService._();
@@ -10,6 +12,36 @@ class SeriesService {
   Future<List<SeriesSummary>> getUserSeries(String username) async {
     final json = await _api.get('/api/users/$username/series');
     return _api.extractList(json).map(SeriesSummary.fromJson).toList();
+  }
+
+  /// Cache-first user series (Profile "Series" tab) — see
+  /// [PieceService.getUserPiecesCached] for the rationale.
+  Future<List<SeriesSummary>> getUserSeriesCached(
+    String username, {
+    bool forceRefresh = false,
+    void Function(List<SeriesSummary> fresh)? onBackgroundUpdate,
+  }) {
+    final key = 'profile.series.$username';
+    return CacheService.instance.fetchWithCache<List<SeriesSummary>>(
+      key: key,
+      ttl: const Duration(minutes: 3),
+      forceRefresh: forceRefresh,
+      fetchRaw: () {
+        if (!ConnectivityService.instance.isOnline) {
+          throw CacheMiss(key);
+        }
+        return _api.get('/api/users/$username/series');
+      },
+      parse: (json) => _api.extractList(json).map(SeriesSummary.fromJson).toList(),
+      onBackgroundUpdate: onBackgroundUpdate,
+    );
+  }
+
+  List<SeriesSummary>? peekUserSeriesCached(String username) {
+    return CacheService.instance.peekCache<List<SeriesSummary>>(
+      key: 'profile.series.$username',
+      parse: (json) => _api.extractList(json).map(SeriesSummary.fromJson).toList(),
+    );
   }
 
   /// All series owned by the current user (management UI).

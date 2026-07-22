@@ -13,7 +13,7 @@ abstract final class BottomNavIndex {
   static const int profile = 4;
 }
 
-const Color _kNavGlassFill = Color(0x401A1A1A);
+const Color _kNavGlassFill = Color(0x991A1A1A);
 const Color _kNavGlassBorder = Color(0x26FFFFFF);
 
 const double _kPillWidth = 255;

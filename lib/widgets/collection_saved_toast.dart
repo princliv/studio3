@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -31,10 +32,10 @@ void showCollectionSavedToast(
               width: 36,
               height: 36,
               child: (thumbnailUrl != null && thumbnailUrl.isNotEmpty)
-                  ? Image.network(
-                      thumbnailUrl,
+                  ? CachedNetworkImage(
+                      imageUrl: thumbnailUrl,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
+                      errorWidget: (context, url, error) =>
                           _placeholder(),
                     )
                   : _placeholder(),

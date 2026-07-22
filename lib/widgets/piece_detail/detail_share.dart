@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../config/app_link_config.dart';
 import '../../models/feed_preview_item.dart';
 
 String buildPieceShareText(FeedPreviewItem item, {int imageIndex = 0}) {
-  final imageUrl =
-      item.heroImageUrl ?? feedPreviewImageUrl(item, imageIndex: imageIndex);
+  final pieceUrl = AppLinkConfig.pieceUrl(item.id);
   final lines = <String>[
     '${item.title} by ${item.displayName} on Studio',
     if (item.story.trim().isNotEmpty) item.story,
-    imageUrl,
+    pieceUrl,
   ];
   return lines.join('\n\n');
 }

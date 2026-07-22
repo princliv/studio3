@@ -15,68 +15,75 @@ class ApiClient {
 
   Dio? _dio;
   CookieJar? _cookieJar;
-  bool _initializing = false;
+  Future<void>? _initFuture;
   bool _refreshing = false;
 
-  Future<void> _ensureInitialized() async {
-    if (_dio != null || _initializing) return;
-    _initializing = true;
-    try {
-      final dir = await getApplicationDocumentsDirectory();
-      _cookieJar = PersistCookieJar(
-        storage: FileStorage('${dir.path}/.cookies/'),
-      );
-      _dio = Dio(BaseOptions(
-        baseUrl: ApiConfig.baseUrl,
-        // The deployed backend (Render free tier) spins down after
-        // inactivity and can take 30-60s to wake back up on the next
-        // request — 30s was too tight and tripped on exactly that cold
-        // start, especially on the first request of a session (e.g. sign-up
-        // OTP generation).
-        connectTimeout: const Duration(seconds: 60),
-        receiveTimeout: const Duration(seconds: 60),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      ));
-      _dio!.interceptors.add(CookieManager(_cookieJar!));
-      _dio!.interceptors.add(InterceptorsWrapper(
-        onError: (error, handler) async {
-          final status = error.response?.statusCode;
-          final path = error.requestOptions.path;
-          if (status == 401 &&
-              error.requestOptions.extra['retried'] != true &&
-              !path.contains('/api/auth/refresh') &&
-              !path.contains('/api/auth/login') &&
-              !path.contains('/api/auth/register')) {
-            try {
-              await _refreshToken();
-              final opts = error.requestOptions;
-              opts.extra['retried'] = true;
-              opts.headers['Authorization'] =
-                  'Bearer ${AuthSession.instance.accessToken}';
-              final response = await _dio!.fetch(opts);
-              return handler.resolve(response);
-            } catch (e) {
-              // Only a genuine 401 from the refresh call itself means the
-              // refresh token was actually rejected — a network error,
-              // timeout, or backend 5xx during refresh is a transient
-              // hiccup, not a real logout, so the session is left intact
-              // to retry later.
-              final refreshRejected = e is ApiException && e.statusCode == 401;
-              if (refreshRejected) {
-                await AuthSession.instance.clear();
-              }
-              return handler.next(error);
+  // All 5 bottom-nav tabs fire their first request concurrently (they're
+  // mounted together in an IndexedStack), so initialization must be shared
+  // across concurrent callers rather than guarded by a plain bool — a bool
+  // guard lets a second caller return early while _dio is still null,
+  // causing it to dereference a null Dio client.
+  Future<void> _ensureInitialized() {
+    if (_dio != null) return Future.value();
+    return _initFuture ??= _initialize().catchError((Object e) {
+      _initFuture = null; // let a later call retry instead of staying stuck
+      throw e;
+    });
+  }
+
+  Future<void> _initialize() async {
+    final dir = await getApplicationDocumentsDirectory();
+    _cookieJar = PersistCookieJar(
+      storage: FileStorage('${dir.path}/.cookies/'),
+    );
+    _dio = Dio(BaseOptions(
+      baseUrl: ApiConfig.baseUrl,
+      // The deployed backend (Render free tier) spins down after
+      // inactivity and can take 30-60s to wake back up on the next
+      // request — 30s was too tight and tripped on exactly that cold
+      // start, especially on the first request of a session (e.g. sign-up
+      // OTP generation).
+      connectTimeout: const Duration(seconds: 60),
+      receiveTimeout: const Duration(seconds: 60),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+    ));
+    _dio!.interceptors.add(CookieManager(_cookieJar!));
+    _dio!.interceptors.add(InterceptorsWrapper(
+      onError: (error, handler) async {
+        final status = error.response?.statusCode;
+        final path = error.requestOptions.path;
+        if (status == 401 &&
+            error.requestOptions.extra['retried'] != true &&
+            !path.contains('/api/auth/refresh') &&
+            !path.contains('/api/auth/login') &&
+            !path.contains('/api/auth/register')) {
+          try {
+            await _refreshToken();
+            final opts = error.requestOptions;
+            opts.extra['retried'] = true;
+            opts.headers['Authorization'] =
+                'Bearer ${AuthSession.instance.accessToken}';
+            final response = await _dio!.fetch(opts);
+            return handler.resolve(response);
+          } catch (e) {
+            // Only a genuine 401 from the refresh call itself means the
+            // refresh token was actually rejected — a network error,
+            // timeout, or backend 5xx during refresh is a transient
+            // hiccup, not a real logout, so the session is left intact
+            // to retry later.
+            final refreshRejected = e is ApiException && e.statusCode == 401;
+            if (refreshRejected) {
+              await AuthSession.instance.clear();
             }
+            return handler.next(error);
           }
-          return handler.next(error);
-        },
-      ));
-    } finally {
-      _initializing = false;
-    }
+        }
+        return handler.next(error);
+      },
+    ));
   }
 
   Future<Dio> get _client async {

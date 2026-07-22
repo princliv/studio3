@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
 import '../models/feed_item.dart';
 import '../services/connectivity_service.dart';
 import '../services/feed_service.dart';
+import '../widgets/feed_skeleton.dart';
 import '../widgets/reels/reel_player_page.dart';
 
 /// App-wide observer so ReelsPage can pause playback when another route is
@@ -14,16 +16,21 @@ class ReelsPage extends StatefulWidget {
     super.key,
     this.initialIndex = 0,
     this.initialItems,
-    this.active = true,
+    this.activeListenable,
   });
 
   final int initialIndex;
   final List<FeedItem>? initialItems;
 
-  /// Whether this Reels instance is the currently visible bottom-nav tab.
-  /// Pass `false` when another tab is selected so playback pauses even
-  /// though an IndexedStack keeps this widget mounted.
-  final bool active;
+  /// Whether this Reels instance is the currently visible bottom-nav tab —
+  /// a [ValueListenable] (rather than a plain bool) so the host (MainShell)
+  /// can flip it without reconstructing this widget: that lets MainShell
+  /// build its tab list once as a fully-`const` `late final`, instead of
+  /// rebuilding a fresh `ReelsPage` on every nav tap. `null` (the default
+  /// for standalone pushes, e.g. from a saved-video deep link) means always
+  /// active. Playback still pauses independently while another route is
+  /// pushed on top (see [_routePaused]).
+  final ValueListenable<bool>? activeListenable;
 
   @override
   State<ReelsPage> createState() => _ReelsPageState();
@@ -37,16 +44,24 @@ class _ReelsPageState extends State<ReelsPage> with RouteAware {
   String? _nextCursor;
   int _currentIndex = 0;
   bool _routePaused = false;
+  bool _isActive = true;
 
-  bool get _playbackActive => widget.active && !_routePaused;
+  bool get _playbackActive => _isActive && !_routePaused;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    _isActive = widget.activeListenable?.value ?? true;
+    widget.activeListenable?.addListener(_onActiveChanged);
     _pageController = PageController(initialPage: widget.initialIndex);
     ConnectivityService.instance.addReconnectHook(_onReconnected);
     _loadItems();
+  }
+
+  void _onActiveChanged() {
+    if (!mounted) return;
+    setState(() => _isActive = widget.activeListenable!.value);
   }
 
   Future<void> _onReconnected() => _loadItems(refresh: true);
@@ -55,12 +70,6 @@ class _ReelsPageState extends State<ReelsPage> with RouteAware {
   void didChangeDependencies() {
     super.didChangeDependencies();
     routeObserver.subscribe(this, ModalRoute.of(context) as PageRoute);
-  }
-
-  @override
-  void didUpdateWidget(covariant ReelsPage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.active != widget.active) setState(() {});
   }
 
   @override
@@ -76,6 +85,7 @@ class _ReelsPageState extends State<ReelsPage> with RouteAware {
   @override
   void dispose() {
     routeObserver.unsubscribe(this);
+    widget.activeListenable?.removeListener(_onActiveChanged);
     _pageController.dispose();
     ConnectivityService.instance.removeReconnectHook(_onReconnected);
     super.dispose();
@@ -146,16 +156,7 @@ class _ReelsPageState extends State<ReelsPage> with RouteAware {
     return Scaffold(
       backgroundColor: Colors.black,
       body: _loading && _items.isEmpty
-          ? const Center(
-              child: SizedBox(
-                width: 28,
-                height: 28,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white70,
-                ),
-              ),
-            )
+          ? const ReelSkeleton()
           : _items.isEmpty
             ? RefreshIndicator(
                 color: Colors.white,

@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -52,10 +53,10 @@ class PieceSeriesRow extends StatelessWidget {
                   width: 118,
                   height: 118,
                   child: url != null
-                      ? Image.network(
-                          url,
+                      ? CachedNetworkImage(
+                          imageUrl: url,
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
+                          errorWidget: (context, url, error) =>
                               const _ThumbPlaceholder(),
                         )
                       : const _ThumbPlaceholder(),

@@ -62,7 +62,10 @@ class FeedService {
   /// always stays network-only. Serves cached data immediately when fresh
   /// (or when offline and cache exists), refreshing in the background
   /// otherwise.
-  Future<FeedPage> getForYouCached({bool forceRefresh = false}) {
+  Future<FeedPage> getForYouCached({
+    bool forceRefresh = false,
+    void Function(FeedPage fresh)? onBackgroundUpdate,
+  }) {
     return CacheService.instance.fetchWithCache<FeedPage>(
       key: 'feed.forYou',
       ttl: const Duration(minutes: 5),
@@ -78,6 +81,7 @@ class FeedService {
         );
       },
       parse: _parseFeedPage,
+      onBackgroundUpdate: onBackgroundUpdate,
     );
   }
 
@@ -98,6 +102,7 @@ class FeedService {
     String? medium,
     bool videoOnly = false,
     bool forceRefresh = false,
+    void Function(FeedPage fresh)? onBackgroundUpdate,
   }) {
     final key = 'feed.explore.${videoOnly ? 'video' : (medium ?? 'all')}';
     return CacheService.instance.fetchWithCache<FeedPage>(
@@ -121,6 +126,7 @@ class FeedService {
         );
       },
       parse: (json) => _parseFeedPage(json, videoOnly: videoOnly),
+      onBackgroundUpdate: onBackgroundUpdate,
     );
   }
 
