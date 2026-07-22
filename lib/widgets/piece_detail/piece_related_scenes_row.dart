@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -64,10 +65,10 @@ class PieceRelatedScenesRow extends StatelessWidget {
                       fit: StackFit.expand,
                       children: [
                         if (scene.mediaUrl != null && scene.mediaUrl!.isNotEmpty)
-                          Image.network(
-                            scene.mediaUrl!,
+                          CachedNetworkImage(
+                            imageUrl: scene.mediaUrl!,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
+                            errorWidget: (context, url, error) =>
                                 const _ScenePlaceholder(),
                           )
                         else

@@ -15,11 +15,13 @@ import '../widgets/profile_avatar_preview_sheet.dart';
 import '../widgets/profile_cover_image.dart';
 import 'profile/models/profile_series_data.dart';
 import 'profile/profile_constants.dart';
+import '../widgets/follow_button.dart';
 import 'profile/widgets/profile_header.dart';
 import 'profile/widgets/profile_locked_placeholder.dart';
 import 'profile/widgets/profile_tab_content.dart';
 import 'profile/widgets/profile_tabs.dart';
 import 'profile/widgets/profile_viewer_mode_capsule.dart';
+import 'reels_page.dart' show routeObserver;
 
 /// Artist profile — own tab or pushed public profile by [username].
 class ProfilePage extends StatefulWidget {
@@ -35,7 +37,7 @@ class ProfilePage extends StatefulWidget {
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
-class _ProfilePageState extends State<ProfilePage> {
+class _ProfilePageState extends State<ProfilePage> with RouteAware {
   String _tab = 'pieces';
   UserProfile? _profile;
   List<PieceSummary> _pieces = [];
@@ -49,7 +51,9 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _listedPiecesLoaded = false;
   bool _seriesLoaded = false;
   String _collectSegment = 'available';
+  String _sceneFilter = 'all';
   bool _followBusy = false;
+  int _profileLoadAttempts = 0;
 
   bool get _isTabContext => widget.username == null;
 
@@ -68,15 +72,53 @@ class _ProfilePageState extends State<ProfilePage> {
     if (_isTabContext) {
       AuthSession.instance.addListener(_onSessionChanged);
     }
+    _seedContentFromCache();
     _loadProfileShell();
+  }
+
+  /// Paints Profile's tabs instantly from whatever's already cached (if
+  /// anything) instead of an empty/skeleton state on cold app start — the
+  /// cached service calls in `_loadActiveTab` still run once `_profile`
+  /// resolves to confirm/silently refresh this. Deliberately doesn't set
+  /// the `*Loaded` flags: that's what lets `_loadActiveTab` still run for
+  /// real, which is what actually wires up the background refresh.
+  void _seedContentFromCache() {
+    final username = widget.username ?? AuthSession.instance.user?.username;
+    if (username == null) return;
+    final pieces = PieceService.instance.peekUserPiecesCached(username);
+    if (pieces != null) _pieces = pieces;
+    final scenes = PostService.instance.peekUserPostsCached(username);
+    if (scenes != null) _scenes = scenes;
+    final forSale = PieceService.instance.peekUserPiecesForSaleCached(username);
+    if (forSale != null) _listedPieces = forSale;
+    final series = SeriesService.instance.peekUserSeriesCached(username);
+    if (series != null) {
+      _series = series.map(ProfileSeriesData.fromSeries).toList();
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_isTabContext) {
+      routeObserver.subscribe(this, ModalRoute.of(context) as PageRoute);
+    }
   }
 
   @override
   void dispose() {
     if (_isTabContext) {
       AuthSession.instance.removeListener(_onSessionChanged);
+      routeObserver.unsubscribe(this);
     }
     super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    _resetTabCache();
+    _loadProfileShell(silent: true);
+    _loadActiveTab(force: true);
   }
 
   void _onSessionChanged() {
@@ -110,11 +152,21 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       final UserProfile profile;
       if (_isTabContext || (_isOwnProfile && !widget.viewerMode)) {
-        profile = await UserService.instance.getMeCached();
+        profile = await UserService.instance.getMeCached(
+          onBackgroundUpdate: (fresh) {
+            if (!mounted) return;
+            setState(() {
+              _profile = fresh;
+              _lastKnownSeller = fresh.sellerEnabled;
+              if (!fresh.sellerEnabled && _tab == 'collect') _tab = 'pieces';
+            });
+          },
+        );
       } else {
         profile = await UserService.instance.getPublicProfile(widget.username!);
       }
       if (!mounted) return;
+      _profileLoadAttempts = 0;
       setState(() {
         _profile = profile;
         _lastKnownSeller = profile.sellerEnabled;
@@ -125,7 +177,17 @@ class _ProfilePageState extends State<ProfilePage> {
       // nothing to show and no point firing the requests.
       if (!silent && !profile.isLocked) _loadActiveTab();
     } catch (_) {
-      // Keep session-backed shell visible when profile cannot be loaded.
+      // Keep session-backed shell visible when profile cannot be loaded, but
+      // don't get stuck there forever — a cold backend or a momentary
+      // network blip is common on the very first load, and nothing else
+      // (short of a manual pull-to-refresh) would otherwise retry it.
+      if (_profile == null && mounted && _profileLoadAttempts < 3) {
+        _profileLoadAttempts++;
+        final attempt = _profileLoadAttempts;
+        Future.delayed(Duration(seconds: 2 * attempt), () {
+          if (mounted && _profile == null) _loadProfileShell(silent: silent);
+        });
+      }
     }
   }
 
@@ -147,12 +209,29 @@ class _ProfilePageState extends State<ProfilePage> {
     if (tab == 'collect' && (_listedPiecesLoaded && !force)) return;
     if (tab == 'series' && (_seriesLoaded && !force)) return;
 
-    setState(() => _tabContentLoading = true);
+    // Only show the loading flag when this tab is truly empty — if a cache
+    // peek (or a prior load) already put content on screen, the cached
+    // fetch below resolves near-instantly and refreshes silently, so a
+    // spinner would just be a flash for nothing.
+    final hasVisibleData = switch (tab) {
+      'pieces' => _pieces.isNotEmpty,
+      'scenes' => _scenes.isNotEmpty,
+      'collect' => _listedPieces.isNotEmpty,
+      'series' => _series.isNotEmpty,
+      _ => false,
+    };
+    if (!hasVisibleData) setState(() => _tabContentLoading = true);
 
     try {
       if (tab == 'pieces') {
-        final pieces =
-            await PieceService.instance.getUserPieces(profile.username);
+        final pieces = await PieceService.instance.getUserPiecesCached(
+          profile.username,
+          forceRefresh: force,
+          onBackgroundUpdate: (fresh) {
+            if (!mounted) return;
+            setState(() => _pieces = fresh);
+          },
+        );
         if (!mounted) return;
         setState(() {
           _pieces = pieces;
@@ -160,8 +239,14 @@ class _ProfilePageState extends State<ProfilePage> {
           _tabContentLoading = false;
         });
       } else if (tab == 'scenes') {
-        final scenes =
-            await PostService.instance.getUserPosts(profile.username);
+        final scenes = await PostService.instance.getUserPostsCached(
+          profile.username,
+          forceRefresh: force,
+          onBackgroundUpdate: (fresh) {
+            if (!mounted) return;
+            setState(() => _scenes = fresh);
+          },
+        );
         if (!mounted) return;
         setState(() {
           _scenes = scenes;
@@ -169,7 +254,7 @@ class _ProfilePageState extends State<ProfilePage> {
           _tabContentLoading = false;
         });
       } else if (tab == 'collect' && profile.sellerEnabled) {
-        final listedPieces = await _loadListedPieces(profile);
+        final listedPieces = await _loadListedPieces(profile, force: force);
         if (!mounted) return;
         setState(() {
           _listedPieces = listedPieces;
@@ -177,8 +262,16 @@ class _ProfilePageState extends State<ProfilePage> {
           _tabContentLoading = false;
         });
       } else if (tab == 'series') {
-        final series =
-            await SeriesService.instance.getUserSeries(profile.username);
+        final series = await SeriesService.instance.getUserSeriesCached(
+          profile.username,
+          forceRefresh: force,
+          onBackgroundUpdate: (fresh) {
+            if (!mounted) return;
+            setState(() {
+              _series = fresh.map(ProfileSeriesData.fromSeries).toList();
+            });
+          },
+        );
         if (!mounted) return;
         setState(() {
           _series = series.map(ProfileSeriesData.fromSeries).toList();
@@ -193,8 +286,18 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  Future<List<PieceSummary>> _loadListedPieces(UserProfile profile) async {
-    return PieceService.instance.getUserPiecesForSale(profile.username);
+  Future<List<PieceSummary>> _loadListedPieces(
+    UserProfile profile, {
+    bool force = false,
+  }) async {
+    return PieceService.instance.getUserPiecesForSaleCached(
+      profile.username,
+      forceRefresh: force,
+      onBackgroundUpdate: (fresh) {
+        if (!mounted) return;
+        setState(() => _listedPieces = fresh);
+      },
+    );
   }
 
   void _onTabChanged(String tab) {
@@ -207,6 +310,10 @@ class _ProfilePageState extends State<ProfilePage> {
 
   void _onCollectSegmentChanged(String segment) {
     setState(() => _collectSegment = segment);
+  }
+
+  void _onSceneFilterChanged(String filter) {
+    setState(() => _sceneFilter = filter);
   }
 
   FollowState get _followState {
@@ -292,15 +399,31 @@ class _ProfilePageState extends State<ProfilePage> {
       itemLabel: 'piece',
     );
     if (confirmed != true || !mounted) return;
+
+    // Optimistic: remove immediately (same pattern as
+    // detail_save_state.dart's like/save toggles), roll back on failure
+    // instead of waiting on the network before the UI reflects the delete.
+    final pieceIndex = _pieces.indexWhere((p) => p.id == piece.id);
+    final listedIndex = _listedPieces.indexWhere((p) => p.id == piece.id);
+    setState(() {
+      if (pieceIndex != -1) _pieces = List.of(_pieces)..removeAt(pieceIndex);
+      if (listedIndex != -1) {
+        _listedPieces = List.of(_listedPieces)..removeAt(listedIndex);
+      }
+    });
     try {
       await PieceService.instance.delete(piece.id);
-      if (!mounted) return;
-      setState(() {
-        _pieces = _pieces.where((p) => p.id != piece.id).toList();
-        _listedPieces = _listedPieces.where((p) => p.id != piece.id).toList();
-      });
     } catch (e) {
       if (!mounted) return;
+      setState(() {
+        if (pieceIndex != -1) {
+          _pieces = List.of(_pieces)..insert(pieceIndex.clamp(0, _pieces.length), piece);
+        }
+        if (listedIndex != -1) {
+          _listedPieces = List.of(_listedPieces)
+            ..insert(listedIndex.clamp(0, _listedPieces.length), piece);
+        }
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to delete piece: $e')),
       );
@@ -313,14 +436,20 @@ class _ProfilePageState extends State<ProfilePage> {
       itemLabel: 'scene',
     );
     if (confirmed != true || !mounted) return;
+
+    final index = _scenes.indexWhere((p) => p.id == post.id);
+    setState(() {
+      if (index != -1) _scenes = List.of(_scenes)..removeAt(index);
+    });
     try {
       await PostService.instance.delete(post.id);
-      if (!mounted) return;
-      setState(() {
-        _scenes = _scenes.where((p) => p.id != post.id).toList();
-      });
     } catch (e) {
       if (!mounted) return;
+      setState(() {
+        if (index != -1) {
+          _scenes = List.of(_scenes)..insert(index.clamp(0, _scenes.length), post);
+        }
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to delete scene: $e')),
       );
@@ -411,14 +540,17 @@ class _ProfilePageState extends State<ProfilePage> {
         (widget.viewerMode ? 56 : 0);
     final profile = _profile;
     final sessionUser = AuthSession.instance.user;
-    final sellerEnabled =
-        profile?.sellerEnabled ?? AuthSession.instance.sellerEnabled;
     final isOwnProfile = _isOwnProfile;
     final showPublicActions = widget.viewerMode || !isOwnProfile;
+    // Only borrow the viewer's own session data while `_profile` is still
+    // loading for their own profile — otherwise viewing another artist's
+    // profile flashes the viewer's own name/handle/seller state first.
+    final sellerEnabled = profile?.sellerEnabled ??
+        (isOwnProfile ? AuthSession.instance.sellerEnabled : false);
 
-    final name = profile?.name ?? sessionUser?.name ?? '';
+    final name = profile?.name ?? (isOwnProfile ? sessionUser?.name : null) ?? '';
     final handle = profile?.handle ??
-        (sessionUser != null ? '@${sessionUser.username}' : '');
+        (isOwnProfile && sessionUser != null ? '@${sessionUser.username}' : '');
     final coverUrl = profile?.coverPhotoUrl;
     final avatarUrl = profile?.profilePhotoUrl;
 
@@ -439,6 +571,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       url: coverUrl,
                       height: heroH,
                       width: width,
+                      showDefaultWhenEmpty: profile != null,
                     ),
                     if (_isPushedRoute)
                       Positioned(
@@ -527,20 +660,20 @@ class _ProfilePageState extends State<ProfilePage> {
                     kProfileHorizontalPad,
                     bottomPad,
                   ),
-                  sliver: SliverToBoxAdapter(
-                    child: ProfileTabContent(
-                      currentTab: _tab,
-                      seriesItems: _series,
-                      pieces: _pieces,
-                      scenes: _scenes,
-                      listedPieces: _listedPieces,
-                      collectSegment: _collectSegment,
-                      sellerMode: sellerEnabled,
-                      loading: _tabContentLoading,
-                      isOwnProfile: isOwnProfile && !widget.viewerMode,
-                      onDeletePiece: _deletePiece,
-                      onDeleteScene: _deleteScene,
-                    ),
+                  sliver: ProfileTabContent(
+                    currentTab: _tab,
+                    seriesItems: _series,
+                    pieces: _pieces,
+                    scenes: _scenes,
+                    listedPieces: _listedPieces,
+                    collectSegment: _collectSegment,
+                    sellerMode: sellerEnabled,
+                    loading: _tabContentLoading,
+                    isOwnProfile: isOwnProfile && !widget.viewerMode,
+                    onDeletePiece: _deletePiece,
+                    onDeleteScene: _deleteScene,
+                    sceneFilter: _sceneFilter,
+                    onSceneFilterChanged: _onSceneFilterChanged,
                   ),
                 ),
               ],

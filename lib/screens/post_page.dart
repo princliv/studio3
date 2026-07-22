@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:photo_manager/photo_manager.dart';
 
 import '../data/post_media_assets.dart';
 import '../models/post_image_transform.dart';
-import '../services/permission_service.dart';
 import '../theme/home_feed_tokens.dart';
 import '../widgets/permission_denied_sheet.dart';
+import '../widgets/post_gallery/post_gallery_picker.dart';
 import 'post_create_page.dart';
 import 'post_edit_page.dart';
 
@@ -23,20 +23,26 @@ class PostPage extends StatefulWidget {
 
 class _PostPageState extends State<PostPage> {
   static const _bannerHeight = 64.0;
-  static const _gridGap = 3.0;
   static const _bottomControlsOffset = 42.0;
   static const _maxSelection = 10;
 
   _PostFlowStep _step = _PostFlowStep.gallery;
   String _postType = 'piece';
-  final List<int> _selectedIndices = [];
+  List<AssetEntity> _pickedAssets = [];
   List<String>? _pickedImagePaths;
   String? _pickedVideoPath;
-  final _picker = ImagePicker();
+  final ValueNotifier<bool> _albumMenuOpen = ValueNotifier(false);
+  String _selectedAlbumName = 'Recents';
 
   List<String> _editImagePaths = [];
   List<PostImageTransform> _editTransforms = [];
   int _previewImageIndex = 0;
+
+  @override
+  void dispose() {
+    _albumMenuOpen.dispose();
+    super.dispose();
+  }
 
   void _exitFlow() => Navigator.pop(context);
 
@@ -44,105 +50,41 @@ class _PostPageState extends State<PostPage> {
     if (type == _postType) return;
     setState(() {
       _postType = type;
-      _selectedIndices.clear();
+      _pickedAssets = [];
       _pickedImagePaths = null;
       _pickedVideoPath = null;
     });
   }
 
-  void _onCellTap(int cellIndex) {
-    final position = _selectedIndices.indexOf(cellIndex);
-    if (position >= 0) {
-      setState(() => _selectedIndices.removeAt(position));
-      return;
-    }
-    if (_selectedIndices.length >= _maxSelection) {
-      _showMaxSelectionMessage();
-      return;
-    }
-    setState(() => _selectedIndices.add(cellIndex));
-  }
-
-  void _showMaxSelectionMessage() {
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          elevation: 0,
-          padding: EdgeInsets.zero,
-          backgroundColor: Colors.transparent,
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-          duration: const Duration(seconds: 2),
-          content: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.75),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              'You can select up to 10 photos at a time.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: Colors.white,
-                height: 1.3,
-              ),
-            ),
-          ),
-        ),
-      );
-  }
-
-  Future<bool> _ensureGalleryAccess({required bool forVideo}) async {
-    final outcome = await PermissionService.instance
-        .requestGalleryAccess(forVideo: forVideo);
-    if (outcome == GalleryPermissionOutcome.granted) return true;
-    if (outcome == GalleryPermissionOutcome.deniedForever && mounted) {
-      await showPermissionDeniedSheet(
-        context,
-        title: forVideo ? 'Video access needed' : 'Photo access needed',
-        message:
-            'Enable ${forVideo ? 'video' : 'photo'} library access in Settings to continue.',
-      );
-    }
-    return false;
-  }
-
-  Future<void> _pickFromGallery() async {
-    if (!await _ensureGalleryAccess(forVideo: false)) return;
-    final images = await _picker.pickMultiImage(limit: _maxSelection);
-    if (images.isEmpty || !mounted) return;
-    setState(() {
-      _pickedImagePaths = images.map((x) => x.path).toList();
-      _pickedVideoPath = null;
-      _selectedIndices.clear();
-      for (var i = 0; i < _pickedImagePaths!.length; i++) {
-        _selectedIndices.add(i);
+  Future<void> _goToEdit() async {
+    if (_pickedAssets.isEmpty) return;
+    AssetEntity? video;
+    for (final asset in _pickedAssets) {
+      if (asset.type == AssetType.video) {
+        video = asset;
+        break;
       }
-    });
-  }
-
-  Future<void> _pickVideo() async {
-    if (!await _ensureGalleryAccess(forVideo: true)) return;
-    final video = await _picker.pickVideo(source: ImageSource.gallery);
-    if (video == null || !mounted) return;
-    setState(() {
-      _pickedVideoPath = video.path;
-      _pickedImagePaths = null;
-      _selectedIndices.clear();
-    });
-  }
-
-  void _goToEdit() {
-    if (_pickedVideoPath != null) {
+    }
+    if (video != null) {
+      final file = await video.file;
+      if (file == null || !mounted) return;
+      setState(() {
+        _pickedVideoPath = file.path;
+        _pickedImagePaths = null;
+      });
       _goToDetailsFromVideo();
       return;
     }
-    final isPicked = _pickedImagePaths != null && _pickedImagePaths!.isNotEmpty;
-    if (!isPicked && _selectedIndices.isEmpty) return;
-    setState(() => _step = _PostFlowStep.edit);
+    final paths = <String>[];
+    for (final asset in _pickedAssets) {
+      final file = await asset.file;
+      if (file != null) paths.add(file.path);
+    }
+    if (!mounted || paths.isEmpty) return;
+    setState(() {
+      _pickedImagePaths = paths;
+      _step = _PostFlowStep.edit;
+    });
   }
 
   void _goToDetailsFromVideo() {
@@ -193,11 +135,6 @@ class _PostPageState extends State<PostPage> {
     }
   }
 
-  int? _selectionOrder(int cellIndex) {
-    final position = _selectedIndices.indexOf(cellIndex);
-    return position >= 0 ? position + 1 : null;
-  }
-
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -217,8 +154,7 @@ class _PostPageState extends State<PostPage> {
   Widget _buildGallery() {
     final topInset = MediaQuery.paddingOf(context).top;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
-    final hasSelection =
-        _selectedIndices.isNotEmpty || _pickedVideoPath != null;
+    final hasSelection = _pickedAssets.isNotEmpty || _pickedVideoPath != null;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -229,10 +165,23 @@ class _PostPageState extends State<PostPage> {
             left: 0,
             right: 0,
             bottom: 0,
-            child: _MediaGrid(
-              postType: _postType,
-              selectionOrderFor: _selectionOrder,
-              onSelect: _onCellTap,
+            child: PostGalleryPicker(
+              key: ValueKey(_postType),
+              openNotifier: _albumMenuOpen,
+              maxSelection: _maxSelection,
+              allowVideos: _postType == 'scene',
+              onAlbumChanged: (name) =>
+                  setState(() => _selectedAlbumName = name),
+              onSelectionChanged: (assets) =>
+                  setState(() => _pickedAssets = assets),
+              onPermissionPermanentlyDenied: () {
+                showPermissionDeniedSheet(
+                  context,
+                  title: 'Photo access needed',
+                  message:
+                      'Enable photo library access in Settings to continue.',
+                );
+              },
             ),
           ),
           Positioned(
@@ -244,31 +193,25 @@ class _PostPageState extends State<PostPage> {
               onClose: _exitFlow,
               hasSelection: hasSelection,
               onNext: hasSelection ? _goToEdit : null,
-              onPickGallery: _pickFromGallery,
-              onPickVideo: _postType == 'scene' ? _pickVideo : null,
+              albumName: _selectedAlbumName,
+              menuOpen: _albumMenuOpen,
             ),
           ),
           Positioned(
             left: 0,
             right: 0,
             bottom: bottomInset + _bottomControlsOffset,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _PostingSelector(
-                  postType: _postType,
-                  onChanged: _onPostTypeChanged,
-                ),
-                const SizedBox(width: 12),
-                GestureDetector(
-                  onTap: () {},
-                  child: SvgPicture.asset(
-                    PostMediaAssets.filterButton,
-                    width: 38,
-                    height: 38,
+            child: ValueListenableBuilder<bool>(
+              valueListenable: _albumMenuOpen,
+              builder: (context, open, _) {
+                if (open) return const SizedBox.shrink();
+                return Center(
+                  child: _PostingSelector(
+                    postType: _postType,
+                    onChanged: _onPostTypeChanged,
                   ),
-                ),
-              ],
+                );
+              },
             ),
           ),
         ],
@@ -279,9 +222,9 @@ class _PostPageState extends State<PostPage> {
   Widget _buildEdit() {
     final isPicked = _pickedImagePaths != null && _pickedImagePaths!.isNotEmpty;
     return PostEditPage(
-      key: ValueKey('edit-$_postType-${_selectedIndices.join(",")}'),
+      key: ValueKey('edit-$_postType-${(_pickedImagePaths ?? const []).join(",")}'),
       postType: _postType,
-      selectedCellIndices: List<int>.from(_selectedIndices),
+      selectedCellIndices: const [],
       customImagePaths: isPicked ? _pickedImagePaths : null,
       initialImageIndex: _previewImageIndex,
       initialTransforms:
@@ -295,7 +238,7 @@ class _PostPageState extends State<PostPage> {
     return PostCreatePage(
       key: const ValueKey('details'),
       postType: _postType,
-      selectedCellIndices: List<int>.from(_selectedIndices),
+      selectedCellIndices: const [],
       imagePaths: _editImagePaths,
       transforms: _editTransforms,
       previewImageIndex: _previewImageIndex,
@@ -313,8 +256,8 @@ class _PostingBanner extends StatelessWidget {
     required this.onClose,
     required this.hasSelection,
     required this.onNext,
-    this.onPickGallery,
-    this.onPickVideo,
+    required this.albumName,
+    required this.menuOpen,
   });
 
   static const _neutral300 = Color(0xFFC8C5BC);
@@ -323,8 +266,8 @@ class _PostingBanner extends StatelessWidget {
   final VoidCallback onClose;
   final bool hasSelection;
   final VoidCallback? onNext;
-  final VoidCallback? onPickGallery;
-  final VoidCallback? onPickVideo;
+  final String albumName;
+  final ValueNotifier<bool> menuOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -336,201 +279,88 @@ class _PostingBanner extends StatelessWidget {
           height: _PostPageState._bannerHeight,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-            child: Row(
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                GestureDetector(
-                  onTap: onClose,
-                  behavior: HitTestBehavior.opaque,
-                  child: SvgPicture.asset(
-                    PostMediaAssets.closeIcon,
-                    width: 14,
-                    height: 14,
-                  ),
-                ),
-                Expanded(
-                  child: Center(
-                    child: GestureDetector(
-                      onTap: onPickGallery,
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap: onClose,
                       behavior: HitTestBehavior.opaque,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Recents',
-                            style: GoogleFonts.inter(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                              color: HomeFeedTokens.textInverse,
+                      child: SvgPicture.asset(
+                        PostMediaAssets.closeIcon,
+                        width: 14,
+                        height: 14,
+                      ),
+                    ),
+                    const Spacer(),
+                    Opacity(
+                      opacity: hasSelection ? 1 : 0.3,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: onNext,
+                          borderRadius: BorderRadius.circular(100),
+                          child: Container(
+                            width: 60,
+                            height: 32,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: _neutral300,
+                              borderRadius: BorderRadius.circular(100),
+                            ),
+                            child: Text(
+                              'Next',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: HomeFeedTokens.textPrimary,
+                              ),
                             ),
                           ),
-                          const SizedBox(width: 4),
-                          SvgPicture.asset(
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                ValueListenableBuilder<bool>(
+                  valueListenable: menuOpen,
+                  builder: (context, open, _) => GestureDetector(
+                    onTap: () => menuOpen.value = !open,
+                    behavior: HitTestBehavior.opaque,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          albumName,
+                          style: GoogleFonts.inter(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: HomeFeedTokens.textInverse,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        AnimatedRotation(
+                          turns: open ? 0.5 : 0,
+                          duration: const Duration(milliseconds: 150),
+                          child: SvgPicture.asset(
                             PostMediaAssets.chevronDown,
                             width: 9,
-                            height: 5,
+                            height: 9,
+                            colorFilter: ColorFilter.mode(
+                              HomeFeedTokens.textInverse,
+                              BlendMode.srcIn,
+                            ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-                Opacity(
-                  opacity: hasSelection ? 1 : 0.3,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: onNext,
-                      borderRadius: BorderRadius.circular(100),
-                      child: Container(
-                        width: 60,
-                        height: 32,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: _neutral300,
-                          borderRadius: BorderRadius.circular(100),
-                        ),
-                        child: Text(
-                          'Next',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: HomeFeedTokens.textPrimary,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                if (onPickVideo != null) ...[
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: onPickVideo,
-                    behavior: HitTestBehavior.opaque,
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.12),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.videocam_rounded,
-                        color: Colors.white,
-                        size: 18,
-                      ),
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _MediaGrid extends StatelessWidget {
-  const _MediaGrid({
-    required this.postType,
-    required this.selectionOrderFor,
-    required this.onSelect,
-  });
-
-  final String postType;
-  final int? Function(int cellIndex) selectionOrderFor;
-  final ValueChanged<int> onSelect;
-
-  bool get _isScene => postType == 'scene';
-
-  List<PostMediaGridRow> get _rows =>
-      _isScene ? PostMediaAssets.sceneGridRows : PostMediaAssets.pieceGridRows;
-
-  List<String> get _thumbs =>
-      _isScene ? PostMediaAssets.sceneGridThumbs : PostMediaAssets.pieceGridThumbs;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView.builder(
-      padding: EdgeInsets.zero,
-      itemCount: _rows.length,
-      itemBuilder: (context, rowIndex) {
-        final row = _rows[rowIndex];
-        final rowStartIndex = rowIndex * 3;
-
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: rowIndex < _rows.length - 1 ? _PostPageState._gridGap : 0,
-          ),
-          child: SizedBox(
-            height: row.height,
-            child: Row(
-              children: [
-                for (var col = 0; col < row.thumbIndices.length; col++) ...[
-                  if (col > 0) const SizedBox(width: _PostPageState._gridGap),
-                  Expanded(
-                    child: _MediaCell(
-                      thumbs: _thumbs,
-                      thumbIndex: row.thumbIndices[col],
-                      cellIndex: rowStartIndex + col,
-                      selectionOrder: selectionOrderFor(rowStartIndex + col),
-                      onTap: onSelect,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _MediaCell extends StatelessWidget {
-  const _MediaCell({
-    required this.thumbs,
-    required this.thumbIndex,
-    required this.cellIndex,
-    required this.selectionOrder,
-    required this.onTap,
-  });
-
-  final List<String> thumbs;
-  final int thumbIndex;
-  final int cellIndex;
-  final int? selectionOrder;
-  final ValueChanged<int> onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final selected = selectionOrder != null;
-
-    return GestureDetector(
-      onTap: () => onTap(cellIndex),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.asset(
-            thumbs[thumbIndex],
-            fit: BoxFit.cover,
-          ),
-          if (selected)
-            ColoredBox(
-              color: Colors.white.withValues(alpha: 0.5),
-              child: Center(
-                child: Text(
-                  '$selectionOrder',
-                  style: GoogleFonts.inter(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w400,
-                    color: HomeFeedTokens.textPrimary,
-                    height: 1,
-                  ),
-                ),
-              ),
-            ),
-        ],
       ),
     );
   }
@@ -552,8 +382,8 @@ class _PostingSelector extends StatelessWidget {
     const options = ['piece', 'scene'];
 
     return Container(
-      width: 160,
-      height: 38,
+      width: 200,
+      height: 46,
       padding: const EdgeInsets.symmetric(horizontal: 30),
       alignment: Alignment.center,
       decoration: BoxDecoration(
@@ -596,7 +426,7 @@ class _SelectorTab extends StatelessWidget {
       child: Text(
         label,
         style: GoogleFonts.inter(
-          fontSize: 13,
+          fontSize: 15,
           fontWeight: selected ? FontWeight.w500 : FontWeight.w400,
           color: selected ? HomeFeedTokens.textInverse : _textSecondary,
         ),

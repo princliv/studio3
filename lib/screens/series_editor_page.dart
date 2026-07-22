@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -277,7 +278,7 @@ class _PieceRow extends StatelessWidget {
               width: 52,
               height: 52,
               child: piece.mediaUrl != null && piece.mediaUrl!.isNotEmpty
-                  ? Image.network(piece.mediaUrl!, fit: BoxFit.cover)
+                  ? CachedNetworkImage(imageUrl: piece.mediaUrl!, fit: BoxFit.cover)
                   : ColoredBox(color: Colors.grey.shade300),
             ),
           ),
@@ -369,7 +370,7 @@ class _AddPiecesSheetState extends State<_AddPiecesSheet> {
                         width: 44,
                         height: 44,
                         child: piece.mediaUrl != null
-                            ? Image.network(piece.mediaUrl!, fit: BoxFit.cover)
+                            ? CachedNetworkImage(imageUrl: piece.mediaUrl!, fit: BoxFit.cover)
                             : ColoredBox(color: Colors.grey.shade300),
                       ),
                     ),

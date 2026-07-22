@@ -12,7 +12,17 @@ Future<void> openExploreDetail(BuildContext context, FeedItem item) {
     return openReelsForItem(context, item);
   }
 
-  final preview = FeedPreviewItem.fromFeedItem(item);
+  return openPieceDetailPreview(context, FeedPreviewItem.fromFeedItem(item));
+}
+
+/// Pushes the piece/collect detail screen for an already-resolved preview —
+/// shared by [openExploreDetail] and deep-link resolution
+/// ([DeepLinkService]), which builds its preview from a fetched
+/// [PieceSummary] instead of a feed [FeedItem].
+Future<void> openPieceDetailPreview(
+  BuildContext context,
+  FeedPreviewItem preview,
+) {
   final page = preview.isAvailable
       ? AvailablePieceDetailPage(item: preview)
       : PieceDetailPage(item: preview);

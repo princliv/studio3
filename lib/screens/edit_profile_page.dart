@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -349,8 +350,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     const SizedBox(height: 10),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        _bannerMediaUrl!,
+                      child: CachedNetworkImage(
+                        imageUrl: _bannerMediaUrl!,
                         height: 80,
                         width: 80,
                         fit: BoxFit.cover,

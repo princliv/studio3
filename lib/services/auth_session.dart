@@ -59,6 +59,10 @@ class AuthSession {
     await _prefs?.setString(_tokenKey, token);
     await _prefs?.setString(_userKey, jsonEncode(authUser.toJson()));
     await _prefs?.setBool(_sellerKey, sellerEnabled);
+    // A prior session's cached profile can still be within its TTL if this
+    // login follows one that ended without a clean logout (app killed,
+    // etc.) — invalidate it so this session always fetches a live profile.
+    await CacheService.instance.invalidate('user.me');
     notifyListeners();
   }
 
@@ -84,8 +88,10 @@ class AuthSession {
       name: json['name'] as String? ?? current.name,
       email: json['email'] as String? ?? current.email,
       emailVerified: json['emailVerified'] as bool? ?? current.emailVerified,
+      // Monotonic: never let a server payload un-set a locally-completed
+      // onboarding flag (see the matching guard in UserService).
       onboardingComplete:
-          json['onboardingComplete'] as bool? ?? current.onboardingComplete,
+          current.onboardingComplete || (json['onboardingComplete'] as bool? ?? false),
       role: json['role'] as String? ?? current.role,
       sellerEnabled: json['sellerEnabled'] as bool? ??
           json['isSeller'] as bool? ??

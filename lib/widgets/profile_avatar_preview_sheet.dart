@@ -47,7 +47,6 @@ class _ProfileAvatarPreviewSheetState extends State<_ProfileAvatarPreviewSheet> 
   static const _previewSize = 140.0;
 
   String? _avatarUrl;
-  bool _uploading = false;
 
   @override
   void initState() {
@@ -56,11 +55,8 @@ class _ProfileAvatarPreviewSheetState extends State<_ProfileAvatarPreviewSheet> 
   }
 
   Future<void> _changePhoto() async {
-    setState(() => _uploading = true);
     final url = await pickAndUploadProfilePhoto(context);
-    if (!mounted) return;
-    setState(() => _uploading = false);
-    if (url == null) return;
+    if (!mounted || url == null) return;
     setState(() => _avatarUrl = url);
     widget.onChanged?.call();
     if (mounted) Navigator.pop(context);
@@ -85,7 +81,7 @@ class _ProfileAvatarPreviewSheetState extends State<_ProfileAvatarPreviewSheet> 
               if (widget.allowChange) ...[
                 const SizedBox(height: 20),
                 FilledButton(
-                  onPressed: _uploading ? null : _changePhoto,
+                  onPressed: _changePhoto,
                   style: FilledButton.styleFrom(
                     backgroundColor: HomeFeedTokens.textPrimary,
                     foregroundColor: HomeFeedTokens.textInverse,
@@ -99,22 +95,13 @@ class _ProfileAvatarPreviewSheetState extends State<_ProfileAvatarPreviewSheet> 
                       ),
                     ),
                   ),
-                  child: _uploading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : Text(
-                          'Change',
-                          style: GoogleFonts.inter(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                  child: Text(
+                    'Change',
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ],
             ],

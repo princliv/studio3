@@ -152,14 +152,22 @@ class _ReelOverlayState extends State<ReelOverlay> {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
-                        authorName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
+                      child: GestureDetector(
+                        onTap: authorUsername != null
+                            ? () => openUserProfile(context, authorUsername)
+                            : null,
+                        behavior: authorUsername != null
+                            ? HitTestBehavior.opaque
+                            : HitTestBehavior.deferToChild,
+                        child: Text(
+                          authorName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),

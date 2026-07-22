@@ -33,6 +33,22 @@ class PermissionService {
     return GalleryPermissionOutcome.denied;
   }
 
+  /// Requests both photo and video library access together, for pickers
+  /// that show mixed media (e.g. the Scene gallery grid). On Android 13+
+  /// these are distinct runtime permissions, so requesting only one leaves
+  /// the other media type invisible to the picker.
+  Future<GalleryPermissionOutcome> requestMixedGalleryAccess() async {
+    final statuses = await [Permission.photos, Permission.videos].request();
+    final results = statuses.values;
+    if (results.every((s) => s.isGranted || s.isLimited)) {
+      return GalleryPermissionOutcome.granted;
+    }
+    if (results.any((s) => s.isPermanentlyDenied)) {
+      return GalleryPermissionOutcome.deniedForever;
+    }
+    return GalleryPermissionOutcome.denied;
+  }
+
   /// Requested once, right after login, alongside device/push registration.
   Future<bool> requestNotifications() async {
     final status = await Permission.notification.status;

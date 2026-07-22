@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/explore_feed_block.dart';
 import '../models/feed_item.dart';
+import '../models/feed_page.dart';
 import '../models/user_profile.dart';
 import '../services/connectivity_service.dart';
 import '../services/feed_service.dart';
@@ -73,6 +74,9 @@ class _ExplorePageState extends State<ExplorePage> {
           ? await FeedService.instance.getExplore(cursor: _nextCursor)
           : await FeedService.instance.getExploreCached(
               forceRefresh: refresh,
+              // Stale cache paints immediately; this silently merges the
+              // background-refreshed page once it lands, no flicker.
+              onBackgroundUpdate: _mergeBackgroundPage,
             );
       UserProfile? profile = _profile;
       if (!append) {
@@ -118,6 +122,25 @@ class _ExplorePageState extends State<ExplorePage> {
         _loadingMore = false;
       });
     }
+  }
+
+  /// Applies a page fetched silently in the background (see
+  /// [CacheService.fetchWithCache]'s `onBackgroundUpdate`) — mirrors the
+  /// non-append branch of `_loadData` (replace items, recompute featured),
+  /// just without ever showing a spinner for it.
+  void _mergeBackgroundPage(FeedPage page) {
+    if (!mounted) return;
+    setState(() {
+      _allItems = page.items;
+      _nextCursor = page.nextCursor;
+    });
+    final filtered = _filterItems(_allItems, _category, _searchQuery);
+    final featured = ExploreFeaturedRanker.pickFeatured(filtered, profile: _profile);
+    if (!mounted) return;
+    setState(() {
+      _featured = featured;
+      _visibleCycleCount = 2;
+    });
   }
 
   List<FeedItem> get _sourceItems => _allItems;

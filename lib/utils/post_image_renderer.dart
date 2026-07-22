@@ -5,9 +5,10 @@ import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
 
 import '../models/post_image_transform.dart';
+import 'crop_cover_math.dart' show CropFitMode;
 import 'image_adjust_math.dart';
 
-/// Bakes a [PostImageTransform] (crop aspect ratio, rotation, flip, zoom,
+/// Bakes a [PostImageTransform] (crop box, rotation, flip, fit mode,
 /// brightness/contrast/exposure) into real image bytes, matching exactly
 /// what the edit screen's live preview shows — so the uploaded image is
 /// what the user actually chose, not the original untouched file.
@@ -56,20 +57,19 @@ abstract final class PostImageRenderer {
       outW = outH * ratio;
     }
 
-    final baseCoverScale = math.max(outW / imgW, outH / imgH);
-    final totalScale = baseCoverScale * transform.effectiveScale(imageAspect);
+    // Same coordinate contract as PostCropPreview: rect is normalized to
+    // the image's own width/height fractions.
+    final rect = transform.resolvedCropRect(imageAspect);
+    final radians = transform.rotationDegrees * math.pi / 180;
+    final flipX = transform.flipHorizontal ? -1.0 : 1.0;
+    final flipY = transform.flipVertical ? -1.0 : 1.0;
+    final rectCenterX = (rect.left + rect.right) / 2 * imgW;
+    final rectCenterY = (rect.top + rect.bottom) / 2 * imgH;
 
     final recorder = ui.PictureRecorder();
     final canvas = ui.Canvas(
       recorder,
       ui.Rect.fromLTWH(0, 0, outW, outH),
-    );
-    canvas.clipRect(ui.Rect.fromLTWH(0, 0, outW, outH));
-    canvas.translate(outW / 2, outH / 2);
-    canvas.rotate(transform.rotationDegrees * math.pi / 180);
-    canvas.scale(
-      (transform.flipHorizontal ? -1.0 : 1.0) * totalScale,
-      (transform.flipVertical ? -1.0 : 1.0) * totalScale,
     );
 
     final paint = ui.Paint();
@@ -87,7 +87,47 @@ abstract final class PostImageRenderer {
       );
     }
 
-    canvas.drawImage(image, ui.Offset(-imgW / 2, -imgH / 2), paint);
+    if (transform.fitMode == CropFitMode.fill) {
+      // The box's fraction-space aspect already matches `ratio` (Fill
+      // locks it), so mapping it straight onto the full output canvas
+      // fills edge-to-edge with no gaps.
+      canvas.clipRect(ui.Rect.fromLTWH(0, 0, outW, outH));
+      final scale = outW / (rect.width * imgW);
+      canvas.translate(outW / 2, outH / 2);
+      canvas.rotate(radians);
+      canvas.scale(flipX * scale, flipY * scale);
+      canvas.translate(-rectCenterX, -rectCenterY);
+      canvas.drawImage(image, ui.Offset.zero, paint);
+    } else {
+      // Fit: the box can be any shape, so letterbox its own aspect ratio
+      // into the output canvas — black bars fill whatever's left over.
+      canvas.drawRect(
+        ui.Rect.fromLTWH(0, 0, outW, outH),
+        ui.Paint()..color = const ui.Color(0xFF000000),
+      );
+      final subimageAspect = (rect.width / rect.height) * imageAspect;
+      double windowW;
+      double windowH;
+      if (subimageAspect >= ratio) {
+        windowW = outW;
+        windowH = outW / subimageAspect;
+      } else {
+        windowH = outH;
+        windowW = outH * subimageAspect;
+      }
+      final windowLeft = (outW - windowW) / 2;
+      final windowTop = (outH - windowH) / 2;
+      final scale = windowW / (rect.width * imgW);
+
+      canvas.save();
+      canvas.clipRect(ui.Rect.fromLTWH(windowLeft, windowTop, windowW, windowH));
+      canvas.translate(windowLeft + windowW / 2, windowTop + windowH / 2);
+      canvas.rotate(radians);
+      canvas.scale(flipX * scale, flipY * scale);
+      canvas.translate(-rectCenterX, -rectCenterY);
+      canvas.drawImage(image, ui.Offset.zero, paint);
+      canvas.restore();
+    }
 
     final picture = recorder.endRecording();
     try {

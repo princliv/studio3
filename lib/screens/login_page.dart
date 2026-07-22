@@ -50,6 +50,7 @@ class _LoginPageState extends State<LoginPage> {
       _passwordController.text.isNotEmpty;
 
   Future<void> _signIn() async {
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() => _submitted = true);
     if (!_canSubmit) return;
 

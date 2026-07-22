@@ -634,7 +634,18 @@ class _AuthOtpInputState extends State<AuthOtpInput> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         GestureDetector(
-          onTap: () => _focusNode.requestFocus(),
+          onTap: () {
+            // A dismissed on-screen keyboard doesn't clear Flutter's
+            // internal focus state, so requestFocus() alone is a no-op
+            // once the node is already focused — force a focus transition
+            // so the platform "show keyboard" call fires again.
+            if (_focusNode.hasFocus) {
+              _focusNode.unfocus();
+              Future.microtask(() => _focusNode.requestFocus());
+            } else {
+              _focusNode.requestFocus();
+            }
+          },
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: List.generate(_length, (i) {
@@ -706,7 +717,13 @@ void showAuthSnackBar(BuildContext context, String message, {bool isError = fals
 
 void showAuthError(BuildContext context, Object error) {
   final message = switch (error) {
-    ApiException(:final message) => message,
+    ApiException(statusCode: 429) =>
+        'Too many attempts — please wait a moment before trying again.',
+    // Prefer the server's own message (now specific and useful — e.g.
+    // "Could not send the verification email...", "OTP service is
+    // temporarily unavailable...") over a blanket generic one, even for
+    // 5xx, so failures are actually diagnosable instead of a dead end.
+    ApiException(:final message) when message.isNotEmpty => message,
     _ => 'Something went wrong',
   };
   showAuthSnackBar(context, message, isError: true);

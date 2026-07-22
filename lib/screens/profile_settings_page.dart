@@ -57,6 +57,37 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
     }
   }
 
+  Future<void> _confirmLogout({
+    required String title,
+    required String message,
+    required Future<void> Function() onConfirmed,
+  }) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text(
+              'Log out',
+              style: TextStyle(color: Color(0xFFE05252)),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await onConfirmed();
+    if (!mounted) return;
+    Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
+  }
+
   Future<void> _loadAnalytics() async {
     try {
       final analytics = await UserService.instance.getSellerAnalytics();
@@ -206,12 +237,15 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
             SettingsTile(
               icon: Icons.devices_other_outlined,
               label: 'Log out of all devices',
-              onTap: () async {
-                await DeviceService.instance.unregisterCurrentDevice();
-                await AuthService.instance.logoutAllDevices();
-                if (!context.mounted) return;
-                Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
-              },
+              onTap: () => _confirmLogout(
+                title: 'Log out of all devices?',
+                message:
+                    "You'll be signed out everywhere you're currently logged in.",
+                onConfirmed: () async {
+                  await DeviceService.instance.unregisterCurrentDevice();
+                  await AuthService.instance.logoutAllDevices();
+                },
+              ),
             ),
 
             const _SectionHeader('Notifications'),
@@ -231,12 +265,14 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
               icon: Icons.logout_rounded,
               label: 'Log out',
               destructive: true,
-              onTap: () async {
-                await DeviceService.instance.unregisterCurrentDevice();
-                await AuthService.instance.logout();
-                if (!context.mounted) return;
-                Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
-              },
+              onTap: () => _confirmLogout(
+                title: 'Log out?',
+                message: "You'll need to log back in to use Studio 3.",
+                onConfirmed: () async {
+                  await DeviceService.instance.unregisterCurrentDevice();
+                  await AuthService.instance.logout();
+                },
+              ),
             ),
           ],
         ),

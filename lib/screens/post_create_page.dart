@@ -24,6 +24,7 @@ import '../widgets/create_flow/series_picker_sheet.dart';
 import '../widgets/post_create_option_sheet.dart';
 import '../widgets/post_crop_preview.dart';
 import '../widgets/seller_mode_required_dialog.dart';
+import '../widgets/uploading_dialog.dart';
 import 'add_materials_page.dart';
 
 /// Add Piece / Scene details — posting flow step (Figma 1995:1486).
@@ -294,9 +295,11 @@ class _PostCreatePageState extends State<PostCreatePage> {
 
   Future<void> _publish(PostDraft draft) async {
     setState(() => _publishing = true);
+    showUploadingDialog(context, message: 'Publishing…');
     try {
       await PostPublishService.instance.publish(draft);
       if (!mounted) return;
+      hideUploadingDialog(context);
       Navigator.of(context).popUntil((route) => route.isFirst);
       final message = draft.isForSale
           ? 'Piece listed for sale'
@@ -304,6 +307,7 @@ class _PostCreatePageState extends State<PostCreatePage> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     } catch (e) {
       if (!mounted) return;
+      hideUploadingDialog(context);
       final message = e is ApiException ? e.message : e.toString();
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(message)));

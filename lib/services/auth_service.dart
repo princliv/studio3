@@ -18,6 +18,15 @@ class AuthService {
     await _api.post('/api/auth/otp/resend', body: {'email': email.trim()});
   }
 
+  /// Check-only verification — does not create an account. The real,
+  /// single-use check still happens server-side inside [register].
+  Future<void> verifyOtp(String email, String otp) async {
+    await _api.post(
+      '/api/auth/otp/verify',
+      body: {'email': email.trim(), 'otp': otp},
+    );
+  }
+
   Future<UsernameCheckResult> checkUsername(
     String username, {
     bool forCurrentUser = false,

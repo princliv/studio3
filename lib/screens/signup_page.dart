@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../services/api_exception.dart';
 import '../services/auth_service.dart';
 import '../utils/auth_validators.dart';
 import '../widgets/auth_ui.dart';
@@ -45,6 +46,10 @@ class _SignUpPageState extends State<SignUpPage> {
   List<String> _usernameSuggestions = [];
   Timer? _usernameDebounce;
 
+  int _resendCooldown = 0;
+  Timer? _resendCooldownTimer;
+  static const _resendCooldownSeconds = 120;
+
   static const _formSteps = 6;
 
   int get _progressStep => switch (_step) {
@@ -75,6 +80,7 @@ class _SignUpPageState extends State<SignUpPage> {
   @override
   void dispose() {
     _usernameDebounce?.cancel();
+    _resendCooldownTimer?.cancel();
     _firstNameController.dispose();
     _lastNameController.dispose();
     _emailController.dispose();
@@ -124,23 +130,49 @@ class _SignUpPageState extends State<SignUpPage> {
     setState(() => _submitted = true);
     if (AuthValidators.email(_emailController.text) != null) return;
 
-    setState(() => _loading = true);
+    // Navigate immediately rather than waiting on the network — sending
+    // the code is inherently slow (backend cold start, SMTP delivery) and
+    // the user shouldn't have to wait through that just to see the entry
+    // screen. The actual send happens in the background; a failure is
+    // surfaced via SnackBar once it resolves, with "Resend code" already
+    // available on this next screen to retry.
+    final email = _emailController.text.trim();
+    setState(() {
+      _submitted = false;
+      _otp = '';
+      _otpError = null;
+      _step = _SignUpStep.emailVerify;
+    });
+
     try {
-      await AuthService.instance.generateOtp(_emailController.text.trim());
+      await AuthService.instance.generateOtp(email);
       if (!mounted) return;
-      setState(() {
-        _submitted = false;
-        _otp = '';
-        _otpError = null;
-        _step = _SignUpStep.emailVerify;
-      });
+      _startResendCooldown();
       showAuthSnackBar(context, 'Verification code sent to your email');
     } catch (e) {
       if (mounted) showAuthError(context, e);
-    } finally {
-      if (mounted) setState(() => _loading = false);
     }
   }
+
+  void _startResendCooldown() {
+    _resendCooldownTimer?.cancel();
+    setState(() => _resendCooldown = _resendCooldownSeconds);
+    _resendCooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_resendCooldown <= 1) {
+        timer.cancel();
+        setState(() => _resendCooldown = 0);
+      } else {
+        setState(() => _resendCooldown--);
+      }
+    });
+  }
+
+  String _formatCooldown(int seconds) =>
+      '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
 
   Future<void> _resendOtp() async {
     setState(() => _loading = true);
@@ -151,6 +183,7 @@ class _SignUpPageState extends State<SignUpPage> {
           _otp = '';
           _otpError = null;
         });
+        _startResendCooldown();
         showAuthSnackBar(context, 'Verification code resent');
       }
     } catch (e) {
@@ -160,16 +193,30 @@ class _SignUpPageState extends State<SignUpPage> {
     }
   }
 
-  void _continueOtp(String code) {
+  Future<void> _continueOtp(String code) async {
     if (code.length != 6) {
       setState(() => _otpError = 'Enter the 6-digit code');
       return;
     }
+    if (_loading) return;
     setState(() {
-      _otp = code;
+      _loading = true;
       _otpError = null;
-      _step = _SignUpStep.username;
     });
+    try {
+      await AuthService.instance.verifyOtp(_emailController.text.trim(), code);
+      if (!mounted) return;
+      setState(() {
+        _otp = code;
+        _step = _SignUpStep.username;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      final message = e is ApiException ? e.message : 'Could not verify the code';
+      setState(() => _otpError = message);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   void _onUsernameChanged(String value) {
@@ -373,7 +420,7 @@ class _SignUpPageState extends State<SignUpPage> {
         AuthPrimaryButton(
           label: 'Send code',
           enabled: AuthValidators.email(_emailController.text) == null,
-          loading: false,
+          loading: _loading,
           onPressed: _continueEmail,
         ),
       ],
@@ -395,15 +442,34 @@ class _SignUpPageState extends State<SignUpPage> {
         AuthPrimaryButton(
           label: 'Verify',
           enabled: _otp.length == 6,
+          loading: _loading,
           onPressed: () => _continueOtp(_otp),
         ),
         const SizedBox(height: 12),
-        TextButton(
-          onPressed: _loading ? null : _resendOtp,
-          child: Text(
-            'Resend code',
-            style: GoogleFonts.inter(fontSize: 13, color: AuthColors.textMuted, decoration: TextDecoration.underline),
-          ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextButton(
+              onPressed: (_loading || _resendCooldown > 0) ? null : _resendOtp,
+              child: Text(
+                'Resend code',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  color: _resendCooldown > 0
+                      ? AuthColors.textMuted.withValues(alpha: 0.5)
+                      : AuthColors.textMuted,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ),
+            if (_resendCooldown > 0) ...[
+              const SizedBox(width: 4),
+              Text(
+                '(${_formatCooldown(_resendCooldown)})',
+                style: GoogleFonts.inter(fontSize: 13, color: AuthColors.textMuted),
+              ),
+            ],
+          ],
         ),
       ],
     );

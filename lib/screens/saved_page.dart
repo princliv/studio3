@@ -27,17 +27,50 @@ class _SavedPageState extends State<SavedPage> {
   @override
   void initState() {
     super.initState();
+    // Seed before attaching the listener so populating the store here can't
+    // trigger a setState via _onStoreChanged before the first build.
+    _seedFromCache();
     _store.addListener(_onStoreChanged);
     _loadSavedFromApi();
   }
 
-  Future<void> _loadSavedFromApi() async {
-    try {
-      final pieces = await UserService.instance.getSavedPieces();
+  /// Paints Saved instantly from whatever's cached (if anything) instead of
+  /// an empty state on cold app start — `_loadSavedFromApi` below still
+  /// runs to confirm/silently refresh via the cached (SWR) service calls.
+  void _seedFromCache() {
+    final pieces = UserService.instance.peekSavedPiecesCached();
+    if (pieces != null) {
       for (final piece in pieces) {
         _store.savePreview(FeedPreviewItem.fromPieceSummary(piece));
       }
-      final posts = await PostService.instance.getSavedPosts();
+    }
+    final posts = PostService.instance.peekSavedPostsCached();
+    if (posts != null) {
+      for (final post in posts) {
+        _store.saveFeedItem(FeedItem.post(post));
+      }
+    }
+  }
+
+  Future<void> _loadSavedFromApi() async {
+    try {
+      final pieces = await UserService.instance.getSavedPiecesCached(
+        onBackgroundUpdate: (fresh) {
+          for (final piece in fresh) {
+            _store.savePreview(FeedPreviewItem.fromPieceSummary(piece));
+          }
+        },
+      );
+      for (final piece in pieces) {
+        _store.savePreview(FeedPreviewItem.fromPieceSummary(piece));
+      }
+      final posts = await PostService.instance.getSavedPostsCached(
+        onBackgroundUpdate: (fresh) {
+          for (final post in fresh) {
+            _store.saveFeedItem(FeedItem.post(post));
+          }
+        },
+      );
       for (final post in posts) {
         _store.saveFeedItem(FeedItem.post(post));
       }

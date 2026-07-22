@@ -62,7 +62,10 @@ class FeedService {
   /// always stays network-only. Serves cached data immediately when fresh
   /// (or when offline and cache exists), refreshing in the background
   /// otherwise.
-  Future<FeedPage> getForYouCached({bool forceRefresh = false}) {
+  Future<FeedPage> getForYouCached({
+    bool forceRefresh = false,
+    void Function(FeedPage fresh)? onBackgroundUpdate,
+  }) {
     return CacheService.instance.fetchWithCache<FeedPage>(
       key: 'feed.forYou',
       ttl: const Duration(minutes: 5),
@@ -78,6 +81,18 @@ class FeedService {
         );
       },
       parse: _parseFeedPage,
+      onBackgroundUpdate: onBackgroundUpdate,
+    );
+  }
+
+  /// Synchronous peek at whatever "For You" page is already cached (if any)
+  /// — for seeding the feed screen's initial state instantly instead of
+  /// starting from an empty spinner while the real (possibly-cached)
+  /// network round trip resolves.
+  FeedPage? peekForYouCached() {
+    return CacheService.instance.peekCache<FeedPage>(
+      key: 'feed.forYou',
+      parse: _parseFeedPage,
     );
   }
 
@@ -87,6 +102,7 @@ class FeedService {
     String? medium,
     bool videoOnly = false,
     bool forceRefresh = false,
+    void Function(FeedPage fresh)? onBackgroundUpdate,
   }) {
     final key = 'feed.explore.${videoOnly ? 'video' : (medium ?? 'all')}';
     return CacheService.instance.fetchWithCache<FeedPage>(
@@ -110,6 +126,7 @@ class FeedService {
         );
       },
       parse: (json) => _parseFeedPage(json, videoOnly: videoOnly),
+      onBackgroundUpdate: onBackgroundUpdate,
     );
   }
 

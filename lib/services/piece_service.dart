@@ -60,9 +60,72 @@ class PieceService {
     return _api.extractList(json).map(PieceSummary.fromJson).toList();
   }
 
+  /// Cache-first user pieces — lets a cold app start paint the Profile
+  /// "Pieces" tab instantly from the last-seen list while silently
+  /// refreshing, instead of a spinner on every fresh launch.
+  Future<List<PieceSummary>> getUserPiecesCached(
+    String username, {
+    bool forceRefresh = false,
+    void Function(List<PieceSummary> fresh)? onBackgroundUpdate,
+  }) {
+    final key = 'profile.pieces.$username';
+    return CacheService.instance.fetchWithCache<List<PieceSummary>>(
+      key: key,
+      ttl: const Duration(minutes: 3),
+      forceRefresh: forceRefresh,
+      fetchRaw: () {
+        if (!ConnectivityService.instance.isOnline) {
+          throw CacheMiss(key);
+        }
+        return _api.get('/api/users/$username/pieces');
+      },
+      parse: (json) => _api.extractList(json).map(PieceSummary.fromJson).toList(),
+      onBackgroundUpdate: onBackgroundUpdate,
+    );
+  }
+
+  /// Synchronous peek at whatever pieces list is already cached for
+  /// [username] (if any) — for seeding Profile's initial state instantly.
+  List<PieceSummary>? peekUserPiecesCached(String username) {
+    return CacheService.instance.peekCache<List<PieceSummary>>(
+      key: 'profile.pieces.$username',
+      parse: (json) => _api.extractList(json).map(PieceSummary.fromJson).toList(),
+    );
+  }
+
   Future<List<PieceSummary>> getUserPiecesForSale(String username) async {
     final json = await _api.get('/api/users/$username/pieces/for-sale');
     return _api.extractList(json).map(PieceSummary.fromJson).toList();
+  }
+
+  /// Cache-first for-sale pieces (Profile "Collect" tab).
+  Future<List<PieceSummary>> getUserPiecesForSaleCached(
+    String username, {
+    bool forceRefresh = false,
+    void Function(List<PieceSummary> fresh)? onBackgroundUpdate,
+  }) {
+    final key = 'profile.forSale.$username';
+    return CacheService.instance.fetchWithCache<List<PieceSummary>>(
+      key: key,
+      ttl: const Duration(minutes: 3),
+      forceRefresh: forceRefresh,
+      fetchRaw: () {
+        if (!ConnectivityService.instance.isOnline) {
+          throw CacheMiss(key);
+        }
+        return _api.get('/api/users/$username/pieces/for-sale');
+      },
+      parse: (json) => _api.extractList(json).map(PieceSummary.fromJson).toList(),
+      onBackgroundUpdate: onBackgroundUpdate,
+    );
+  }
+
+  /// Synchronous peek at whatever for-sale list is already cached.
+  List<PieceSummary>? peekUserPiecesForSaleCached(String username) {
+    return CacheService.instance.peekCache<List<PieceSummary>>(
+      key: 'profile.forSale.$username',
+      parse: (json) => _api.extractList(json).map(PieceSummary.fromJson).toList(),
+    );
   }
 
   Future<List<PostSummary>> getRelatedPosts(String pieceId) async {

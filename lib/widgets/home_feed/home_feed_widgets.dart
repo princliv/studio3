@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../data/nav_assets.dart';
 import '../../models/feed_preview_item.dart';
+import '../../services/inquiry_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/social_service.dart';
 import '../../theme/app_theme.dart';
@@ -105,6 +106,7 @@ class _InboxMenuButton extends StatefulWidget {
 class _InboxMenuButtonState extends State<_InboxMenuButton> {
   int _unreadCount = 0;
   int _followRequestCount = 0;
+  int _chatUnreadCount = 0;
 
   @override
   void initState() {
@@ -121,11 +123,16 @@ class _InboxMenuButtonState extends State<_InboxMenuButton> {
           .listFollowRequests()
           .then((requests) => requests.length)
           .catchError((_) => _followRequestCount),
+      InquiryService.instance
+          .getInbox()
+          .then((page) => page.items.where((inq) => inq.unread).length)
+          .catchError((_) => _chatUnreadCount),
     ]);
     if (!mounted) return;
     setState(() {
       _unreadCount = results[0];
       _followRequestCount = results[1];
+      _chatUnreadCount = results[2];
     });
   }
 
@@ -155,18 +162,20 @@ class _InboxMenuButtonState extends State<_InboxMenuButton> {
         borderRadius: BorderRadius.circular(AppDims.radiusMd),
       ),
       items: [
-        const PopupMenuItem(
+        PopupMenuItem(
           value: '/notifications',
           child: _InboxMenuRow(
             icon: Icons.notifications_none_rounded,
             label: 'Notifications',
+            count: _unreadCount,
           ),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: '/chat',
           child: _InboxMenuRow(
             icon: Icons.chat_bubble_outline_rounded,
             label: 'Chats',
+            count: _chatUnreadCount,
           ),
         ),
         PopupMenuItem(
@@ -186,7 +195,8 @@ class _InboxMenuButtonState extends State<_InboxMenuButton> {
     }
   }
 
-  int get _badgeCount => _unreadCount + _followRequestCount;
+  int get _badgeCount =>
+      _unreadCount + _followRequestCount + _chatUnreadCount;
 
   @override
   Widget build(BuildContext context) {
@@ -451,32 +461,38 @@ class FeedCardArtistStrip extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w400,
-                  color: HomeFeedTokens.textInverse,
-                ),
-              ),
-              if (medium != null && medium!.isNotEmpty)
+          child: GestureDetector(
+            onTap: canNavigate ? () => _onAvatarTap(context) : null,
+            behavior: canNavigate
+                ? HitTestBehavior.opaque
+                : HitTestBehavior.deferToChild,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
                 Text(
-                  medium!,
+                  name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.inter(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w300,
-                    color: HomeFeedTokens.textInverse.withValues(alpha: 0.6),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                    color: HomeFeedTokens.textInverse,
                   ),
                 ),
-            ],
+                if (medium != null && medium!.isNotEmpty)
+                  Text(
+                    medium!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w300,
+                      color: HomeFeedTokens.textInverse.withValues(alpha: 0.6),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ],

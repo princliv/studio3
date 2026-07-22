@@ -2,14 +2,17 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../models/feed_item.dart';
+import '../models/feed_page.dart';
 import '../models/feed_preview_item.dart' show FeedAvailabilityFilter;
 import '../theme/home_feed_tokens.dart';
 import '../utils/explore_detail_route.dart';
 import '../utils/image_aspect_ratio_resolver.dart';
+import '../widgets/feed_skeleton.dart';
 import '../widgets/home_feed/home_feed_widgets.dart';
 import '../widgets/offline_state.dart';
 import '../services/connectivity_service.dart';
 import '../services/feed_service.dart';
+import 'reels_page.dart' show routeObserver;
 
 class HomeFeedPage extends StatefulWidget {
   /// For You feed — mixed Pieces and Scenes with All / Available filters.
@@ -19,7 +22,7 @@ class HomeFeedPage extends StatefulWidget {
   State<HomeFeedPage> createState() => _HomeFeedPageState();
 }
 
-class _HomeFeedPageState extends State<HomeFeedPage> {
+class _HomeFeedPageState extends State<HomeFeedPage> with RouteAware {
   static const double _loadMoreThreshold = 200;
 
   final List<FeedItem> _apiItems = [];
@@ -39,18 +42,37 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
   @override
   void initState() {
     super.initState();
+    // Paint instantly from whatever's already cached (if anything) instead
+    // of starting from an empty spinner — _loadFeed() below still runs to
+    // silently refresh in the background.
+    final cached = FeedService.instance.peekForYouCached();
+    if (cached != null && cached.items.isNotEmpty) {
+      _apiItems.addAll(cached.items);
+      _nextCursor = cached.nextCursor;
+      _loading = false;
+    }
     _scrollController.addListener(_onScroll);
     ConnectivityService.instance.addReconnectHook(_onReconnected);
     _loadFeed();
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    routeObserver.subscribe(this, ModalRoute.of(context) as PageRoute);
+  }
+
+  @override
   void dispose() {
+    routeObserver.unsubscribe(this);
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     ConnectivityService.instance.removeReconnectHook(_onReconnected);
     super.dispose();
   }
+
+  @override
+  void didPopNext() => _loadFeed(refresh: true);
 
   Future<void> _onReconnected() => _loadFeed(refresh: true);
 
@@ -61,14 +83,23 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
     setState(() {
       if (append) {
         _loadingMore = true;
-      } else {
+      } else if (_apiItems.isEmpty) {
+        // Only block with a spinner when there's truly nothing to show yet
+        // — a refresh with existing (cached or previously-loaded) content
+        // already on screen updates silently in place instead.
         _loading = true;
       }
     });
     try {
       final page = append
           ? await FeedService.instance.getForYou(cursor: _nextCursor)
-          : await FeedService.instance.getForYouCached(forceRefresh: refresh);
+          : await FeedService.instance.getForYouCached(
+              forceRefresh: refresh,
+              // Stale cache paints immediately (see _loadFeed's caller);
+              // this silently merges the background-refreshed page in
+              // place once it lands, with no spinner or flicker.
+              onBackgroundUpdate: _mergeBackgroundPage,
+            );
       if (!mounted) return;
       setState(() {
         if (append) {
@@ -87,13 +118,32 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        if (!append) _apiItems.clear();
+        // Keep whatever's already showing (cached or previously-loaded) on
+        // a failed refresh — a silent background failure shouldn't blank a
+        // screen that already has content, only a genuinely empty one
+        // falls through to the offline state below.
         _loading = false;
         _loadingMore = false;
         _showOfflineState =
             _apiItems.isEmpty && !ConnectivityService.instance.isOnline;
       });
     }
+  }
+
+  /// Applies a page fetched silently in the background (see
+  /// [CacheService.fetchWithCache]'s `onBackgroundUpdate`) — same
+  /// replace-from-page-1 convention `_loadFeed`'s foreground refresh
+  /// already uses, just without ever showing a spinner for it.
+  void _mergeBackgroundPage(FeedPage page) {
+    if (!mounted) return;
+    setState(() {
+      _apiItems
+        ..clear()
+        ..addAll(page.items);
+      _nextCursor = page.nextCursor;
+      _showOfflineState =
+          _apiItems.isEmpty && !ConnectivityService.instance.isOnline;
+    });
   }
 
   void _onScroll() {
@@ -149,7 +199,10 @@ class _HomeFeedPageState extends State<HomeFeedPage> {
       return OfflineState(onRetry: () => _loadFeed(refresh: true));
     }
     if (_loading && _apiItems.isEmpty) {
-      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+      // First-load only — a revisit (cache hit) never reaches this branch
+      // since _loading is seeded false whenever peekForYouCached() finds
+      // something in initState.
+      return const FeedListSkeleton();
     }
 
     final visible = _visibleItems;

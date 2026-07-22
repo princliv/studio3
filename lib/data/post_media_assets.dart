@@ -2,7 +2,6 @@
 abstract final class PostMediaAssets {
   static const closeIcon = 'assets/post/close_icon.svg';
   static const chevronDown = 'assets/post/chevron_down.svg';
-  static const filterButton = 'assets/post/filter_button.svg';
 
   static const cropRotate = 'assets/post/crop/rotate.svg';
   static const cropPerspectiveV = 'assets/post/crop/perspective_v.svg';
@@ -48,27 +47,10 @@ abstract final class PostMediaAssets {
     'assets/post/grid/grid_18.png',
   ];
 
-  static const sceneGridThumbs = <String>[
-    'assets/post/scene_grid/grid_00.png',
-    'assets/post/scene_grid/grid_01.png',
-    'assets/post/scene_grid/grid_02.png',
-    'assets/post/scene_grid/grid_03.png',
-    'assets/post/scene_grid/grid_04.png',
-    'assets/post/scene_grid/grid_05.png',
-    'assets/post/scene_grid/grid_06.png',
-    'assets/post/scene_grid/grid_07.png',
-    'assets/post/scene_grid/grid_08.png',
-    'assets/post/scene_grid/grid_09.png',
-    'assets/post/scene_grid/grid_10.png',
-    'assets/post/scene_grid/grid_11.png',
-    'assets/post/scene_grid/grid_12.png',
-    'assets/post/scene_grid/grid_13.png',
-    'assets/post/scene_grid/grid_14.png',
-    'assets/post/scene_grid/grid_15.png',
-    'assets/post/scene_grid/grid_16.png',
-    'assets/post/scene_grid/grid_17.png',
-    'assets/post/scene_grid/grid_18.png',
-  ];
+  /// Identical image set to [pieceGridThumbs] — the scene picker reuses the
+  /// same thumbnails (`assets/post/scene_grid/` used to be a byte-for-byte
+  /// duplicate of `assets/post/grid/` and was removed).
+  static const sceneGridThumbs = pieceGridThumbs;
 
   /// Piece flow — 7 rows × 3 columns, uniform 128px rows (Figma 1609:1975).
   static const pieceGridRows = <PostMediaGridRow>[

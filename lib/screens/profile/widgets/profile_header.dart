@@ -2,12 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../theme/home_feed_tokens.dart';
+import '../../../widgets/follow_button.dart';
 import '../../../widgets/profile_avatar.dart';
 import '../profile_constants.dart';
-
-/// Follow relationship from the viewer to this profile — a private account
-/// yields [pending] instead of jumping straight to [following].
-enum FollowState { none, pending, following }
 
 class ProfileHeader extends StatelessWidget {
   const ProfileHeader({
@@ -198,7 +195,7 @@ class ProfileHeader extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _FollowButton(
+                    FollowButton(
                       state: followState,
                       onPressed: onFollow,
                     ),
@@ -254,59 +251,6 @@ class _StatBlock extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _FollowButton extends StatelessWidget {
-  const _FollowButton({required this.state, this.onPressed});
-
-  final FollowState state;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final outlined = state != FollowState.none;
-    final label = switch (state) {
-      FollowState.none => 'Follow',
-      FollowState.pending => 'Requested',
-      FollowState.following => 'Following',
-    };
-    return Material(
-      color: outlined ? Colors.transparent : HomeFeedTokens.textPrimary,
-      borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
-        child: DecoratedBox(
-          decoration: outlined
-              ? BoxDecoration(
-                  borderRadius:
-                      BorderRadius.circular(HomeFeedTokens.cardRadius),
-                  border: Border.all(
-                    color: HomeFeedTokens.textPrimary.withValues(
-                      alpha: state == FollowState.pending ? 0.2 : 0.35,
-                    ),
-                  ),
-                )
-              : const BoxDecoration(),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 28),
-            child: Text(
-              label,
-              style: GoogleFonts.inter(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: outlined
-                    ? HomeFeedTokens.textPrimary.withValues(
-                        alpha: state == FollowState.pending ? 0.7 : 1,
-                      )
-                    : HomeFeedTokens.textInverse,
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

@@ -5,10 +5,16 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../models/piece_summary.dart';
 import '../../../models/post_summary.dart';
 import '../../../widgets/feed_skeleton.dart';
+import '../../../widgets/pill_chip.dart';
 import '../profile_constants.dart';
 import 'profile_masonry_grid.dart';
 import 'profile_series_grid.dart';
 import '../models/profile_series_data.dart';
+
+bool _isVideoPost(PostSummary p) {
+  final m = p.mediaType?.toLowerCase();
+  return m == 'video' || m == 'reel' || m == 'reels';
+}
 
 class ProfileTabContent extends StatelessWidget {
   const ProfileTabContent({
@@ -24,6 +30,8 @@ class ProfileTabContent extends StatelessWidget {
     this.isOwnProfile = false,
     this.onDeletePiece,
     this.onDeleteScene,
+    this.sceneFilter = 'all',
+    this.onSceneFilterChanged,
   });
 
   final String currentTab;
@@ -37,7 +45,15 @@ class ProfileTabContent extends StatelessWidget {
   final bool isOwnProfile;
   final void Function(PieceSummary piece)? onDeletePiece;
   final void Function(PostSummary post)? onDeleteScene;
+  final String sceneFilter;
+  final ValueChanged<String>? onSceneFilterChanged;
 
+  /// A sliver — must be placed directly in a `CustomScrollView.slivers` list
+  /// (or a `SliverPadding`'s `sliver:`), not wrapped in `SliverToBoxAdapter`,
+  /// since [ProfileContentGrid]'s masonry grid is itself a lazily-built
+  /// sliver now (see `profile_masonry_grid.dart`). Every branch below wraps
+  /// its box content (skeleton/empty-state/series grid) in
+  /// `SliverToBoxAdapter` so the whole widget always returns a valid sliver.
   @override
   Widget build(BuildContext context) {
     if (loading &&
@@ -50,14 +66,18 @@ class ProfileTabContent extends StatelessWidget {
                     : currentTab == 'series'
                         ? seriesItems.isEmpty
                         : true)) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 8),
-        child: ProfileGridSkeleton(),
+      return const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: ProfileGridSkeleton(),
+        ),
       );
     }
 
     if (currentTab == 'series') {
-      return ProfileSeriesGrid(items: seriesItems, loading: loading);
+      return SliverToBoxAdapter(
+        child: ProfileSeriesGrid(items: seriesItems, loading: loading),
+      );
     }
 
     if (currentTab == 'pieces') {
@@ -69,35 +89,70 @@ class ProfileTabContent extends StatelessWidget {
           showOwnerActions: isOwnProfile,
         );
       }
-      return const _EmptyState(label: 'No pieces yet');
+      return const SliverToBoxAdapter(child: _EmptyState(label: 'No pieces yet'));
     }
 
     if (currentTab == 'scenes') {
-      if (scenes.isNotEmpty) {
-        return ProfileContentGrid.fromPosts(
-          scenes,
-          onPostTap: (post) => openProfileScene(context, scenes, post),
-          onDeletePost: onDeleteScene,
-          showOwnerActions: isOwnProfile,
-        );
-      }
-      return const _EmptyState(label: 'No scenes yet');
+      final visibleScenes =
+          sceneFilter == 'videos' ? scenes.where(_isVideoPost).toList() : scenes;
+      final Widget gridSliver = visibleScenes.isNotEmpty
+          ? ProfileContentGrid.fromPosts(
+              visibleScenes,
+              onPostTap: (post) => openProfileScene(context, visibleScenes, post),
+              onDeletePost: onDeleteScene,
+              showOwnerActions: isOwnProfile,
+            )
+          : SliverToBoxAdapter(
+              child: _EmptyState(
+                label: sceneFilter == 'videos' ? 'No videos yet' : 'No scenes yet',
+              ),
+            );
+      if (scenes.isEmpty) return gridSliver;
+      return SliverMainAxisGroup(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  PillChip(
+                    label: 'All',
+                    selected: sceneFilter != 'videos',
+                    onTap: () => onSceneFilterChanged?.call('all'),
+                  ),
+                  const SizedBox(width: 8),
+                  PillChip(
+                    label: 'Videos',
+                    selected: sceneFilter == 'videos',
+                    onTap: () => onSceneFilterChanged?.call('videos'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          gridSliver,
+        ],
+      );
     }
 
     if (currentTab == 'collect') {
       if (!sellerMode) {
-        return const _EmptyState(
-          label: 'Switch to Seller to list pieces for sale',
+        return const SliverToBoxAdapter(
+          child: _EmptyState(label: 'Switch to Seller to list pieces for sale'),
         );
       }
 
       if (collectSegment == 'sold') {
-        return const _EmptyState(label: 'No sold pieces yet');
+        return const SliverToBoxAdapter(
+          child: _EmptyState(label: 'No sold pieces yet'),
+        );
       }
 
       final available = listedPieces.where((p) => p.isForSale).toList();
       if (available.isEmpty) {
-        return const _EmptyState(label: 'No pieces listed for sale yet');
+        return const SliverToBoxAdapter(
+          child: _EmptyState(label: 'No pieces listed for sale yet'),
+        );
       }
 
       return ProfileContentGrid.fromPieces(
@@ -107,7 +162,7 @@ class ProfileTabContent extends StatelessWidget {
       );
     }
 
-    return const _EmptyState(label: 'Coming soon');
+    return const SliverToBoxAdapter(child: _EmptyState(label: 'Coming soon'));
   }
 }
 

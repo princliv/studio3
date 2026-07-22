@@ -1,10 +1,13 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'services/auth_session.dart';
 import 'services/cache_service.dart';
 import 'services/connectivity_service.dart';
+import 'services/deep_link_service.dart';
 import 'services/device_service.dart';
 import 'services/permission_service.dart';
 import 'services/saved_content_store.dart';
@@ -44,6 +47,7 @@ import 'theme/home_feed_tokens.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: '.env');
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
   ]);
@@ -139,12 +143,16 @@ class _AuthGateState extends State<AuthGate> {
   void initState() {
     super.initState();
     AuthSession.instance.addListener(_onSessionChanged);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkAuth());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAuth();
+      DeepLinkService.instance.start(context);
+    });
   }
 
   @override
   void dispose() {
     AuthSession.instance.removeListener(_onSessionChanged);
+    DeepLinkService.instance.dispose();
     super.dispose();
   }
 
@@ -164,6 +172,28 @@ class _AuthGateState extends State<AuthGate> {
       return;
     }
     if (!session.isOnboarded) {
+      if (kDebugMode) {
+        final u = session.user;
+        debugPrint(
+          '[AuthGate] Redirecting to /onboarding — '
+          'user.onboardingComplete=${u?.onboardingComplete}, '
+          'username=${u?.username}, isLoggedIn=${session.isLoggedIn}',
+        );
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: Colors.red.shade900,
+              duration: const Duration(seconds: 6),
+              content: Text(
+                'DEBUG: bounced to onboarding — '
+                'onboardingComplete=${u?.onboardingComplete} '
+                'for ${u?.username}',
+              ),
+            ),
+          );
+        });
+      }
       Navigator.pushNamedAndRemoveUntil(context, '/onboarding', (_) => false);
     }
   }
@@ -180,21 +210,34 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
-  late int _selectedNavIndex = AppStateStore.instance.lastNavIndex;
+  // Always start on the For You/Home tab, regardless of which tab was last
+  // open — matching Instagram's "always opens to the main feed" behavior.
+  // A ValueNotifier (rather than a plain int + setState) so nav-index
+  // changes only rebuild the IndexedStack/BottomNav subtree below, instead
+  // of the whole MainShell (which would otherwise also re-run on every
+  // avatar reload / auth-session change via the shared setState scope).
+  final ValueNotifier<int> _selectedNavIndex =
+      ValueNotifier(BottomNavIndex.home);
+  late final ValueNotifier<bool> _reelsActive =
+      ValueNotifier(_selectedNavIndex.value == BottomNavIndex.reels);
 
-  List<Widget> _buildTabs() => [
-        const HomeFeedPage(),
-        const ExplorePage(),
-        ReelsPage(active: _selectedNavIndex == BottomNavIndex.reels),
-        const SavedPage(),
-        const ProfilePage(),
-      ];
+  // Built once — every tab widget is `const` (ReelsPage takes a
+  // ValueListenable instead of a constructor bool) so this list never needs
+  // to be reconstructed, unlike the previous per-build `_buildTabs()`.
+  late final List<Widget> _tabs = [
+    const HomeFeedPage(),
+    const ExplorePage(),
+    ReelsPage(activeListenable: _reelsActive),
+    const SavedPage(),
+    const ProfilePage(),
+  ];
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     AuthSession.instance.addListener(_onSessionChanged);
+    _selectedNavIndex.addListener(_onNavIndexChanged);
     _loadProfilePhoto();
   }
 
@@ -202,6 +245,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     AuthSession.instance.removeListener(_onSessionChanged);
+    _selectedNavIndex.removeListener(_onNavIndexChanged);
+    _selectedNavIndex.dispose();
+    _reelsActive.dispose();
     super.dispose();
   }
 
@@ -209,11 +255,19 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
-      AppStateStore.instance.saveNavIndex(_selectedNavIndex);
+      AppStateStore.instance.saveNavIndex(_selectedNavIndex.value);
     }
   }
 
+  void _onNavIndexChanged() {
+    _reelsActive.value = _selectedNavIndex.value == BottomNavIndex.reels;
+  }
+
   void _onSessionChanged() {
+    // Only the avatar (read directly by BottomNav's ValueListenableBuilder
+    // below) needs to react to session changes — no setState here avoids
+    // rebuilding the whole shell (and therefore every const-canonicalized
+    // tab reference) for an avatar URL update.
     if (mounted) setState(() {});
   }
 
@@ -228,7 +282,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   }
 
   void _onNavTap(int navIndex) {
-    setState(() => _selectedNavIndex = navIndex);
+    _selectedNavIndex.value = navIndex;
     AppStateStore.instance.saveNavIndex(navIndex);
     if (navIndex == BottomNavIndex.profile) {
       _loadProfilePhoto();
@@ -243,14 +297,20 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          IndexedStack(
-            index: _selectedNavIndex,
-            children: _buildTabs(),
+          ValueListenableBuilder<int>(
+            valueListenable: _selectedNavIndex,
+            builder: (context, index, _) => IndexedStack(
+              index: index,
+              children: _tabs,
+            ),
           ),
-          BottomNav(
-            selectedNavIndex: _selectedNavIndex,
-            onNavTap: _onNavTap,
-            avatarUrl: AuthSession.instance.user?.profilePhotoUrl,
+          ValueListenableBuilder<int>(
+            valueListenable: _selectedNavIndex,
+            builder: (context, index, _) => BottomNav(
+              selectedNavIndex: index,
+              onNavTap: _onNavTap,
+              avatarUrl: AuthSession.instance.user?.profilePhotoUrl,
+            ),
           ),
         ],
       ),
