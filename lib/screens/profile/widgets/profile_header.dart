@@ -61,16 +61,16 @@ class ProfileHeader extends StatelessWidget {
   List<({String value, String label})> get _stats {
     if (sellerMode) {
       return [
-        (value: _formatCount(piecesCount), label: 'pieces'),
-        (value: _formatCount(collectedCount), label: 'collected'),
-        (value: _formatCount(savesCount), label: 'saves'),
-        (value: _formatCount(salesCount), label: 'sales'),
+        (value: _formatCount(piecesCount), label: 'Pieces'),
+        (value: _formatCount(collectedCount), label: 'Collected'),
+        (value: _formatCount(savesCount), label: 'Saves'),
+        (value: _formatCount(salesCount), label: 'Sales'),
       ];
     }
     return [
-      (value: _formatCount(piecesCount), label: 'pieces'),
-      (value: _formatCount(collectedCount), label: 'collected'),
-      (value: _formatCount(savesCount), label: 'saves'),
+      (value: _formatCount(piecesCount), label: 'Pieces'),
+      (value: _formatCount(collectedCount), label: 'Collected'),
+      (value: _formatCount(savesCount), label: 'Saves'),
     ];
   }
 
@@ -93,61 +93,74 @@ class ProfileHeader extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                GestureDetector(
-                  onTap: onAvatarTap,
-                  behavior: onAvatarTap != null
-                      ? HitTestBehavior.opaque
-                      : HitTestBehavior.deferToChild,
-                  child: ProfileAvatar(
-                    url: avatarUrl,
-                    size: _avatarSize,
+                // Column 1: avatar circle, with name (and username below it)
+                // next to it.
+                Expanded(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      GestureDetector(
+                        onTap: onAvatarTap,
+                        behavior: onAvatarTap != null
+                            ? HitTestBehavior.opaque
+                            : HitTestBehavior.deferToChild,
+                        child: ProfileAvatar(
+                          url: avatarUrl,
+                          size: _avatarSize,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: HomeFeedTokens.textPrimary,
+                                height: 1.2,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              handle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w400,
+                                color: kProfileTextMuted,
+                                height: 1.2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 20),
+                const SizedBox(width: 12),
+                // Column 2: stat cards, equally spaced from one another.
                 Expanded(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.center,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        for (var i = 0; i < stats.length; i++) ...[
-                          if (i > 0) const SizedBox(width: 18),
-                          _StatBlock(
-                            value: stats[i].value,
-                            label: stats[i].label,
+                  child: Row(
+                    children: [
+                      for (final stat in stats)
+                        Expanded(
+                          child: _StatBlock(
+                            value: stat.value,
+                            label: stat.label,
                             compact: sellerMode,
                           ),
-                        ],
-                      ],
-                    ),
+                        ),
+                    ],
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: 14),
-            Text(
-              name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.inter(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: HomeFeedTokens.textPrimary,
-                height: 1.2,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              handle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                fontWeight: FontWeight.w400,
-                color: kProfileTextMuted,
-                height: 1.2,
-              ),
             ),
             const SizedBox(height: 8),
             Row(
@@ -239,8 +252,10 @@ class _StatBlock extends StatelessWidget {
         Text(
           value,
           textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: GoogleFonts.inter(
-            fontSize: compact ? 15 : 17,
+            fontSize: compact ? 18 : 20,
             fontWeight: FontWeight.w700,
             color: HomeFeedTokens.textPrimary,
             height: 1.0,
@@ -250,8 +265,10 @@ class _StatBlock extends StatelessWidget {
         Text(
           label,
           textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: GoogleFonts.inter(
-            fontSize: compact ? 11 : 12,
+            fontSize: compact ? 12 : 13,
             fontWeight: FontWeight.w400,
             color: kProfileTextMuted,
             height: 1.0,
