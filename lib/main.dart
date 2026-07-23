@@ -7,6 +7,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'services/auth_session.dart';
 import 'services/cache_service.dart';
 import 'services/connectivity_service.dart';
+import 'services/chat_socket_service.dart';
 import 'services/deep_link_service.dart';
 import 'services/device_service.dart';
 import 'services/permission_service.dart';
@@ -30,6 +31,7 @@ import 'screens/profile_page.dart';
 import 'screens/post_page.dart';
 import 'screens/notifications_page.dart';
 import 'screens/chat_page.dart';
+import 'screens/direct_messages_page.dart';
 import 'screens/onboarding/onboarding_page.dart';
 import 'screens/edit_profile_page.dart';
 import 'screens/manage_series_page.dart';
@@ -121,6 +123,7 @@ class Studio3App extends StatelessWidget {
         '/post': (context) => const PostPage(),
         '/notifications': (context) => const NotificationsPage(),
         '/chat': (context) => const ChatPage(),
+        '/direct-messages': (context) => const DirectMessagesPage(),
       },
     );
   }
@@ -165,9 +168,14 @@ class _AuthGateState extends State<AuthGate> {
       _deviceRegistered = true;
       DeviceService.instance.registerCurrentDevice();
       PermissionService.instance.requestNotifications();
+      ChatSocketService.instance.connect();
+      ConnectivityService.instance.addReconnectHook(() async {
+        ChatSocketService.instance.connect();
+      });
     }
     if (!session.isLoggedIn) {
       _deviceRegistered = false;
+      ChatSocketService.instance.disconnect();
       Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
       return;
     }

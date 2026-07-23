@@ -10,6 +10,7 @@ abstract final class MediaPurpose {
   static const cover = 'cover';
   static const piece = 'piece';
   static const post = 'post';
+  static const chat = 'chat';
 }
 
 class PresignResult {

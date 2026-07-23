@@ -10,6 +10,7 @@ import '../services/series_service.dart';
 import '../services/social_service.dart';
 import '../services/user_service.dart';
 import '../theme/home_feed_tokens.dart';
+import 'conversation_thread_page.dart';
 import 'follow_list_page.dart';
 import '../widgets/delete_confirmation_dialog.dart';
 import '../widgets/profile_avatar_preview_sheet.dart';
@@ -393,8 +394,17 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
       _showViewerModePreviewSnackBar();
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Messaging coming soon')),
+    final target = _profile;
+    if (target == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ConversationThreadPage(
+          otherPartyUsername: target.username,
+          otherPartyName: target.name,
+          otherPartyAvatarUrl: target.profilePhotoUrl,
+        ),
+      ),
     );
   }
 

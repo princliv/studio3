@@ -5,7 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../data/nav_assets.dart';
 import '../../models/feed_preview_item.dart';
-import '../../services/inquiry_service.dart';
+import '../../services/chat_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/social_service.dart';
 import '../../theme/app_theme.dart';
@@ -123,9 +123,9 @@ class _InboxMenuButtonState extends State<_InboxMenuButton> {
           .listFollowRequests()
           .then((requests) => requests.length)
           .catchError((_) => _followRequestCount),
-      InquiryService.instance
+      ChatService.instance
           .getInbox()
-          .then((page) => page.items.where((inq) => inq.unread).length)
+          .then((page) => page.items.where((c) => c.unread).length)
           .catchError((_) => _chatUnreadCount),
     ]);
     if (!mounted) return;
@@ -170,8 +170,10 @@ class _InboxMenuButtonState extends State<_InboxMenuButton> {
             count: _unreadCount,
           ),
         ),
+        // Inquiries (piece-anchored) deferred to v2; this now opens the general-purpose
+        // chat feature (see screens/direct_messages_page.dart) instead of '/chat'.
         PopupMenuItem(
-          value: '/chat',
+          value: '/direct-messages',
           child: _InboxMenuRow(
             icon: Icons.chat_bubble_outline_rounded,
             label: 'Chats',

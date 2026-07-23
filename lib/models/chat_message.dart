@@ -1,0 +1,181 @@
+/// One row in the "new message" user search, from `GET /api/conversations/search-users`.
+class MessageableUser {
+  const MessageableUser({
+    required this.username,
+    required this.name,
+    this.profilePhotoUrl,
+  });
+
+  final String username;
+  final String name;
+  final String? profilePhotoUrl;
+
+  factory MessageableUser.fromJson(Map<String, dynamic> json) {
+    return MessageableUser(
+      username: json['username'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      profilePhotoUrl: json['profilePhotoUrl'] as String?,
+    );
+  }
+
+  String get displayName => name.isNotEmpty ? name : username;
+}
+
+/// Result of `POST /api/conversations`.
+class ConversationCreateResult {
+  const ConversationCreateResult({
+    required this.id,
+    required this.reused,
+    this.status = 'open',
+  });
+
+  final String id;
+  final bool reused;
+
+  /// `"open"` or `"pending"` — pending means it landed in the recipient's
+  /// message-requests folder instead of their main inbox.
+  final String status;
+
+  factory ConversationCreateResult.fromJson(Map<String, dynamic> json) {
+    return ConversationCreateResult(
+      id: json['id'] as String? ?? '',
+      reused: json['reused'] as bool? ?? false,
+      status: json['status'] as String? ?? 'open',
+    );
+  }
+}
+
+/// One row in the chat inbox, from `GET /api/conversations`.
+class ConversationSummary {
+  const ConversationSummary({
+    required this.id,
+    this.otherPartyId,
+    this.otherPartyUsername,
+    this.otherPartyName,
+    this.otherPartyAvatarUrl,
+    this.preview,
+    required this.updatedAt,
+    required this.unread,
+    required this.status,
+  });
+
+  final String id;
+  final String? otherPartyId;
+  final String? otherPartyUsername;
+  final String? otherPartyName;
+  final String? otherPartyAvatarUrl;
+  final String? preview;
+  final DateTime updatedAt;
+  final bool unread;
+  final String status;
+
+  factory ConversationSummary.fromJson(Map<String, dynamic> json) {
+    final otherParty = json['otherParty'] as Map<String, dynamic>?;
+    return ConversationSummary(
+      id: json['id'] as String? ?? '',
+      otherPartyId: otherParty?['id'] as String?,
+      otherPartyUsername: otherParty?['username'] as String?,
+      otherPartyName: otherParty?['name'] as String?,
+      otherPartyAvatarUrl: otherParty?['profilePhotoUrl'] as String?,
+      preview: json['preview'] as String?,
+      updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? '') ??
+          DateTime.now(),
+      unread: json['unread'] as bool? ?? false,
+      status: json['status'] as String? ?? 'open',
+    );
+  }
+
+  String get otherPartyDisplayName =>
+      (otherPartyName != null && otherPartyName!.isNotEmpty)
+          ? otherPartyName!
+          : 'Someone';
+
+  ConversationSummary copyWith({bool? unread, String? status}) {
+    return ConversationSummary(
+      id: id,
+      otherPartyId: otherPartyId,
+      otherPartyUsername: otherPartyUsername,
+      otherPartyName: otherPartyName,
+      otherPartyAvatarUrl: otherPartyAvatarUrl,
+      preview: preview,
+      updatedAt: updatedAt,
+      unread: unread ?? this.unread,
+      status: status ?? this.status,
+    );
+  }
+}
+
+/// A single message in a chat thread. `body` and/or `imageUrl` may be set.
+class ChatMessage {
+  const ChatMessage({
+    required this.id,
+    this.body,
+    this.imageUrl,
+    this.senderUsername,
+    this.senderName,
+    this.senderAvatarUrl,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String? body;
+  final String? imageUrl;
+  final String? senderUsername;
+  final String? senderName;
+  final String? senderAvatarUrl;
+  final DateTime createdAt;
+
+  factory ChatMessage.fromJson(Map<String, dynamic> json) {
+    final sender = json['sender'] as Map<String, dynamic>?;
+    return ChatMessage(
+      id: json['id'] as String? ?? '',
+      body: json['body'] as String?,
+      imageUrl: json['imageUrl'] as String?,
+      senderUsername: sender?['username'] as String?,
+      senderName: sender?['name'] as String?,
+      senderAvatarUrl: sender?['profilePhotoUrl'] as String?,
+      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+          DateTime.now(),
+    );
+  }
+}
+
+/// Full thread detail from `GET /api/conversations/:id`.
+class ChatThread {
+  const ChatThread({
+    required this.id,
+    this.otherPartyId,
+    this.otherPartyUsername,
+    this.otherPartyName,
+    this.otherPartyAvatarUrl,
+    required this.status,
+    required this.messages,
+  });
+
+  final String id;
+  final String? otherPartyId;
+  final String? otherPartyUsername;
+  final String? otherPartyName;
+  final String? otherPartyAvatarUrl;
+  final String status;
+  final List<ChatMessage> messages;
+
+  factory ChatThread.fromJson(Map<String, dynamic> json) {
+    final otherParty = json['otherParty'] as Map<String, dynamic>?;
+    final messagesJson = json['messages'];
+    final items = messagesJson is Map<String, dynamic>
+        ? messagesJson['items']
+        : messagesJson;
+    return ChatThread(
+      id: json['id'] as String? ?? '',
+      otherPartyId: otherParty?['id'] as String?,
+      otherPartyUsername: otherParty?['username'] as String?,
+      otherPartyName: otherParty?['name'] as String?,
+      otherPartyAvatarUrl: otherParty?['profilePhotoUrl'] as String?,
+      status: json['status'] as String? ?? 'open',
+      messages: items is List
+          ? items.whereType<Map<String, dynamic>>().map(ChatMessage.fromJson).toList()
+          : const [],
+    );
+  }
+}

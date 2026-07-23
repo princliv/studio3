@@ -202,14 +202,16 @@ class _PieceDetailPageState extends State<PieceDetailPage>
                   followState: followState,
                   onFollowToggle: toggleFollow,
                 ),
-                if (_canAskAboutPiece)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                    child: OutlinedButton(
-                      onPressed: _onAskAboutPiece,
-                      child: const Text('Ask about this piece'),
-                    ),
-                  ),
+                // "Ask about this piece" (piece-anchored inquiries) deferred to v2 in favor of
+                // general-purpose chat. Left commented out rather than removed.
+                // if (_canAskAboutPiece)
+                //   Padding(
+                //     padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                //     child: OutlinedButton(
+                //       onPressed: _onAskAboutPiece,
+                //       child: const Text('Ask about this piece'),
+                //     ),
+                //   ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                   child: Text(
