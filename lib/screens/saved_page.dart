@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -11,6 +13,7 @@ import '../screens/piece_detail_page.dart';
 import '../services/saved_content_store.dart';
 import '../theme/home_feed_tokens.dart';
 import '../utils/reels_route.dart';
+import '../widgets/create_collection_dialog.dart';
 import '../widgets/home_feed/home_feed_widgets.dart';
 
 class SavedPage extends StatefulWidget {
@@ -22,7 +25,6 @@ class SavedPage extends StatefulWidget {
 
 class _SavedPageState extends State<SavedPage> {
   final _store = SavedContentStore.instance;
-  SavedContentFilter _filter = SavedContentFilter.all;
 
   @override
   void initState() {
@@ -32,6 +34,7 @@ class _SavedPageState extends State<SavedPage> {
     _seedFromCache();
     _store.addListener(_onStoreChanged);
     _loadSavedFromApi();
+    unawaited(_store.loadCollectionsFromApi());
   }
 
   /// Paints Saved instantly from whatever's cached (if anything) instead of
@@ -86,6 +89,130 @@ class _SavedPageState extends State<SavedPage> {
   }
 
   void _onStoreChanged() => setState(() {});
+
+  Future<void> _createCollection() async {
+    final name = await CreateCollectionDialog.show(context);
+    if (name == null || name.isEmpty) return;
+    await _store.createCollection(name);
+  }
+
+  void _openFolder(String? collectionId, String title) {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          backgroundColor: HomeFeedTokens.background,
+          appBar: AppBar(
+            backgroundColor: HomeFeedTokens.background,
+            elevation: 0,
+            iconTheme: const IconThemeData(color: HomeFeedTokens.textPrimary),
+            title: Text(
+              title,
+              style: GoogleFonts.inter(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: HomeFeedTokens.textPrimary,
+              ),
+            ),
+          ),
+          body: SafeArea(
+            top: false,
+            bottom: false,
+            child: _SavedItemsView(collectionId: collectionId),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: HomeFeedTokens.background,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Saved',
+                      style: GoogleFonts.inter(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        color: HomeFeedTokens.textPrimary,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.add,
+                      color: HomeFeedTokens.textPrimary,
+                    ),
+                    tooltip: 'Create collection',
+                    onPressed: _createCollection,
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: _store.hasCollections
+                  ? _SavedFoldersGrid(
+                      store: _store,
+                      onOpenFolder: _openFolder,
+                      onCreate: _createCollection,
+                    )
+                  : const _SavedItemsView(collectionId: null),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The existing filter-tabs + 3-column grid, scoped to either the flat
+/// "Saved" bucket (`collectionId == null`) or a single collection.
+class _SavedItemsView extends StatefulWidget {
+  const _SavedItemsView({required this.collectionId});
+
+  final String? collectionId;
+
+  @override
+  State<_SavedItemsView> createState() => _SavedItemsViewState();
+}
+
+class _SavedItemsViewState extends State<_SavedItemsView> {
+  final _store = SavedContentStore.instance;
+  SavedContentFilter _filter = SavedContentFilter.all;
+
+  @override
+  void initState() {
+    super.initState();
+    _store.addListener(_onStoreChanged);
+    final collectionId = widget.collectionId;
+    if (collectionId != null) {
+      unawaited(_store.loadCollectionDetailFromApi(collectionId));
+    }
+  }
+
+  @override
+  void dispose() {
+    _store.removeListener(_onStoreChanged);
+    super.dispose();
+  }
+
+  void _onStoreChanged() => setState(() {});
+
+  List<SavedEntry> get _items {
+    final collectionId = widget.collectionId;
+    return collectionId == null
+        ? _store.entries(filter: _filter)
+        : _store.entriesForCollection(collectionId, filter: _filter);
+  }
 
   void _openEntry(SavedEntry entry) {
     if (entry.isVideoScene && entry.feedItem != null) {
@@ -179,88 +306,70 @@ class _SavedPageState extends State<SavedPage> {
 
   @override
   Widget build(BuildContext context) {
-    final items = _store.entries(filter: _filter);
+    final items = _items;
 
-    return Scaffold(
-      backgroundColor: HomeFeedTokens.background,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Text(
-                'Saved',
-                style: GoogleFonts.inter(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: HomeFeedTokens.textPrimary,
-                ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              FeedFilterTab(
+                label: 'All',
+                active: _filter == SavedContentFilter.all,
+                onTap: () => setState(() => _filter = SavedContentFilter.all),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  FeedFilterTab(
-                    label: 'All',
-                    active: _filter == SavedContentFilter.all,
-                    onTap: () =>
-                        setState(() => _filter = SavedContentFilter.all),
-                  ),
-                  const SizedBox(width: 24),
-                  FeedFilterTab(
-                    label: 'Piece',
-                    active: _filter == SavedContentFilter.piece,
-                    onTap: () =>
-                        setState(() => _filter = SavedContentFilter.piece),
-                  ),
-                  const SizedBox(width: 24),
-                  FeedFilterTab(
-                    label: 'Scene',
-                    active: _filter == SavedContentFilter.scene,
-                    onTap: () =>
-                        setState(() => _filter = SavedContentFilter.scene),
-                  ),
-                ],
+              const SizedBox(width: 24),
+              FeedFilterTab(
+                label: 'Piece',
+                active: _filter == SavedContentFilter.piece,
+                onTap: () =>
+                    setState(() => _filter = SavedContentFilter.piece),
               ),
-            ),
-            Expanded(
-              child: items.isEmpty
-                  ? Center(
-                      child: Text(
-                        _emptyMessage(),
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          color: HomeFeedTokens.textSecondary,
-                        ),
-                      ),
-                    )
-                  : GridView.builder(
-                      padding: const EdgeInsets.fromLTRB(8, 8, 8, 120),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        crossAxisSpacing: 2,
-                        mainAxisSpacing: 2,
-                        childAspectRatio: 1,
-                      ),
-                      itemCount: items.length,
-                      itemBuilder: (context, index) {
-                        final entry = items[index];
-                        return _SavedGridCard(
-                          entry: entry,
-                          onTap: () => _openEntry(entry),
-                          onLongPress: () => _confirmUnsave(entry),
-                        );
-                      },
-                    ),
-            ),
-          ],
+              const SizedBox(width: 24),
+              FeedFilterTab(
+                label: 'Scene',
+                active: _filter == SavedContentFilter.scene,
+                onTap: () =>
+                    setState(() => _filter = SavedContentFilter.scene),
+              ),
+            ],
+          ),
         ),
-      ),
+        Expanded(
+          child: items.isEmpty
+              ? Center(
+                  child: Text(
+                    _emptyMessage(),
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      color: HomeFeedTokens.textSecondary,
+                    ),
+                  ),
+                )
+              : GridView.builder(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 120),
+                  gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    crossAxisSpacing: 2,
+                    mainAxisSpacing: 2,
+                    childAspectRatio: 1,
+                  ),
+                  itemCount: items.length,
+                  itemBuilder: (context, index) {
+                    final entry = items[index];
+                    return _SavedGridCard(
+                      entry: entry,
+                      onTap: () => _openEntry(entry),
+                      onLongPress: () => _confirmUnsave(entry),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 }
@@ -276,18 +385,10 @@ class _SavedGridCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onLongPress;
 
-  String? get _imageUrl {
-    final preview = entry.preview;
-    if (preview != null) {
-      return preview.heroImageUrl ?? feedPreviewImageUrl(preview);
-    }
-    return entry.feedItem?.mediaUrl;
-  }
-
   @override
   Widget build(BuildContext context) {
     final isVideo = entry.isVideoScene;
-    final imageUrl = _imageUrl;
+    final imageUrl = savedEntryThumbnailUrl(entry);
 
     return Material(
       color: HomeFeedTokens.textPrimary.withValues(alpha: 0.06),
@@ -321,6 +422,150 @@ class _SavedGridCard extends StatelessWidget {
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Two-column grid of "Saved" (all items) plus every user-created
+/// collection, Instagram-style — shown once at least one collection exists.
+class _SavedFoldersGrid extends StatelessWidget {
+  const _SavedFoldersGrid({
+    required this.store,
+    required this.onOpenFolder,
+    required this.onCreate,
+  });
+
+  final SavedContentStore store;
+  final void Function(String? collectionId, String title) onOpenFolder;
+  final VoidCallback onCreate;
+
+  @override
+  Widget build(BuildContext context) {
+    final collections = store.collections;
+    final itemCount = collections.length + 2; // "Saved" tile + "+" tile
+
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 120),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 0.92,
+      ),
+      itemCount: itemCount,
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          final cover = store.mostRecentEntryOverall();
+          return _SavedFolderTile(
+            title: 'Saved',
+            count: store.entries().length,
+            imageUrl: cover != null ? savedEntryThumbnailUrl(cover) : null,
+            icon: Icons.bookmark,
+            onTap: () => onOpenFolder(null, 'Saved'),
+          );
+        }
+        if (index == itemCount - 1) {
+          return _SavedFolderTile(
+            title: 'New collection',
+            count: null,
+            imageUrl: null,
+            icon: Icons.add,
+            onTap: onCreate,
+          );
+        }
+        final collection = collections[index - 1];
+        final items = store.entriesForCollection(collection.id);
+        final cover = items.isNotEmpty ? items.first : null;
+        return _SavedFolderTile(
+          title: collection.name,
+          count: items.length,
+          imageUrl: cover != null ? savedEntryThumbnailUrl(cover) : null,
+          icon: Icons.folder_outlined,
+          onTap: () => onOpenFolder(collection.id, collection.name),
+        );
+      },
+    );
+  }
+}
+
+class _SavedFolderTile extends StatelessWidget {
+  const _SavedFolderTile({
+    required this.title,
+    required this.count,
+    required this.imageUrl,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String title;
+  final int? count;
+  final String? imageUrl;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
+      child: Material(
+        color: HomeFeedTokens.textPrimary.withValues(alpha: 0.06),
+        child: InkWell(
+          onTap: onTap,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (imageUrl != null && imageUrl!.isNotEmpty)
+                      FeedPicsumImage(url: imageUrl!)
+                    else
+                      ColoredBox(
+                        color: HomeFeedTokens.textPrimary.withValues(alpha: 0.08),
+                        child: Icon(
+                          icon,
+                          color:
+                              HomeFeedTokens.textSecondary.withValues(alpha: 0.7),
+                          size: 32,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: HomeFeedTokens.textPrimary,
+                        ),
+                      ),
+                    ),
+                    if (count != null) ...[
+                      const SizedBox(width: 6),
+                      Text(
+                        '$count',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: HomeFeedTokens.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

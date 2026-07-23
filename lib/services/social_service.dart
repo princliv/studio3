@@ -150,6 +150,45 @@ class SocialService {
     await _api.delete('/api/posts/$id/save');
   }
 
+  Future<List<Map<String, dynamic>>> listCollections() async {
+    final json = await _api.get('/api/collections', auth: true);
+    return _api.extractList(json);
+  }
+
+  Future<Map<String, dynamic>> createCollection(String name) async {
+    final json = await _api.post(
+      '/api/collections',
+      body: {'name': name},
+      auth: true,
+    );
+    return _api.extractData(json) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getCollectionDetail(String collectionId) async {
+    final json = await _api.get('/api/collections/$collectionId', auth: true);
+    return _api.extractData(json) as Map<String, dynamic>;
+  }
+
+  Future<void> addToCollection({
+    required String collectionId,
+    required String targetType,
+    required String targetId,
+  }) async {
+    await _api.post(
+      '/api/collections/$collectionId/items',
+      body: {'targetType': targetType, 'targetId': targetId},
+      auth: true,
+    );
+  }
+
+  Future<void> removeFromCollection({
+    required String collectionId,
+    required String targetType,
+    required String targetId,
+  }) async {
+    await _api.delete('/api/collections/$collectionId/items/$targetType/$targetId');
+  }
+
   Future<CommentSummary> commentOnPiece(String id, String body) async {
     final json = await _api.post(
       '/api/pieces/$id/comments',

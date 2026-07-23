@@ -6,7 +6,9 @@ import '../../models/feed_item.dart';
 import '../../services/saved_content_store.dart';
 import '../../services/social_service.dart';
 import '../../utils/profile_navigation.dart';
+import '../collection_saved_toast.dart';
 import '../profile_avatar.dart';
+import '../save_to_collection_sheet.dart';
 import 'scene_video_comment_sheet.dart';
 
 class ReelOverlay extends StatefulWidget {
@@ -102,9 +104,25 @@ class _ReelOverlayState extends State<ReelOverlay> {
     final postId = widget.item.post?.id;
     if (postId == null) return;
     final nextSaved = !_saved;
+
+    String? collectionId;
+    final hadCollections = SavedContentStore.instance.hasCollections;
+    if (nextSaved) {
+      final resolution = await resolveSaveCollection(context);
+      if (resolution.cancelled) return;
+      collectionId = resolution.collectionId;
+    }
+
     setState(() => _saved = nextSaved);
     if (nextSaved) {
       SavedContentStore.instance.saveFeedItem(widget.item);
+      if (collectionId != null) {
+        SavedContentStore.instance.addEntryToCollection(
+          collectionId,
+          postId,
+          targetType: 'post',
+        );
+      }
     } else {
       SavedContentStore.instance.unsave(postId);
     }
@@ -116,6 +134,9 @@ class _ReelOverlayState extends State<ReelOverlay> {
       }
     } catch (_) {
       // Keep local saved state for scene videos when API is unavailable.
+    }
+    if (mounted && nextSaved && hadCollections) {
+      showCollectionSavedToast(context, saved: true, thumbnailUrl: widget.item.mediaUrl);
     }
   }
 

@@ -4,6 +4,7 @@ import '../../models/feed_preview_item.dart';
 import '../../services/saved_content_store.dart';
 import '../../services/social_service.dart';
 import '../collection_saved_toast.dart';
+import '../save_to_collection_sheet.dart';
 
 /// Shared save-state wiring for piece detail pages.
 mixin DetailSaveState<T extends StatefulWidget> on State<T> {
@@ -54,10 +55,25 @@ mixin DetailSaveState<T extends StatefulWidget> on State<T> {
     if (_saveBusy) return;
     final item = saveItem;
     final nextSaved = !saved;
+
+    String? collectionId;
+    if (nextSaved) {
+      final resolution = await resolveSaveCollection(context);
+      if (resolution.cancelled) return;
+      collectionId = resolution.collectionId;
+    }
+
     setState(() => saved = nextSaved);
     if (!item.isApiBacked) {
       if (nextSaved) {
         savedStore.savePreview(item);
+        if (collectionId != null) {
+          savedStore.addEntryToCollection(
+            collectionId,
+            item.id,
+            targetType: item.isScene ? 'post' : 'piece',
+          );
+        }
       } else {
         savedStore.unsave(item.id);
       }
@@ -74,6 +90,13 @@ mixin DetailSaveState<T extends StatefulWidget> on State<T> {
         }
         _ownStoreWrite = true;
         savedStore.savePreview(item);
+        if (collectionId != null) {
+          savedStore.addEntryToCollection(
+            collectionId,
+            item.id,
+            targetType: item.isScene ? 'post' : 'piece',
+          );
+        }
         _ownStoreWrite = false;
       } else {
         if (item.isScene) {
