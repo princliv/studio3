@@ -29,9 +29,8 @@ import 'screens/reels_page.dart';
 import 'screens/saved_page.dart';
 import 'screens/profile_page.dart';
 import 'screens/post_page.dart';
-import 'screens/notifications_page.dart';
+import 'screens/inbox_page.dart';
 import 'screens/chat_page.dart';
-import 'screens/direct_messages_page.dart';
 import 'screens/onboarding/onboarding_page.dart';
 import 'screens/edit_profile_page.dart';
 import 'screens/manage_series_page.dart';
@@ -41,10 +40,10 @@ import 'screens/my_sales_page.dart';
 import 'screens/change_password_page.dart';
 import 'screens/change_email_page.dart';
 import 'screens/notification_preferences_page.dart';
-import 'screens/follow_requests_page.dart';
 import 'screens/blocked_users_page.dart';
 import 'screens/privacy_settings_page.dart';
 import 'models/auth_user.dart';
+import 'models/feed_preview_item.dart' show FeedAvailabilityFilter;
 import 'theme/home_feed_tokens.dart';
 
 Future<void> main() async {
@@ -108,7 +107,6 @@ class Studio3App extends StatelessWidget {
         '/change-email': (context) => const ChangeEmailPage(),
         '/notification-preferences': (context) => const NotificationPreferencesPage(),
         '/privacy-settings': (context) => const PrivacySettingsPage(),
-        '/follow-requests': (context) => const FollowRequestsPage(),
         '/blocked-users': (context) => const BlockedUsersPage(),
         '/profile': (context) {
           final args = parseProfileRouteArgs(
@@ -121,9 +119,11 @@ class Studio3App extends StatelessWidget {
           );
         },
         '/post': (context) => const PostPage(),
-        '/notifications': (context) => const NotificationsPage(),
         '/chat': (context) => const ChatPage(),
-        '/direct-messages': (context) => const DirectMessagesPage(),
+        '/inbox': (context) {
+          final tab = ModalRoute.of(context)?.settings.arguments as InboxTab?;
+          return InboxPage(initialTab: tab ?? InboxTab.notifications);
+        },
       },
     );
   }
@@ -218,26 +218,56 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
+  // Slide indices for the single swipeable Home/Discover/Video/Saved
+  // sequence. Home's "All" and "Available" are two adjacent slides in the
+  // SAME PageView (rather than Home owning its own nested horizontal
+  // PageView) so a left/right swipe flows continuously from Available all
+  // the way through to Saved with no nested-gesture conflict. Profile is
+  // deliberately NOT one of these slides — it's shown as a tap-only overlay
+  // (see `_showProfile`) so it can never be swiped into or out of.
+  static const _kHomeAllPage = 0;
+  static const _kHomeAvailablePage = 1;
+  static const _kDiscoverPage = 2;
+  static const _kReelsPage = 3;
+  static const _kSavedPage = 4;
+
   // Always start on the For You/Home tab, regardless of which tab was last
   // open — matching Instagram's "always opens to the main feed" behavior.
   // A ValueNotifier (rather than a plain int + setState) so nav-index
-  // changes only rebuild the IndexedStack/BottomNav subtree below, instead
-  // of the whole MainShell (which would otherwise also re-run on every
-  // avatar reload / auth-session change via the shared setState scope).
+  // changes only rebuild the BottomNav subtree below, instead of the whole
+  // MainShell (which would otherwise also re-run on every avatar reload /
+  // auth-session change via the shared setState scope).
   final ValueNotifier<int> _selectedNavIndex =
       ValueNotifier(BottomNavIndex.home);
   late final ValueNotifier<bool> _reelsActive =
       ValueNotifier(_selectedNavIndex.value == BottomNavIndex.reels);
+  final ValueNotifier<bool> _showProfile = ValueNotifier(false);
 
-  // Built once — every tab widget is `const` (ReelsPage takes a
-  // ValueListenable instead of a constructor bool) so this list never needs
-  // to be reconstructed, unlike the previous per-build `_buildTabs()`.
-  late final List<Widget> _tabs = [
-    const HomeFeedPage(),
+  late final PageController _pageController = PageController(
+    initialPage: _kHomeAllPage,
+  );
+  final HomeFeedStore _homeFeedStore = HomeFeedStore();
+  int _currentPage = _kHomeAllPage;
+  int _lastHomeSlide = _kHomeAllPage;
+
+  // Built once — every page widget is `const` where possible (ReelsPage
+  // takes a ValueListenable instead of a constructor bool; the two
+  // HomeFeedSlides share one HomeFeedStore) so this list never needs to be
+  // reconstructed.
+  late final List<Widget> _pages = [
+    HomeFeedSlide(
+      store: _homeFeedStore,
+      showAvailable: false,
+      onFilterTap: _onHomeFilterTap,
+    ),
+    HomeFeedSlide(
+      store: _homeFeedStore,
+      showAvailable: true,
+      onFilterTap: _onHomeFilterTap,
+    ),
     const ExplorePage(),
     ReelsPage(activeListenable: _reelsActive),
     const SavedPage(),
-    const ProfilePage(),
   ];
 
   @override
@@ -256,6 +286,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     _selectedNavIndex.removeListener(_onNavIndexChanged);
     _selectedNavIndex.dispose();
     _reelsActive.dispose();
+    _showProfile.dispose();
+    _pageController.dispose();
+    _homeFeedStore.dispose();
     super.dispose();
   }
 
@@ -275,7 +308,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     // Only the avatar (read directly by BottomNav's ValueListenableBuilder
     // below) needs to react to session changes — no setState here avoids
     // rebuilding the whole shell (and therefore every const-canonicalized
-    // tab reference) for an avatar URL update.
+    // page reference) for an avatar URL update.
     if (mounted) setState(() {});
   }
 
@@ -289,11 +322,68 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     }
   }
 
-  void _onNavTap(int navIndex) {
+  int _navIndexForPage(int page) {
+    switch (page) {
+      case _kHomeAllPage:
+      case _kHomeAvailablePage:
+        return BottomNavIndex.home;
+      case _kDiscoverPage:
+        return BottomNavIndex.discover;
+      case _kReelsPage:
+        return BottomNavIndex.reels;
+      case _kSavedPage:
+      default:
+        return BottomNavIndex.bookmark;
+    }
+  }
+
+  void _onPageChanged(int page) {
+    _currentPage = page;
+    if (page == _kHomeAllPage || page == _kHomeAvailablePage) {
+      _lastHomeSlide = page;
+    }
+    final navIndex = _navIndexForPage(page);
     _selectedNavIndex.value = navIndex;
     AppStateStore.instance.saveNavIndex(navIndex);
+  }
+
+  /// Tapping "All"/"Available" in the Home header animates the shared
+  /// PageView to the matching slide — `_onPageChanged` then updates
+  /// `_selectedNavIndex`/`_lastHomeSlide` once it lands, same as a swipe.
+  void _onHomeFilterTap(FeedAvailabilityFilter filter) {
+    final page =
+        filter == FeedAvailabilityFilter.all ? _kHomeAllPage : _kHomeAvailablePage;
+    _pageController.animateToPage(
+      page,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+    );
+  }
+
+  void _onNavTap(int navIndex) {
     if (navIndex == BottomNavIndex.profile) {
+      _showProfile.value = true;
+      _selectedNavIndex.value = BottomNavIndex.profile;
+      AppStateStore.instance.saveNavIndex(navIndex);
       _loadProfilePhoto();
+      return;
+    }
+    _showProfile.value = false;
+    final targetPage = switch (navIndex) {
+      BottomNavIndex.home => _lastHomeSlide,
+      BottomNavIndex.discover => _kDiscoverPage,
+      BottomNavIndex.reels => _kReelsPage,
+      BottomNavIndex.bookmark => _kSavedPage,
+      _ => _currentPage,
+    };
+    _selectedNavIndex.value = navIndex;
+    AppStateStore.instance.saveNavIndex(navIndex);
+    if (targetPage != _currentPage) {
+      _pageController.animateToPage(
+        targetPage,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
     }
   }
 
@@ -305,11 +395,22 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          ValueListenableBuilder<int>(
-            valueListenable: _selectedNavIndex,
-            builder: (context, index, _) => IndexedStack(
-              index: index,
-              children: _tabs,
+          PageView(
+            controller: _pageController,
+            onPageChanged: _onPageChanged,
+            children: _pages,
+          ),
+          // Offstage (not a conditional widget swap) so ProfilePage stays
+          // mounted the whole session — its own data/scroll state survives
+          // being hidden, same as it did as an IndexedStack child before.
+          Positioned.fill(
+            child: ValueListenableBuilder<bool>(
+              valueListenable: _showProfile,
+              builder: (context, show, child) => Offstage(
+                offstage: !show,
+                child: child,
+              ),
+              child: const ProfilePage(),
             ),
           ),
           ValueListenableBuilder<int>(

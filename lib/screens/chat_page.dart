@@ -9,6 +9,7 @@ import '../theme/home_feed_tokens.dart';
 import '../widgets/accept_decline_buttons.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/home_feed/home_feed_widgets.dart';
+import '../widgets/studio_loading.dart';
 
 enum _InboxTab { all, requests }
 
@@ -94,7 +95,8 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Future<void> _loadRequests({bool append = false}) async {
-    if (append && (_requestsNextCursor == null || _requestsNextCursor!.isEmpty)) {
+    if (append &&
+        (_requestsNextCursor == null || _requestsNextCursor!.isEmpty)) {
       return;
     }
     setState(() {
@@ -153,7 +155,10 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
-  Future<void> _openThread(InquirySummary inquiry, {required bool isRequest}) async {
+  Future<void> _openThread(
+    InquirySummary inquiry, {
+    required bool isRequest,
+  }) async {
     setState(() {
       _selectedId = inquiry.id;
       _selectedIsRequest = isRequest;
@@ -221,9 +226,9 @@ class _ChatPageState extends State<ChatPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _sending = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to send reply: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to send reply: $e')));
     }
   }
 
@@ -247,9 +252,9 @@ class _ChatPageState extends State<ChatPage> {
       if (_selectedId == request.id) _closeThread();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to accept: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to accept: $e')));
     } finally {
       if (mounted) setState(() => _requestBusy.remove(request.id));
     }
@@ -328,7 +333,9 @@ class _ChatPageState extends State<ChatPage> {
             ),
             const SizedBox(height: 12),
             Expanded(
-              child: _activeTab == _InboxTab.all ? _buildAllBody() : _buildRequestsBody(),
+              child: _activeTab == _InboxTab.all
+                  ? _buildAllBody()
+                  : _buildRequestsBody(),
             ),
           ],
         ),
@@ -345,13 +352,19 @@ class _ChatPageState extends State<ChatPage> {
               onSend: _sendReply,
               onAccept: _selectedIsRequest && _thread != null
                   ? () => _acceptRequest(
-                      _requests.firstWhere((r) => r.id == _selectedId,
-                          orElse: () => _requests.first))
+                      _requests.firstWhere(
+                        (r) => r.id == _selectedId,
+                        orElse: () => _requests.first,
+                      ),
+                    )
                   : null,
               onDecline: _selectedIsRequest && _thread != null
                   ? () => _declineRequest(
-                      _requests.firstWhere((r) => r.id == _selectedId,
-                          orElse: () => _requests.first))
+                      _requests.firstWhere(
+                        (r) => r.id == _selectedId,
+                        orElse: () => _requests.first,
+                      ),
+                    )
                   : null,
             )
           : null,
@@ -360,7 +373,7 @@ class _ChatPageState extends State<ChatPage> {
 
   Widget _buildAllBody() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+      return const StudioLoadingBody();
     }
     if (_inquiries.isEmpty) {
       return Center(
@@ -421,13 +434,20 @@ class _ChatPageState extends State<ChatPage> {
                           children: [
                             Text(
                               inq.displayTitle,
-                              style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.slate900),
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.slate900,
+                              ),
                             ),
                             Text(
                               '${inq.otherPartyDisplayName} — ${inq.preview ?? 'No messages yet'}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.inter(fontSize: 13, color: AppColors.slate500),
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                color: AppColors.slate500,
+                              ),
                             ),
                           ],
                         ),
@@ -437,11 +457,21 @@ class _ChatPageState extends State<ChatPage> {
                         children: [
                           Text(
                             _timeAgo(inq.updatedAt),
-                            style: GoogleFonts.inter(fontSize: 11, color: AppColors.slate400),
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: AppColors.slate400,
+                            ),
                           ),
                           if (inq.unread) ...[
                             const SizedBox(height: 4),
-                            Container(width: 8, height: 8, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.slate900)),
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: AppColors.slate900,
+                              ),
+                            ),
                           ],
                         ],
                       ),
@@ -458,14 +488,18 @@ class _ChatPageState extends State<ChatPage> {
 
   Widget _buildRequestsBody() {
     if (_requestsLoading) {
-      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+      return const StudioLoadingBody();
     }
     if (_requests.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.mark_email_unread_outlined, size: 48, color: AppColors.slate200),
+            Icon(
+              Icons.mark_email_unread_outlined,
+              size: 48,
+              color: AppColors.slate200,
+            ),
             const SizedBox(height: AppDims.spaceMd),
             Text(
               'No message requests',
@@ -520,13 +554,20 @@ class _ChatPageState extends State<ChatPage> {
                           children: [
                             Text(
                               inq.displayTitle,
-                              style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.slate900),
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.slate900,
+                              ),
                             ),
                             Text(
                               '${inq.otherPartyDisplayName} — ${inq.preview ?? 'No messages yet'}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.inter(fontSize: 13, color: AppColors.slate500),
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                color: AppColors.slate500,
+                              ),
                             ),
                           ],
                         ),
@@ -589,11 +630,15 @@ class _InquiryBottomSheet extends StatelessWidget {
     final showPendingActions = isRequest && thread?.status == 'pending';
 
     return Container(
-      constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.75),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.75,
+      ),
       padding: const EdgeInsets.all(AppDims.spaceLg),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.72),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppDims.radiusXl)),
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AppDims.radiusXl),
+        ),
         border: Border.all(color: Colors.white.withValues(alpha: 0.45)),
       ),
       child: Column(
@@ -614,15 +659,28 @@ class _InquiryBottomSheet extends StatelessWidget {
                   children: [
                     Text(
                       thread?.displayTitle ?? 'Inquiry',
-                      style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.slate900),
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.slate900,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(color: AppColors.slate100, borderRadius: BorderRadius.circular(9999)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.slate100,
+                        borderRadius: BorderRadius.circular(9999),
+                      ),
                       child: Text(
                         thread?.otherPartyName ?? '',
-                        style: GoogleFonts.inter(fontSize: 12, color: AppColors.slate600),
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: AppColors.slate600,
+                        ),
                       ),
                     ),
                   ],
@@ -647,7 +705,8 @@ class _InquiryBottomSheet extends StatelessWidget {
                     for (final message in thread?.messages ?? const [])
                       _MessageBubble(
                         message: message,
-                        isMine: myUsername != null &&
+                        isMine:
+                            myUsername != null &&
                             message.senderUsername == myUsername,
                       ),
                   ],
@@ -670,7 +729,9 @@ class _InquiryBottomSheet extends StatelessWidget {
               style: GoogleFonts.inter(fontSize: 14, color: AppColors.slate900),
               decoration: InputDecoration(
                 hintText: 'Reply...',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppDims.radiusMd)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppDims.radiusMd),
+                ),
               ),
             ),
             const SizedBox(height: AppDims.spaceSm + 4),
@@ -679,14 +740,22 @@ class _InquiryBottomSheet extends StatelessWidget {
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.slate900,
                 minimumSize: const Size.fromHeight(AppDims.primaryButtonHeight),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9999)),
-                textStyle: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(9999),
+                ),
+                textStyle: GoogleFonts.inter(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               child: sending
                   ? const SizedBox(
                       width: 18,
                       height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : const Text('Send Reply'),
             ),
@@ -710,7 +779,9 @@ class _MessageBubble extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.7),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.sizeOf(context).width * 0.7,
+        ),
         decoration: BoxDecoration(
           color: isMine ? AppColors.slate900 : AppColors.slate100,
           borderRadius: BorderRadius.circular(AppDims.radiusMd),

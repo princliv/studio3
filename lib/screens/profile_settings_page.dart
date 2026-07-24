@@ -8,8 +8,10 @@ import '../models/user_profile.dart';
 import '../services/user_service.dart';
 import '../theme/home_feed_tokens.dart';
 import '../utils/profile_navigation.dart';
+import '../widgets/feed_skeleton.dart';
 import '../widgets/settings_tile.dart';
 import '../widgets/studio_loading.dart';
+import 'inbox_page.dart';
 import 'profile/widgets/profile_seller_insights.dart';
 import 'seller_analytics_page.dart';
 
@@ -116,10 +118,8 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final pageLoading = _loadingSeller || _togglingSeller;
-
     return StudioLoadingGate(
-      loading: pageLoading,
+      loading: _togglingSeller,
       child: Scaffold(
         backgroundColor: HomeFeedTokens.background,
         appBar: AppBar(
@@ -140,7 +140,9 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
             onPressed: () => Navigator.pop(context, true),
           ),
         ),
-        body: ListView(
+        body: _loadingSeller
+            ? const SettingsListSkeleton()
+            : ListView(
           padding: const EdgeInsets.all(20),
           children: [
             const _SectionHeader('Seller'),
@@ -215,7 +217,11 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
             SettingsTile(
               icon: Icons.person_add_alt_outlined,
               label: 'Follow requests',
-              onTap: () => Navigator.pushNamed(context, '/follow-requests'),
+              onTap: () => Navigator.pushNamed(
+                context,
+                '/inbox',
+                arguments: InboxTab.requests,
+              ),
             ),
             SettingsTile(
               icon: Icons.block_outlined,
@@ -252,7 +258,11 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
             SettingsTile(
               icon: Icons.notifications_outlined,
               label: 'Notifications',
-              onTap: () => Navigator.pushNamed(context, '/notifications'),
+              onTap: () => Navigator.pushNamed(
+                context,
+                '/inbox',
+                arguments: InboxTab.notifications,
+              ),
             ),
             SettingsTile(
               icon: Icons.tune_rounded,

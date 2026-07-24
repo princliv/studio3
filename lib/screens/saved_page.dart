@@ -13,7 +13,7 @@ import '../screens/piece_detail_page.dart';
 import '../services/saved_content_store.dart';
 import '../theme/home_feed_tokens.dart';
 import '../utils/reels_route.dart';
-import '../widgets/create_collection_dialog.dart';
+import '../widgets/collection_name_sheet.dart';
 import '../widgets/home_feed/home_feed_widgets.dart';
 
 class SavedPage extends StatefulWidget {
@@ -91,9 +91,105 @@ class _SavedPageState extends State<SavedPage> {
   void _onStoreChanged() => setState(() {});
 
   Future<void> _createCollection() async {
-    final name = await CreateCollectionDialog.show(context);
+    final name = await CollectionNameSheet.show(context);
     if (name == null || name.isEmpty) return;
     await _store.createCollection(name);
+  }
+
+  Future<void> _showFolderActions(SavedCollection collection) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: HomeFeedTokens.detailBackground,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.edit_outlined),
+                title: Text(
+                  'Rename',
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    color: HomeFeedTokens.textPrimary,
+                  ),
+                ),
+                onTap: () => Navigator.pop(context, 'rename'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                title: Text(
+                  'Delete',
+                  style: GoogleFonts.inter(fontSize: 16, color: Colors.red),
+                ),
+                onTap: () => Navigator.pop(context, 'delete'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted) return;
+
+    if (action == 'rename') {
+      final name = await CollectionNameSheet.show(
+        context,
+        initialName: collection.name,
+        title: 'Rename collection',
+        actionLabel: 'Rename',
+      );
+      if (name != null && name.isNotEmpty) {
+        await _store.renameCollection(collection.id, name);
+      }
+    } else if (action == 'delete') {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: HomeFeedTokens.background,
+          title: Text(
+            'Delete "${collection.name}"?',
+            style: GoogleFonts.inter(
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
+              color: HomeFeedTokens.textPrimary,
+            ),
+          ),
+          content: Text(
+            'Saved items inside will stay in Saved — only this folder is removed.',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              color: HomeFeedTokens.textSecondary,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.inter(color: HomeFeedTokens.textSecondary),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(
+                'Delete',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.red,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+      if (confirmed == true) {
+        await _store.deleteCollection(collection.id);
+      }
+    }
   }
 
   void _openFolder(String? collectionId, String title) {
@@ -164,6 +260,7 @@ class _SavedPageState extends State<SavedPage> {
                       store: _store,
                       onOpenFolder: _openFolder,
                       onCreate: _createCollection,
+                      onLongPressFolder: _showFolderActions,
                     )
                   : const _SavedItemsView(collectionId: null),
             ),
@@ -435,11 +532,13 @@ class _SavedFoldersGrid extends StatelessWidget {
     required this.store,
     required this.onOpenFolder,
     required this.onCreate,
+    required this.onLongPressFolder,
   });
 
   final SavedContentStore store;
   final void Function(String? collectionId, String title) onOpenFolder;
   final VoidCallback onCreate;
+  final void Function(SavedCollection collection) onLongPressFolder;
 
   @override
   Widget build(BuildContext context) {
@@ -484,6 +583,7 @@ class _SavedFoldersGrid extends StatelessWidget {
           imageUrl: cover != null ? savedEntryThumbnailUrl(cover) : null,
           icon: Icons.folder_outlined,
           onTap: () => onOpenFolder(collection.id, collection.name),
+          onLongPress: () => onLongPressFolder(collection),
         );
       },
     );
@@ -497,6 +597,7 @@ class _SavedFolderTile extends StatelessWidget {
     required this.imageUrl,
     required this.icon,
     required this.onTap,
+    this.onLongPress,
   });
 
   final String title;
@@ -504,6 +605,7 @@ class _SavedFolderTile extends StatelessWidget {
   final String? imageUrl;
   final IconData icon;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -513,6 +615,7 @@ class _SavedFolderTile extends StatelessWidget {
         color: HomeFeedTokens.textPrimary.withValues(alpha: 0.06),
         child: InkWell(
           onTap: onTap,
+          onLongPress: onLongPress,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

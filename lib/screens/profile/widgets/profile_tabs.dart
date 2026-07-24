@@ -297,7 +297,7 @@ class _TabItem extends StatelessWidget {
                       active ? HomeFeedTokens.textPrimary : kProfileTextMuted,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Center(
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
@@ -390,7 +390,7 @@ class _CollectTabItem extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Center(
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),

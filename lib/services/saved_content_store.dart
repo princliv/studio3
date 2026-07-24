@@ -82,9 +82,9 @@ class SavedCollection {
   /// Ids of saved entries in this collection, most-recently-added first.
   final List<String> entryIds;
 
-  SavedCollection copyWith({List<String>? entryIds}) => SavedCollection(
+  SavedCollection copyWith({String? name, List<String>? entryIds}) => SavedCollection(
         id: id,
-        name: name,
+        name: name ?? this.name,
         createdAt: createdAt,
         entryIds: entryIds ?? this.entryIds,
       );
@@ -216,6 +216,34 @@ class SavedContentStore extends ChangeNotifier {
     notifyListeners();
     unawaited(_persistCollections());
     return collection;
+  }
+
+  Future<void> renameCollection(String collectionId, String name) async {
+    final trimmed = name.trim();
+    final index = _collections.indexWhere((c) => c.id == collectionId);
+    if (index == -1) return;
+    _collections[index] = _collections[index].copyWith(name: trimmed);
+    notifyListeners();
+    unawaited(_persistCollections());
+    unawaited(
+      SocialService.instance
+          .renameCollection(collectionId, trimmed)
+          .catchError((_) {}),
+    );
+  }
+
+  /// Removes the folder only — saved items inside stay saved (still show
+  /// up under the flat "Saved" bucket), matching Instagram.
+  Future<void> deleteCollection(String collectionId) async {
+    final removed = _collections.any((c) => c.id == collectionId);
+    _collections.removeWhere((c) => c.id == collectionId);
+    if (removed) {
+      notifyListeners();
+      unawaited(_persistCollections());
+    }
+    unawaited(
+      SocialService.instance.deleteCollection(collectionId).catchError((_) {}),
+    );
   }
 
   /// Merges collection summaries from the backend into the local list, so

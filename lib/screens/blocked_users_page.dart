@@ -9,6 +9,7 @@ import '../utils/profile_navigation.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/home_feed/home_feed_widgets.dart';
 import '../widgets/offline_state.dart';
+import '../widgets/studio_loading.dart';
 
 class BlockedUsersPage extends StatefulWidget {
   const BlockedUsersPage({super.key});
@@ -53,7 +54,9 @@ class _BlockedUsersPageState extends State<BlockedUsersPage> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text('Unblock @${user.username}?'),
-        content: const Text('They will be able to follow and message you again.'),
+        content: const Text(
+          'They will be able to follow and message you again.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
@@ -74,8 +77,9 @@ class _BlockedUsersPageState extends State<BlockedUsersPage> {
       setState(() => _blocked.removeWhere((b) => b.username == user.username));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Failed to unblock: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to unblock: $e')));
     } finally {
       if (mounted) setState(() => _busy.remove(user.username));
     }
@@ -106,7 +110,7 @@ class _BlockedUsersPageState extends State<BlockedUsersPage> {
       return OfflineState(onRetry: _load);
     }
     if (_loading && _blocked.isEmpty) {
-      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+      return const StudioLoadingBody();
     }
     if (_blocked.isEmpty) {
       return Center(
@@ -132,17 +136,31 @@ class _BlockedUsersPageState extends State<BlockedUsersPage> {
                 children: [
                   GestureDetector(
                     onTap: () => openUserProfile(context, user.username),
-                    child: UserAvatar(url: user.profilePhotoUrl, name: user.name, size: 40),
+                    child: UserAvatar(
+                      url: user.profilePhotoUrl,
+                      name: user.name,
+                      size: 40,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(user.name,
-                            style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600)),
-                        Text('@${user.username}',
-                            style: GoogleFonts.inter(fontSize: 12, color: AppColors.slate500)),
+                        Text(
+                          user.name,
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          '@${user.username}',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: AppColors.slate500,
+                          ),
+                        ),
                       ],
                     ),
                   ),

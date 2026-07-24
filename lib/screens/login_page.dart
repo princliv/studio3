@@ -39,11 +39,13 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  String? get _usernameError =>
-      _submitted ? AuthValidators.loginIdentifier(_usernameController.text) : null;
+  String? get _usernameError => _submitted
+      ? AuthValidators.loginIdentifier(_usernameController.text)
+      : null;
 
-  String? get _passwordError =>
-      _submitted && _passwordController.text.isEmpty ? 'Password is required' : null;
+  String? get _passwordError => _submitted && _passwordController.text.isEmpty
+      ? 'Password is required'
+      : null;
 
   bool get _canSubmit =>
       AuthValidators.loginIdentifier(_usernameController.text) == null &&
@@ -81,6 +83,7 @@ class _LoginPageState extends State<LoginPage> {
     return StudioLoadingGate(
       loading: _loading,
       dark: true,
+      loginExperience: true,
       child: AuthScaffold(
         compact: true,
         child: AuthFormBody(
@@ -108,16 +111,22 @@ class _LoginPageState extends State<LoginPage> {
                 textInputAction: TextInputAction.done,
                 onSubmitted: (_) => _signIn(),
                 onChanged: (_) => setState(() {}),
-                onToggleVisibility: () => setState(() => _obscurePassword = !_obscurePassword),
+                onToggleVisibility: () =>
+                    setState(() => _obscurePassword = !_obscurePassword),
               ),
               const SizedBox(height: 14),
               AuthRememberRow(
                 value: _rememberMe,
                 onChanged: (v) => setState(() => _rememberMe = v),
-                onForgot: () => Navigator.pushNamed(context, '/forgot-password'),
+                onForgot: () =>
+                    Navigator.pushNamed(context, '/forgot-password'),
               ),
               const SizedBox(height: 20),
-              AuthPrimaryButton(label: 'Login', enabled: _canSubmit, onPressed: _signIn),
+              AuthPrimaryButton(
+                label: 'Login',
+                enabled: _canSubmit,
+                onPressed: _signIn,
+              ),
               const SizedBox(height: 24),
               AuthLinkFooter(
                 prompt: "Don't have an account? ",

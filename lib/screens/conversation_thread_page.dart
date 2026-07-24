@@ -14,6 +14,7 @@ import '../theme/app_theme.dart';
 import '../theme/home_feed_tokens.dart';
 import '../widgets/accept_decline_buttons.dart';
 import '../widgets/home_feed/home_feed_widgets.dart';
+import '../widgets/studio_loading.dart';
 
 /// A single 1:1 chat thread — real-time via [ChatSocketService], with REST
 /// ([ChatService]) as the source of truth for history and pagination.
@@ -383,9 +384,7 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
             ),
             Expanded(
               child: _loading
-                  ? const Center(
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
+                  ? const StudioLoadingBody()
                   : (_isComposing && _messages.isEmpty)
                   ? Center(
                       child: Text(

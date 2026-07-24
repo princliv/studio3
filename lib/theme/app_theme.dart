@@ -43,14 +43,46 @@ class AppTheme {
   static ThemeData get light {
     final base = ThemeData.light(useMaterial3: true);
     final textTheme = GoogleFonts.interTextTheme(base.textTheme).copyWith(
-      headlineMedium: GoogleFonts.inter(fontSize: 28, fontWeight: FontWeight.w700, color: AppColors.slate900),
-      titleLarge: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.slate900),
-      titleMedium: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.slate900),
-      titleSmall: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.slate900),
-      bodyMedium: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w400, color: AppColors.slate700),
-      bodySmall: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w400, color: AppColors.slate500),
-      labelMedium: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w400, color: AppColors.slate400),
-      labelSmall: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w400, color: AppColors.slate400),
+      headlineMedium: GoogleFonts.inter(
+        fontSize: 28,
+        fontWeight: FontWeight.w700,
+        color: AppColors.slate900,
+      ),
+      titleLarge: GoogleFonts.inter(
+        fontSize: 22,
+        fontWeight: FontWeight.w700,
+        color: AppColors.slate900,
+      ),
+      titleMedium: GoogleFonts.inter(
+        fontSize: 20,
+        fontWeight: FontWeight.w600,
+        color: AppColors.slate900,
+      ),
+      titleSmall: GoogleFonts.inter(
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+        color: AppColors.slate900,
+      ),
+      bodyMedium: GoogleFonts.inter(
+        fontSize: 14,
+        fontWeight: FontWeight.w400,
+        color: AppColors.slate700,
+      ),
+      bodySmall: GoogleFonts.inter(
+        fontSize: 13,
+        fontWeight: FontWeight.w400,
+        color: AppColors.slate500,
+      ),
+      labelMedium: GoogleFonts.inter(
+        fontSize: 12,
+        fontWeight: FontWeight.w400,
+        color: AppColors.slate400,
+      ),
+      labelSmall: GoogleFonts.inter(
+        fontSize: 11,
+        fontWeight: FontWeight.w400,
+        color: AppColors.slate400,
+      ),
     );
 
     return ThemeData(
@@ -66,27 +98,43 @@ class AppTheme {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        titleTextStyle: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.slate900),
+        titleTextStyle: GoogleFonts.inter(
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          color: AppColors.slate900,
+        ),
       ),
       textTheme: textTheme,
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          textStyle: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600),
+          textStyle: GoogleFonts.inter(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          textStyle: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600),
+          textStyle: GoogleFonts.inter(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          textStyle: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500),
+          textStyle: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          textStyle: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500),
+          textStyle: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(

@@ -14,46 +14,148 @@ import '../services/connectivity_service.dart';
 import '../services/feed_service.dart';
 import 'reels_page.dart' show routeObserver;
 
-class HomeFeedPage extends StatefulWidget {
-  /// For You feed — mixed Pieces and Scenes with All / Available filters.
-  const HomeFeedPage({super.key});
+/// Owns the "For You" feed's data/pagination — shared by both the "All" and
+/// "Available" slides (`HomeFeedSlide`) so they read from one fetch instead
+/// of each maintaining their own, since they're now separate pages in the
+/// shell's single Home/Discover/Video/Saved swipe sequence rather than
+/// children of one shared parent widget.
+class HomeFeedStore extends ChangeNotifier {
+  final List<FeedItem> apiItems = [];
+  bool loading = true;
+  bool loadingMore = false;
+  String? nextCursor;
+  bool showOfflineState = false;
 
-  @override
-  State<HomeFeedPage> createState() => _HomeFeedPageState();
-}
+  bool _initialized = false;
 
-class _HomeFeedPageState extends State<HomeFeedPage> with RouteAware {
-  static const double _loadMoreThreshold = 200;
+  List<FeedItem> get availableItems =>
+      apiItems.where((item) => item.isForSale).toList();
 
-  final List<FeedItem> _apiItems = [];
-  FeedAvailabilityFilter _filter = FeedAvailabilityFilter.all;
-  bool _loading = true;
-  bool _loadingMore = false;
-  String? _nextCursor;
-  final ScrollController _scrollController = ScrollController();
-
-  List<FeedItem> get _visibleItems {
-    if (_filter == FeedAvailabilityFilter.all) return _apiItems;
-    return _apiItems.where((item) => item.isForSale).toList();
+  /// Paints instantly from whatever's already cached (if anything) instead
+  /// of starting from an empty spinner, then kicks off a fetch to silently
+  /// refresh in the background. Safe to call from both slides — only runs
+  /// once.
+  void ensureInitialized() {
+    if (_initialized) return;
+    _initialized = true;
+    final cached = FeedService.instance.peekForYouCached();
+    if (cached != null && cached.items.isNotEmpty) {
+      apiItems.addAll(cached.items);
+      nextCursor = cached.nextCursor;
+      loading = false;
+    }
+    ConnectivityService.instance.addReconnectHook(_onReconnected);
+    loadFeed();
   }
 
-  bool _showOfflineState = false;
+  @override
+  void dispose() {
+    ConnectivityService.instance.removeReconnectHook(_onReconnected);
+    super.dispose();
+  }
+
+  Future<void> _onReconnected() => loadFeed(refresh: true);
+
+  Future<void> refresh() => loadFeed(refresh: true);
+
+  Future<void> loadMore() => loadFeed(append: true);
+
+  Future<void> loadFeed({bool append = false, bool refresh = false}) async {
+    if (loadingMore) return;
+    if (append && (nextCursor == null || nextCursor!.isEmpty)) return;
+
+    if (append) {
+      loadingMore = true;
+      notifyListeners();
+    } else if (apiItems.isEmpty) {
+      // Only block with a spinner when there's truly nothing to show yet
+      // — a refresh with existing (cached or previously-loaded) content
+      // already on screen updates silently in place instead.
+      loading = true;
+      notifyListeners();
+    }
+    try {
+      final page = append
+          ? await FeedService.instance.getForYou(cursor: nextCursor)
+          : await FeedService.instance.getForYouCached(
+              forceRefresh: refresh,
+              // Stale cache paints immediately (see ensureInitialized);
+              // this silently merges the background-refreshed page in
+              // place once it lands, with no spinner or flicker.
+              onBackgroundUpdate: _mergeBackgroundPage,
+            );
+      if (append) {
+        apiItems.addAll(page.items);
+      } else {
+        apiItems
+          ..clear()
+          ..addAll(page.items);
+      }
+      nextCursor = page.nextCursor;
+      loading = false;
+      loadingMore = false;
+      showOfflineState =
+          apiItems.isEmpty && !ConnectivityService.instance.isOnline;
+      notifyListeners();
+    } catch (_) {
+      // Keep whatever's already showing (cached or previously-loaded) on
+      // a failed refresh — a silent background failure shouldn't blank a
+      // screen that already has content, only a genuinely empty one
+      // falls through to the offline state.
+      loading = false;
+      loadingMore = false;
+      showOfflineState =
+          apiItems.isEmpty && !ConnectivityService.instance.isOnline;
+      notifyListeners();
+    }
+  }
+
+  /// Applies a page fetched silently in the background (see
+  /// [CacheService.fetchWithCache]'s `onBackgroundUpdate`) — same
+  /// replace-from-page-1 convention `loadFeed`'s foreground refresh
+  /// already uses, just without ever showing a spinner for it.
+  void _mergeBackgroundPage(FeedPage page) {
+    apiItems
+      ..clear()
+      ..addAll(page.items);
+    nextCursor = page.nextCursor;
+    showOfflineState =
+        apiItems.isEmpty && !ConnectivityService.instance.isOnline;
+    notifyListeners();
+  }
+}
+
+/// One slide of the "For You" feed — either "All" or "Available" — hosted
+/// as a page in the shell's Home/Discover/Video/Saved swipe sequence
+/// (`MainShell`, `lib/main.dart`). Both slides share one [HomeFeedStore] so
+/// switching between them doesn't refetch anything.
+class HomeFeedSlide extends StatefulWidget {
+  const HomeFeedSlide({
+    super.key,
+    required this.store,
+    required this.showAvailable,
+    required this.onFilterTap,
+  });
+
+  final HomeFeedStore store;
+  final bool showAvailable;
+  final ValueChanged<FeedAvailabilityFilter> onFilterTap;
+
+  @override
+  State<HomeFeedSlide> createState() => _HomeFeedSlideState();
+}
+
+class _HomeFeedSlideState extends State<HomeFeedSlide> with RouteAware {
+  static const double _loadMoreThreshold = 200;
+
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    // Paint instantly from whatever's already cached (if anything) instead
-    // of starting from an empty spinner — _loadFeed() below still runs to
-    // silently refresh in the background.
-    final cached = FeedService.instance.peekForYouCached();
-    if (cached != null && cached.items.isNotEmpty) {
-      _apiItems.addAll(cached.items);
-      _nextCursor = cached.nextCursor;
-      _loading = false;
-    }
+    widget.store.ensureInitialized();
+    widget.store.addListener(_onStoreChanged);
     _scrollController.addListener(_onScroll);
-    ConnectivityService.instance.addReconnectHook(_onReconnected);
-    _loadFeed();
   }
 
   @override
@@ -65,102 +167,28 @@ class _HomeFeedPageState extends State<HomeFeedPage> with RouteAware {
   @override
   void dispose() {
     routeObserver.unsubscribe(this);
+    widget.store.removeListener(_onStoreChanged);
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
-    ConnectivityService.instance.removeReconnectHook(_onReconnected);
     super.dispose();
   }
 
   @override
-  void didPopNext() => _loadFeed(refresh: true);
+  void didPopNext() => widget.store.refresh();
 
-  Future<void> _onReconnected() => _loadFeed(refresh: true);
-
-  Future<void> _loadFeed({bool append = false, bool refresh = false}) async {
-    if (_loadingMore) return;
-    if (append && (_nextCursor == null || _nextCursor!.isEmpty)) return;
-
-    setState(() {
-      if (append) {
-        _loadingMore = true;
-      } else if (_apiItems.isEmpty) {
-        // Only block with a spinner when there's truly nothing to show yet
-        // — a refresh with existing (cached or previously-loaded) content
-        // already on screen updates silently in place instead.
-        _loading = true;
-      }
-    });
-    try {
-      final page = append
-          ? await FeedService.instance.getForYou(cursor: _nextCursor)
-          : await FeedService.instance.getForYouCached(
-              forceRefresh: refresh,
-              // Stale cache paints immediately (see _loadFeed's caller);
-              // this silently merges the background-refreshed page in
-              // place once it lands, with no spinner or flicker.
-              onBackgroundUpdate: _mergeBackgroundPage,
-            );
-      if (!mounted) return;
-      setState(() {
-        if (append) {
-          _apiItems.addAll(page.items);
-        } else {
-          _apiItems
-            ..clear()
-            ..addAll(page.items);
-        }
-        _nextCursor = page.nextCursor;
-        _loading = false;
-        _loadingMore = false;
-        _showOfflineState =
-            _apiItems.isEmpty && !ConnectivityService.instance.isOnline;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        // Keep whatever's already showing (cached or previously-loaded) on
-        // a failed refresh — a silent background failure shouldn't blank a
-        // screen that already has content, only a genuinely empty one
-        // falls through to the offline state below.
-        _loading = false;
-        _loadingMore = false;
-        _showOfflineState =
-            _apiItems.isEmpty && !ConnectivityService.instance.isOnline;
-      });
-    }
-  }
-
-  /// Applies a page fetched silently in the background (see
-  /// [CacheService.fetchWithCache]'s `onBackgroundUpdate`) — same
-  /// replace-from-page-1 convention `_loadFeed`'s foreground refresh
-  /// already uses, just without ever showing a spinner for it.
-  void _mergeBackgroundPage(FeedPage page) {
-    if (!mounted) return;
-    setState(() {
-      _apiItems
-        ..clear()
-        ..addAll(page.items);
-      _nextCursor = page.nextCursor;
-      _showOfflineState =
-          _apiItems.isEmpty && !ConnectivityService.instance.isOnline;
-    });
+  void _onStoreChanged() {
+    if (mounted) setState(() {});
   }
 
   void _onScroll() {
-    if (_loadingMore) return;
-    if (_nextCursor == null || _nextCursor!.isEmpty) return;
+    final store = widget.store;
+    if (store.loadingMore) return;
+    if (store.nextCursor == null || store.nextCursor!.isEmpty) return;
+    if (!_scrollController.hasClients) return;
     final pos = _scrollController.position;
     if (!pos.hasPixels || !pos.hasViewportDimension) return;
     if (pos.pixels >= pos.maxScrollExtent - _loadMoreThreshold) {
-      _loadFeed(append: true);
-    }
-  }
-
-  void _onFilterChanged(FeedAvailabilityFilter filter) {
-    if (_filter == filter) return;
-    setState(() => _filter = filter);
-    if (_scrollController.hasClients) {
-      _scrollController.jumpTo(0);
+      store.loadMore();
     }
   }
 
@@ -171,6 +199,11 @@ class _HomeFeedPageState extends State<HomeFeedPage> with RouteAware {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.paddingOf(context).bottom + 100;
+    final store = widget.store;
+    final items = widget.showAvailable ? store.availableItems : store.apiItems;
+    final filter = widget.showAvailable
+        ? FeedAvailabilityFilter.available
+        : FeedAvailabilityFilter.all;
 
     return Scaffold(
       backgroundColor: HomeFeedTokens.background,
@@ -182,36 +215,47 @@ class _HomeFeedPageState extends State<HomeFeedPage> with RouteAware {
             Padding(
               padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
               child: FeedHomeHeader(
-                filter: _filter,
-                onFilterChanged: _onFilterChanged,
+                filter: filter,
+                onFilterChanged: widget.onFilterTap,
                 onAddTap: () => Navigator.pushNamed(context, '/post'),
+                hasAvailableItems: store.availableItems.isNotEmpty,
               ),
             ),
-            Expanded(child: _buildFeed(bottomInset)),
+            Expanded(
+              child: _buildFeed(
+                bottomInset,
+                items: items,
+                emptyMessage: widget.showAvailable
+                    ? 'No available pieces yet'
+                    : 'No feed items yet',
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildFeed(double bottomInset) {
-    if (_showOfflineState) {
-      return OfflineState(onRetry: () => _loadFeed(refresh: true));
+  Widget _buildFeed(
+    double bottomInset, {
+    required List<FeedItem> items,
+    required String emptyMessage,
+  }) {
+    final store = widget.store;
+    if (store.showOfflineState) {
+      return OfflineState(onRetry: () => store.refresh());
     }
-    if (_loading && _apiItems.isEmpty) {
+    if (store.loading && store.apiItems.isEmpty) {
       // First-load only — a revisit (cache hit) never reaches this branch
-      // since _loading is seeded false whenever peekForYouCached() finds
-      // something in initState.
+      // since loading is seeded false whenever peekForYouCached() finds
+      // something in ensureInitialized().
       return const FeedListSkeleton();
     }
 
-    final visible = _visibleItems;
-    if (visible.isEmpty) {
+    if (items.isEmpty) {
       return Center(
         child: Text(
-          _filter == FeedAvailabilityFilter.available
-              ? 'No available pieces yet'
-              : 'No feed items yet',
+          emptyMessage,
           style: TextStyle(
             color: HomeFeedTokens.textSecondary,
             fontSize: 14,
@@ -221,13 +265,13 @@ class _HomeFeedPageState extends State<HomeFeedPage> with RouteAware {
     }
 
     return RefreshIndicator(
-      onRefresh: () => _loadFeed(refresh: true),
+      onRefresh: () => store.refresh(),
       child: ListView.builder(
         controller: _scrollController,
         padding: EdgeInsets.only(bottom: bottomInset),
-        itemCount: visible.length + (_loadingMore ? 1 : 0),
+        itemCount: items.length + (store.loadingMore ? 1 : 0),
         itemBuilder: (context, index) {
-          if (index >= visible.length) {
+          if (index >= items.length) {
             return const Padding(
               padding: EdgeInsets.symmetric(vertical: 16),
               child: Center(
@@ -239,7 +283,7 @@ class _HomeFeedPageState extends State<HomeFeedPage> with RouteAware {
               ),
             );
           }
-          final item = visible[index];
+          final item = items[index];
           return Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: HomeFeedTokens.sideMargin,

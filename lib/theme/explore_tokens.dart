@@ -9,7 +9,11 @@ abstract final class ExploreTokens {
   static const Color searchFill = Color(0x338C8880);
   static const Color chipActiveFill = Color(0xFF231F1B);
   static const Color chipBorder = Color(0xFF231F1B);
-  static const Color skeleton = Color(0xFFE8E5DF);
+
+  /// Skeleton-loading placeholder fill/highlight. Solid colors with real
+  /// contrast against [background] instead of dissolving into it.
+  static const Color skeleton = Color(0xFFE2DED6);
+  static const Color skeletonHighlight = Color(0xFFF3F0EA);
 
   static const double sideMargin = 10;
   static const double gutter = 8;

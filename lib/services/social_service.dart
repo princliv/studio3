@@ -164,6 +164,17 @@ class SocialService {
     return _api.extractData(json) as Map<String, dynamic>;
   }
 
+  Future<void> renameCollection(String collectionId, String name) async {
+    await _api.patch(
+      '/api/collections/$collectionId',
+      body: {'name': name},
+    );
+  }
+
+  Future<void> deleteCollection(String collectionId) async {
+    await _api.delete('/api/collections/$collectionId');
+  }
+
   Future<Map<String, dynamic>> getCollectionDetail(String collectionId) async {
     final json = await _api.get('/api/collections/$collectionId', auth: true);
     return _api.extractData(json) as Map<String, dynamic>;
