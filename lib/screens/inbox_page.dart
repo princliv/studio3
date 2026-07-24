@@ -5,6 +5,7 @@ import '../services/chat_service.dart';
 import '../services/notification_service.dart';
 import '../services/social_service.dart';
 import '../theme/home_feed_tokens.dart';
+import '../utils/snappy_page_physics.dart';
 import '../widgets/home_feed/home_feed_widgets.dart';
 import '../widgets/inbox/chats_body.dart';
 import '../widgets/inbox/follow_requests_body.dart';
@@ -102,7 +103,6 @@ class _InboxPageState extends State<InboxPage> {
                 label: label,
                 active: active,
                 onTap: onTap,
-                fontSize: 13,
                 underline: false,
               ),
               if (count > 0) ...[
@@ -190,6 +190,7 @@ class _InboxPageState extends State<InboxPage> {
             Expanded(
               child: PageView(
                 controller: _pageController,
+                physics: const SnappyPageScrollPhysics(),
                 onPageChanged: _onPageChanged,
                 children: const [
                   NotificationsBody(),

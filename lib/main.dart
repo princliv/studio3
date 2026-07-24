@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'services/auth_session.dart';
 import 'services/cache_service.dart';
@@ -43,8 +44,9 @@ import 'screens/notification_preferences_page.dart';
 import 'screens/blocked_users_page.dart';
 import 'screens/privacy_settings_page.dart';
 import 'models/auth_user.dart';
-import 'models/feed_preview_item.dart' show FeedAvailabilityFilter;
 import 'theme/home_feed_tokens.dart';
+import 'utils/scrolls_to_top_on_double_tap.dart';
+import 'utils/snappy_page_physics.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -68,7 +70,33 @@ Future<void> main() async {
   } catch (e) {
     debugPrint('Firebase unavailable (no config yet?): $e');
   }
+  await _preloadInterFont();
   runApp(const Studio3App());
+}
+
+/// Requests every Inter weight the app uses and waits for them to finish
+/// loading before the first frame paints — otherwise the very first time
+/// each weight is used in a session (e.g. Home's header right after login),
+/// Flutter briefly paints a fallback system font whose slightly different
+/// metrics can trip a `RenderFlex` overflow in tightly-fitted layouts (see
+/// `_UnderlinedFilterTab` in `widgets/home_feed/home_feed_widgets.dart`).
+/// Bounded by a timeout so a genuinely offline first launch can't hang
+/// startup — it just falls back to the system font for that session.
+Future<void> _preloadInterFont() async {
+  for (final weight in const [
+    FontWeight.w300,
+    FontWeight.w400,
+    FontWeight.w500,
+    FontWeight.w600,
+    FontWeight.w700,
+  ]) {
+    GoogleFonts.inter(fontWeight: weight);
+  }
+  try {
+    await GoogleFonts.pendingFonts().timeout(const Duration(seconds: 3));
+  } catch (_) {
+    // Offline/slow first launch — proceed with the fallback font.
+  }
 }
 
 class Studio3App extends StatelessWidget {
@@ -218,18 +246,21 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
-  // Slide indices for the single swipeable Home/Discover/Video/Saved
-  // sequence. Home's "All" and "Available" are two adjacent slides in the
-  // SAME PageView (rather than Home owning its own nested horizontal
-  // PageView) so a left/right swipe flows continuously from Available all
-  // the way through to Saved with no nested-gesture conflict. Profile is
-  // deliberately NOT one of these slides — it's shown as a tap-only overlay
-  // (see `_showProfile`) so it can never be swiped into or out of.
-  static const _kHomeAllPage = 0;
-  static const _kHomeAvailablePage = 1;
-  static const _kDiscoverPage = 2;
-  static const _kReelsPage = 3;
-  static const _kSavedPage = 4;
+  // Page indices for the single swipeable Home/Discover/Reels/Saved
+  // sequence. Home is one page (its "All"/"Available" tabs switch by
+  // tapping only, entirely within that page — see `HomePage`), so a
+  // left/right swipe flows continuously between these 4 top-level
+  // sections. Profile is deliberately NOT one of these pages — it's shown
+  // as a tap-only overlay (see `_showProfile`) so it can never be swiped
+  // into or out of.
+  static const _kHomePage = 0;
+  static const _kDiscoverPage = 1;
+  static const _kReelsPage = 2;
+  static const _kSavedPage = 3;
+
+  // How long after a nav-icon tap a second tap on the same (already active)
+  // icon still counts as a double-tap → scroll-to-top-and-refresh.
+  static const _kDoubleTapWindow = Duration(milliseconds: 350);
 
   // Always start on the For You/Home tab, regardless of which tab was last
   // open — matching Instagram's "always opens to the main feed" behavior.
@@ -244,30 +275,30 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   final ValueNotifier<bool> _showProfile = ValueNotifier(false);
 
   late final PageController _pageController = PageController(
-    initialPage: _kHomeAllPage,
+    initialPage: _kHomePage,
   );
   final HomeFeedStore _homeFeedStore = HomeFeedStore();
-  int _currentPage = _kHomeAllPage;
-  int _lastHomeSlide = _kHomeAllPage;
+  int _currentPage = _kHomePage;
 
-  // Built once — every page widget is `const` where possible (ReelsPage
-  // takes a ValueListenable instead of a constructor bool; the two
-  // HomeFeedSlides share one HomeFeedStore) so this list never needs to be
-  // reconstructed.
+  int? _lastNavTapIndex;
+  DateTime? _lastNavTapAt;
+
+  // GlobalKeys so a double-tap on a bottom-nav icon can reach into the
+  // already-built page and ask it to scroll to top + refresh
+  // (`ScrollsToTopOnDoubleTap`), without rebuilding the page itself.
+  final GlobalKey<State<StatefulWidget>> _homeKey = GlobalKey();
+  final GlobalKey<State<StatefulWidget>> _exploreKey = GlobalKey();
+  final GlobalKey<State<StatefulWidget>> _reelsKey = GlobalKey();
+  final GlobalKey<State<StatefulWidget>> _savedKey = GlobalKey();
+  final GlobalKey<State<StatefulWidget>> _profileKey = GlobalKey();
+
+  // Built once — every page widget is `const` where possible so this list
+  // never needs to be reconstructed.
   late final List<Widget> _pages = [
-    HomeFeedSlide(
-      store: _homeFeedStore,
-      showAvailable: false,
-      onFilterTap: _onHomeFilterTap,
-    ),
-    HomeFeedSlide(
-      store: _homeFeedStore,
-      showAvailable: true,
-      onFilterTap: _onHomeFilterTap,
-    ),
-    const ExplorePage(),
-    ReelsPage(activeListenable: _reelsActive),
-    const SavedPage(),
+    HomePage(key: _homeKey, store: _homeFeedStore),
+    ExplorePage(key: _exploreKey),
+    ReelsPage(key: _reelsKey, activeListenable: _reelsActive),
+    SavedPage(key: _savedKey),
   ];
 
   @override
@@ -324,8 +355,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
 
   int _navIndexForPage(int page) {
     switch (page) {
-      case _kHomeAllPage:
-      case _kHomeAvailablePage:
+      case _kHomePage:
         return BottomNavIndex.home;
       case _kDiscoverPage:
         return BottomNavIndex.discover;
@@ -339,28 +369,30 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
 
   void _onPageChanged(int page) {
     _currentPage = page;
-    if (page == _kHomeAllPage || page == _kHomeAvailablePage) {
-      _lastHomeSlide = page;
-    }
     final navIndex = _navIndexForPage(page);
     _selectedNavIndex.value = navIndex;
     AppStateStore.instance.saveNavIndex(navIndex);
   }
 
-  /// Tapping "All"/"Available" in the Home header animates the shared
-  /// PageView to the matching slide — `_onPageChanged` then updates
-  /// `_selectedNavIndex`/`_lastHomeSlide` once it lands, same as a swipe.
-  void _onHomeFilterTap(FeedAvailabilityFilter filter) {
-    final page =
-        filter == FeedAvailabilityFilter.all ? _kHomeAllPage : _kHomeAvailablePage;
-    _pageController.animateToPage(
-      page,
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.easeOut,
-    );
-  }
-
+  /// Single tap switches to the tapped section (if not already there).
+  /// A second tap on the icon for the section that's *already active*,
+  /// within [_kDoubleTapWindow], scrolls that page to top and refreshes it
+  /// — matching Instagram's bottom-nav double-tap convention.
   void _onNavTap(int navIndex) {
+    final now = DateTime.now();
+    final isDoubleTap = _selectedNavIndex.value == navIndex &&
+        _lastNavTapIndex == navIndex &&
+        _lastNavTapAt != null &&
+        now.difference(_lastNavTapAt!) <= _kDoubleTapWindow;
+    _lastNavTapIndex = navIndex;
+    _lastNavTapAt = now;
+
+    if (isDoubleTap) {
+      _lastNavTapAt = null; // avoid a third tap re-triggering immediately
+      _scrollToTopAndRefresh(navIndex);
+      return;
+    }
+
     if (navIndex == BottomNavIndex.profile) {
       _showProfile.value = true;
       _selectedNavIndex.value = BottomNavIndex.profile;
@@ -370,7 +402,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     }
     _showProfile.value = false;
     final targetPage = switch (navIndex) {
-      BottomNavIndex.home => _lastHomeSlide,
+      BottomNavIndex.home => _kHomePage,
       BottomNavIndex.discover => _kDiscoverPage,
       BottomNavIndex.reels => _kReelsPage,
       BottomNavIndex.bookmark => _kSavedPage,
@@ -387,6 +419,18 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     }
   }
 
+  void _scrollToTopAndRefresh(int navIndex) {
+    final key = switch (navIndex) {
+      BottomNavIndex.home => _homeKey,
+      BottomNavIndex.discover => _exploreKey,
+      BottomNavIndex.reels => _reelsKey,
+      BottomNavIndex.bookmark => _savedKey,
+      BottomNavIndex.profile => _profileKey,
+      _ => null,
+    };
+    (key?.currentState as ScrollsToTopOnDoubleTap?)?.scrollToTopAndRefresh();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -397,6 +441,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
         children: [
           PageView(
             controller: _pageController,
+            physics: const SnappyPageScrollPhysics(),
             onPageChanged: _onPageChanged,
             children: _pages,
           ),
@@ -410,7 +455,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                 offstage: !show,
                 child: child,
               ),
-              child: const ProfilePage(),
+              child: ProfilePage(key: _profileKey),
             ),
           ),
           ValueListenableBuilder<int>(

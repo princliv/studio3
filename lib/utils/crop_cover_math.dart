@@ -3,8 +3,8 @@ import 'dart:ui' show Offset, Rect;
 
 /// Crop frame aspect ratios (width / height).
 enum CropAspectRatio {
-  ratio3x4(3 / 4, '3:4'),
-  ratio16x9(16 / 9, '16:9');
+  ratio3x4(3 / 4, 'Portrait'),
+  ratio16x9(16 / 9, 'Landscape');
 
   const CropAspectRatio(this.value, this.label);
 
@@ -17,9 +17,6 @@ enum CropAspectRatio {
 /// [fit] lets the box take any shape/size (its content is letterboxed into
 /// the output frame, preserving the box's own aspect, nothing cropped).
 enum CropFitMode { fill, fit }
-
-/// Which corner of the crop box a drag gesture is resizing.
-enum Corner { tl, tr, bl, br }
 
 /// Geometry for the draggable/resizable crop box.
 ///
@@ -59,67 +56,29 @@ abstract final class CropCoverMath {
   /// The whole image — Fit mode defaults to "show everything."
   static Rect defaultFitBox() => const Rect.fromLTRB(0, 0, 1, 1);
 
-  /// Resizes [box] by dragging [corner], keeping the opposite corner fixed
-  /// and preserving the fraction-space aspect ratio `cropAspect/imageAspect`
-  /// (Fill mode). [deltaNorm] is this gesture event's movement, already
-  /// normalized (dx as a fraction of the displayed image's width, dy as a
-  /// fraction of its height). Clamped to a minimum size and to stay fully
-  /// inside `[0,1]²`.
-  static Rect resizeAspectLocked({
+  /// Resizes [box] around its own center by [scaleFactor] (>1 = zoom in —
+  /// shrink the box, showing less of the image magnified; <1 = zoom out —
+  /// grow the box, showing more) — keeping the Fill aspect lock
+  /// (`cropAspect/imageAspect`). Clamped between `defaultFillBox` (max
+  /// zoom-out: the box can never grow past what's needed to fill the
+  /// frame, so no empty space is ever revealed) and [minBoxFraction] (max
+  /// zoom-in).
+  static Rect scaleBox({
     required Rect box,
-    required Corner corner,
-    required Offset deltaNorm,
+    required double scaleFactor,
     required double cropAspect,
     required double imageAspect,
   }) {
+    if (scaleFactor <= 0 || scaleFactor.isNaN) return box;
     final k = cropAspect / imageAspect;
-    final (fixed, draggedOld) = _cornerPoints(box, corner);
-    final draggedNew = draggedOld + deltaNorm;
-
-    final rawW = (draggedNew.dx - fixed.dx).abs();
-    final rawH = (draggedNew.dy - fixed.dy).abs();
-    // Follow whichever axis the user dragged further (in aspect-consistent
-    // terms) so the box tracks the finger instead of lagging on one axis.
-    var w = math.max(rawW, rawH * k);
-
-    final signX = draggedNew.dx >= fixed.dx ? 1.0 : -1.0;
-    final signY = draggedNew.dy >= fixed.dy ? 1.0 : -1.0;
-
-    // Clamp so the box stays inside [0,1]² without breaking the lock: cap
-    // width by whichever bound (x or y-derived-via-k) is tighter.
-    final maxWFromX = signX > 0 ? (1.0 - fixed.dx) : fixed.dx;
-    final maxHFromY = signY > 0 ? (1.0 - fixed.dy) : fixed.dy;
-    final maxW = math.min(maxWFromX, maxHFromY * k);
-    w = w.clamp(0.0, maxW <= 0 ? minBoxFraction : maxW);
-    w = math.max(w, math.min(minBoxFraction, maxW <= 0 ? minBoxFraction : maxW));
-    final h = w / k;
-
-    final newDraggedX = fixed.dx + signX * w;
-    final newDraggedY = fixed.dy + signY * h;
-    return Rect.fromPoints(fixed, Offset(newDraggedX, newDraggedY));
-  }
-
-  /// Resizes [box] by dragging [corner] freely (Fit mode) — no aspect
-  /// lock, the opposite corner stays fixed, clamped to a minimum size and
-  /// to stay fully inside `[0,1]²`.
-  static Rect resizeFree({
-    required Rect box,
-    required Corner corner,
-    required Offset deltaNorm,
-  }) {
-    final (fixed, draggedOld) = _cornerPoints(box, corner);
-    var dx = (draggedOld.dx + deltaNorm.dx).clamp(0.0, 1.0);
-    var dy = (draggedOld.dy + deltaNorm.dy).clamp(0.0, 1.0);
-
-    if ((dx - fixed.dx).abs() < minBoxFraction) {
-      final sign = dx >= fixed.dx ? 1.0 : -1.0;
-      dx = (fixed.dx + sign * minBoxFraction).clamp(0.0, 1.0);
+    final maxBox = defaultFillBox(cropAspect, imageAspect);
+    var w = (box.width / scaleFactor).clamp(minBoxFraction, maxBox.width);
+    var h = w / k;
+    if (h > maxBox.height) {
+      h = maxBox.height;
+      w = h * k;
     }
-    if ((dy - fixed.dy).abs() < minBoxFraction) {
-      final sign = dy >= fixed.dy ? 1.0 : -1.0;
-      dy = (fixed.dy + sign * minBoxFraction).clamp(0.0, 1.0);
-    }
-    return Rect.fromPoints(fixed, Offset(dx, dy));
+    return Rect.fromCenter(center: box.center, width: w, height: h);
   }
 
   /// Repositions [box] by [deltaNorm] (normalized like above), clamped so
@@ -200,14 +159,5 @@ abstract final class CropCoverMath {
     final dxFrac = (clampedCx - centerXMetric) / imageAspect;
     final dyFrac = clampedCy - centerYMetric;
     return box.shift(Offset(dxFrac, dyFrac));
-  }
-
-  static (Offset fixed, Offset dragged) _cornerPoints(Rect box, Corner corner) {
-    return switch (corner) {
-      Corner.tl => (box.bottomRight, box.topLeft),
-      Corner.tr => (box.bottomLeft, box.topRight),
-      Corner.bl => (box.topRight, box.bottomLeft),
-      Corner.br => (box.topLeft, box.bottomRight),
-    };
   }
 }

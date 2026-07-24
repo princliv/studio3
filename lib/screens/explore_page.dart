@@ -27,6 +27,7 @@ import '../widgets/explore/explore_sticky_header.dart';
 import '../widgets/feed_skeleton.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/home_feed/home_feed_widgets.dart';
+import '../utils/scrolls_to_top_on_double_tap.dart';
 
 class ExplorePage extends StatefulWidget {
   const ExplorePage({super.key});
@@ -35,7 +36,8 @@ class ExplorePage extends StatefulWidget {
   State<ExplorePage> createState() => _ExplorePageState();
 }
 
-class _ExplorePageState extends State<ExplorePage> {
+class _ExplorePageState extends State<ExplorePage>
+    with ScrollsToTopOnDoubleTap<ExplorePage> {
   final _scrollController = ScrollController();
   final _searchController = TextEditingController();
 
@@ -73,6 +75,18 @@ class _ExplorePageState extends State<ExplorePage> {
   }
 
   Future<void> _onReconnected() => _loadData(refresh: true);
+
+  @override
+  void scrollToTopAndRefresh() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+    _loadData(refresh: true);
+  }
 
   Future<void> _loadData({bool append = false, bool refresh = false}) async {
     if (append) {

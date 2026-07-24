@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../models/feed_item.dart';
 import '../services/connectivity_service.dart';
 import '../services/feed_service.dart';
+import '../utils/scrolls_to_top_on_double_tap.dart';
 import '../widgets/feed_skeleton.dart';
 import '../widgets/reels/reel_player_page.dart';
 
@@ -36,7 +37,8 @@ class ReelsPage extends StatefulWidget {
   State<ReelsPage> createState() => _ReelsPageState();
 }
 
-class _ReelsPageState extends State<ReelsPage> with RouteAware {
+class _ReelsPageState extends State<ReelsPage>
+    with RouteAware, ScrollsToTopOnDoubleTap<ReelsPage> {
   late final PageController _pageController;
   List<FeedItem> _items = [];
   bool _loading = true;
@@ -147,6 +149,15 @@ class _ReelsPageState extends State<ReelsPage> with RouteAware {
       _pageController.jumpToPage(nextIndex);
     }
     setState(() => _currentIndex = nextIndex);
+  }
+
+  @override
+  void scrollToTopAndRefresh() {
+    if (_pageController.hasClients) {
+      _pageController.jumpToPage(0);
+    }
+    setState(() => _currentIndex = 0);
+    _onRefresh();
   }
 
   @override

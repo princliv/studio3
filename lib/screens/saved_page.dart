@@ -15,6 +15,7 @@ import '../theme/home_feed_tokens.dart';
 import '../utils/reels_route.dart';
 import '../widgets/collection_name_sheet.dart';
 import '../widgets/home_feed/home_feed_widgets.dart';
+import '../utils/scrolls_to_top_on_double_tap.dart';
 
 class SavedPage extends StatefulWidget {
   const SavedPage({super.key});
@@ -23,8 +24,10 @@ class SavedPage extends StatefulWidget {
   State<SavedPage> createState() => _SavedPageState();
 }
 
-class _SavedPageState extends State<SavedPage> {
+class _SavedPageState extends State<SavedPage>
+    with ScrollsToTopOnDoubleTap<SavedPage> {
   final _store = SavedContentStore.instance;
+  final _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -35,6 +38,23 @@ class _SavedPageState extends State<SavedPage> {
     _store.addListener(_onStoreChanged);
     _loadSavedFromApi();
     unawaited(_store.loadCollectionsFromApi());
+  }
+
+  Future<void> _refreshSaved() => Future.wait([
+        _loadSavedFromApi(),
+        _store.loadCollectionsFromApi(),
+      ]);
+
+  @override
+  void scrollToTopAndRefresh() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+    _refreshSaved();
   }
 
   /// Paints Saved instantly from whatever's cached (if anything) instead of
@@ -85,6 +105,7 @@ class _SavedPageState extends State<SavedPage> {
   @override
   void dispose() {
     _store.removeListener(_onStoreChanged);
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -213,7 +234,12 @@ class _SavedPageState extends State<SavedPage> {
           body: SafeArea(
             top: false,
             bottom: false,
-            child: _SavedItemsView(collectionId: collectionId),
+            child: _SavedItemsView(
+              collectionId: collectionId,
+              onRefresh: collectionId == null
+                  ? _refreshSaved
+                  : () => _store.loadCollectionDetailFromApi(collectionId),
+            ),
           ),
         ),
       ),
@@ -258,11 +284,17 @@ class _SavedPageState extends State<SavedPage> {
               child: _store.hasCollections
                   ? _SavedFoldersGrid(
                       store: _store,
+                      controller: _scrollController,
                       onOpenFolder: _openFolder,
                       onCreate: _createCollection,
                       onLongPressFolder: _showFolderActions,
+                      onRefresh: _refreshSaved,
                     )
-                  : const _SavedItemsView(collectionId: null),
+                  : _SavedItemsView(
+                      collectionId: null,
+                      controller: _scrollController,
+                      onRefresh: _refreshSaved,
+                    ),
             ),
           ],
         ),
@@ -274,9 +306,15 @@ class _SavedPageState extends State<SavedPage> {
 /// The existing filter-tabs + 3-column grid, scoped to either the flat
 /// "Saved" bucket (`collectionId == null`) or a single collection.
 class _SavedItemsView extends StatefulWidget {
-  const _SavedItemsView({required this.collectionId});
+  const _SavedItemsView({
+    required this.collectionId,
+    required this.onRefresh,
+    this.controller,
+  });
 
   final String? collectionId;
+  final Future<void> Function() onRefresh;
+  final ScrollController? controller;
 
   @override
   State<_SavedItemsView> createState() => _SavedItemsViewState();
@@ -437,33 +475,48 @@ class _SavedItemsViewState extends State<_SavedItemsView> {
         ),
         Expanded(
           child: items.isEmpty
-              ? Center(
-                  child: Text(
-                    _emptyMessage(),
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      color: HomeFeedTokens.textSecondary,
-                    ),
+              ? RefreshIndicator(
+                  onRefresh: widget.onRefresh,
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    controller: widget.controller,
+                    children: [
+                      SizedBox(height: MediaQuery.sizeOf(context).height * 0.3),
+                      Center(
+                        child: Text(
+                          _emptyMessage(),
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            color: HomeFeedTokens.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 )
-              : GridView.builder(
-                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 120),
-                  gridDelegate:
-                      const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    crossAxisSpacing: 2,
-                    mainAxisSpacing: 2,
-                    childAspectRatio: 1,
+              : RefreshIndicator(
+                  onRefresh: widget.onRefresh,
+                  child: GridView.builder(
+                    controller: widget.controller,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(8, 8, 8, 120),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      crossAxisSpacing: 2,
+                      mainAxisSpacing: 2,
+                      childAspectRatio: 1,
+                    ),
+                    itemCount: items.length,
+                    itemBuilder: (context, index) {
+                      final entry = items[index];
+                      return _SavedGridCard(
+                        entry: entry,
+                        onTap: () => _openEntry(entry),
+                        onLongPress: () => _confirmUnsave(entry),
+                      );
+                    },
                   ),
-                  itemCount: items.length,
-                  itemBuilder: (context, index) {
-                    final entry = items[index];
-                    return _SavedGridCard(
-                      entry: entry,
-                      onTap: () => _openEntry(entry),
-                      onLongPress: () => _confirmUnsave(entry),
-                    );
-                  },
                 ),
         ),
       ],
@@ -533,59 +586,68 @@ class _SavedFoldersGrid extends StatelessWidget {
     required this.onOpenFolder,
     required this.onCreate,
     required this.onLongPressFolder,
+    required this.onRefresh,
+    this.controller,
   });
 
   final SavedContentStore store;
   final void Function(String? collectionId, String title) onOpenFolder;
   final VoidCallback onCreate;
   final void Function(SavedCollection collection) onLongPressFolder;
+  final Future<void> Function() onRefresh;
+  final ScrollController? controller;
 
   @override
   Widget build(BuildContext context) {
     final collections = store.collections;
     final itemCount = collections.length + 2; // "Saved" tile + "+" tile
 
-    return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 120),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 0.92,
-      ),
-      itemCount: itemCount,
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          final cover = store.mostRecentEntryOverall();
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: GridView.builder(
+        controller: controller,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 120),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 0.92,
+        ),
+        itemCount: itemCount,
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            final cover = store.mostRecentEntryOverall();
+            return _SavedFolderTile(
+              title: 'Saved',
+              count: store.entries().length,
+              imageUrl: cover != null ? savedEntryThumbnailUrl(cover) : null,
+              icon: Icons.bookmark,
+              onTap: () => onOpenFolder(null, 'Saved'),
+            );
+          }
+          if (index == itemCount - 1) {
+            return _SavedFolderTile(
+              title: 'New collection',
+              count: null,
+              imageUrl: null,
+              icon: Icons.add,
+              onTap: onCreate,
+            );
+          }
+          final collection = collections[index - 1];
+          final items = store.entriesForCollection(collection.id);
+          final cover = items.isNotEmpty ? items.first : null;
           return _SavedFolderTile(
-            title: 'Saved',
-            count: store.entries().length,
+            title: collection.name,
+            count: items.length,
             imageUrl: cover != null ? savedEntryThumbnailUrl(cover) : null,
-            icon: Icons.bookmark,
-            onTap: () => onOpenFolder(null, 'Saved'),
+            icon: Icons.folder_outlined,
+            onTap: () => onOpenFolder(collection.id, collection.name),
+            onLongPress: () => onLongPressFolder(collection),
           );
-        }
-        if (index == itemCount - 1) {
-          return _SavedFolderTile(
-            title: 'New collection',
-            count: null,
-            imageUrl: null,
-            icon: Icons.add,
-            onTap: onCreate,
-          );
-        }
-        final collection = collections[index - 1];
-        final items = store.entriesForCollection(collection.id);
-        final cover = items.isNotEmpty ? items.first : null;
-        return _SavedFolderTile(
-          title: collection.name,
-          count: items.length,
-          imageUrl: cover != null ? savedEntryThumbnailUrl(cover) : null,
-          icon: Icons.folder_outlined,
-          onTap: () => onOpenFolder(collection.id, collection.name),
-          onLongPress: () => onLongPressFolder(collection),
-        );
-      },
+        },
+      ),
     );
   }
 }

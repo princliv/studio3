@@ -108,6 +108,7 @@ class FollowRequestsBodyState extends State<FollowRequestsBody> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
         itemCount: _requests.length,
         itemBuilder: (context, index) {
