@@ -63,9 +63,9 @@ class NotificationsBodyState extends State<NotificationsBody> {
               forceRefresh: refresh,
             );
       if (!mounted) return;
-      // Chat messages (type "inquiry") already surface as a mobile push and
-      // in the Chats tab — showing them here too is redundant.
-      final items = page.items.where((n) => !n.isInquiry);
+      // Chat DMs (`message` / legacy `inquiry`) surface as phone push + Chats
+      // tab badge — not in the activity Notifications feed (Instagram-style).
+      final items = page.items.where((n) => !n.isInquiry && !n.isChatMessage);
       setState(() {
         if (append) {
           _items.addAll(items);

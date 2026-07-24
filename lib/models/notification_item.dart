@@ -51,6 +51,9 @@ class NotificationItem {
 
   bool get isInquiry => type == 'inquiry';
 
+  /// Chat DMs — phone push + Chats badge only; not shown in Notifications tab.
+  bool get isChatMessage => type == 'message';
+
   bool get isSale => type == 'purchase';
 
   /// The action text shown after the actor's name, built from the real
