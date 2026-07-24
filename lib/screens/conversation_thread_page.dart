@@ -11,6 +11,7 @@ import '../services/chat_service.dart';
 import '../services/chat_socket_service.dart';
 import '../services/media_service.dart';
 import '../theme/app_theme.dart';
+import '../theme/chat_tokens.dart';
 import '../theme/home_feed_tokens.dart';
 import '../widgets/accept_decline_buttons.dart';
 import '../widgets/home_feed/home_feed_widgets.dart';
@@ -60,11 +61,11 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
   String _status = 'open';
   String? _conversationId;
   String? _otherPartyId;
+  int? _followersCount;
+  int? _piecesCount;
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
   Timer? _typingStopTimer;
-
-  bool get _isComposing => _conversationId == null;
 
   @override
   void initState() {
@@ -77,9 +78,38 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
       _load();
       _joinLiveUpdates();
     } else {
-      // Compose mode: nothing to load yet — the thread doesn't exist until
-      // the first message is sent.
-      _loading = false;
+      // Compose entry (search / profile Message): reuse an existing thread if
+      // one already exists so history loads instead of an empty new-chat state.
+      _resolveExistingConversation();
+    }
+  }
+
+  /// When opened without [conversationId], look up an open/pending thread with
+  /// this user and switch into it (same as tapping the chat in the inbox).
+  Future<void> _resolveExistingConversation() async {
+    final username = widget.otherPartyUsername;
+    if (username == null || username.isEmpty) {
+      setState(() => _loading = false);
+      return;
+    }
+    setState(() => _loading = true);
+    try {
+      final existing = await ChatService.instance.findConversationWith(username);
+      if (!mounted) return;
+      if (existing != null) {
+        setState(() {
+          _conversationId = existing.id;
+          _status = existing.status;
+          _otherPartyId = existing.otherPartyId ?? _otherPartyId;
+        });
+        _joinLiveUpdates();
+        await _load();
+      } else {
+        setState(() => _loading = false);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
     }
   }
 
@@ -120,12 +150,36 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
     });
   }
 
+  void _appendMessage(ChatMessage message) {
+    if (_messages.any((m) => m.id == message.id)) return;
+    _messages.add(message);
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+    });
+  }
+
+  /// API returns newest-first; UI needs oldest → newest (WhatsApp/IG style).
+  void _replaceMessagesFromThread(ChatThread thread) {
+    _messages
+      ..clear()
+      ..addAll(thread.messages.reversed);
+    _status = thread.status;
+    _otherPartyId = thread.otherPartyId ?? _otherPartyId;
+    _followersCount = thread.otherPartyFollowersCount ?? _followersCount;
+    _piecesCount = thread.otherPartyPiecesCount ?? _piecesCount;
+  }
+
   void _onSocketMessage(String conversationId, ChatMessage message) {
     if (conversationId != _conversationId || !mounted) return;
     setState(() {
-      _messages.add(message);
+      _appendMessage(message);
       _status = 'open';
     });
+    _scrollToBottom();
   }
 
   void _onTypingStart(String conversationId, String userId) {
@@ -154,13 +208,10 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
       final thread = await ChatService.instance.getThread(id);
       if (!mounted) return;
       setState(() {
-        _messages
-          ..clear()
-          ..addAll(thread.messages);
-        _status = thread.status;
-        _otherPartyId = thread.otherPartyId ?? _otherPartyId;
+        _replaceMessagesFromThread(thread);
         _loading = false;
       });
+      _scrollToBottom();
     } catch (_) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -191,12 +242,10 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
     final thread = await ChatService.instance.getThread(result.id);
     if (!mounted) return null;
     setState(() {
-      _messages
-        ..clear()
-        ..addAll(thread.messages);
-      _status = thread.status;
+      _replaceMessagesFromThread(thread);
     });
-    return thread.messages.isNotEmpty ? thread.messages.last : null;
+    _scrollToBottom();
+    return _messages.isNotEmpty ? _messages.last : null;
   }
 
   Future<void> _sendText() async {
@@ -215,10 +264,11 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
         final message = await ChatService.instance.sendMessage(id, body: text);
         if (!mounted) return;
         setState(() {
-          _messages.add(message);
+          _appendMessage(message);
           _status = 'open';
           _sending = false;
         });
+        _scrollToBottom();
       }
     } catch (e) {
       if (!mounted) return;
@@ -253,10 +303,11 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
         );
         if (!mounted) return;
         setState(() {
-          _messages.add(message);
+          _appendMessage(message);
           _status = 'open';
           _sending = false;
         });
+        _scrollToBottom();
       }
     } catch (e) {
       if (!mounted) return;
@@ -304,18 +355,26 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
     }
   }
 
+  String get _displayUsername {
+    final u = widget.otherPartyUsername;
+    if (u == null || u.isEmpty) return '';
+    return u.startsWith('@') ? u : '@$u';
+  }
+
   @override
   Widget build(BuildContext context) {
     final myUsername = AuthSession.instance.user?.username;
     final showPendingActions = _status == 'pending';
+    final showEmptyState = !_loading && _messages.isEmpty;
 
     return Scaffold(
-      backgroundColor: HomeFeedTokens.background,
+      backgroundColor: ChatTokens.background,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
+            Container(
+              color: ChatTokens.headerBackground,
               padding: const EdgeInsets.fromLTRB(4, 8, 16, 8),
               child: Row(
                 children: [
@@ -346,7 +405,7 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
                               shape: BoxShape.circle,
                               color: Colors.green.shade500,
                               border: Border.all(
-                                color: HomeFeedTokens.background,
+                                color: ChatTokens.headerBackground,
                                 width: 2,
                               ),
                             ),
@@ -375,6 +434,14 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
                               fontSize: 12,
                               color: AppColors.slate500,
                             ),
+                          )
+                        else if (_displayUsername.isNotEmpty)
+                          Text(
+                            _displayUsername,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: ChatTokens.username,
+                            ),
                           ),
                       ],
                     ),
@@ -385,15 +452,13 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
             Expanded(
               child: _loading
                   ? const StudioLoadingBody()
-                  : (_isComposing && _messages.isEmpty)
-                  ? Center(
-                      child: Text(
-                        'Say hello to ${widget.otherPartyName}',
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          color: AppColors.slate500,
-                        ),
-                      ),
+                  : showEmptyState
+                  ? _NewChatEmptyState(
+                      avatarUrl: widget.otherPartyAvatarUrl,
+                      name: widget.otherPartyName,
+                      username: _displayUsername,
+                      followersCount: _followersCount,
+                      piecesCount: _piecesCount,
                     )
                   : ListView.builder(
                       controller: _scrollController,
@@ -426,7 +491,8 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
                 ),
               )
             else
-              Padding(
+              Container(
+                color: ChatTokens.headerBackground,
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
                 child: Row(
                   children: [
@@ -448,8 +514,14 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
                         ),
                         decoration: InputDecoration(
                           hintText: 'Message...',
+                          filled: true,
+                          fillColor: Colors.white,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(9999),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(9999),
+                            borderSide: BorderSide(color: AppColors.slate200),
                           ),
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 16,
@@ -479,41 +551,187 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
   }
 }
 
+class _NewChatEmptyState extends StatelessWidget {
+  const _NewChatEmptyState({
+    required this.avatarUrl,
+    required this.name,
+    required this.username,
+    this.followersCount,
+    this.piecesCount,
+  });
+
+  final String? avatarUrl;
+  final String name;
+  final String username;
+  final int? followersCount;
+  final int? piecesCount;
+
+  String get _statsLine {
+    final parts = <String>[];
+    if (followersCount != null) {
+      parts.add('${_formatCount(followersCount!)} followers');
+    }
+    if (piecesCount != null) {
+      parts.add('${_formatCount(piecesCount!)} pieces');
+    }
+    return parts.join(' • ');
+  }
+
+  static String _formatCount(int n) {
+    if (n >= 1000000) {
+      final v = n / 1000000;
+      return v == v.roundToDouble()
+          ? '${v.toInt()}M'
+          : '${v.toStringAsFixed(1)}M';
+    }
+    if (n >= 1000) {
+      final v = n / 1000;
+      return v == v.roundToDouble()
+          ? '${v.toInt()}K'
+          : '${v.toStringAsFixed(1)}K';
+    }
+    return '$n';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final stats = _statsLine;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            UserAvatar(url: avatarUrl, name: name, size: 96),
+            const SizedBox(height: 16),
+            Text(
+              name,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: HomeFeedTokens.textPrimary,
+              ),
+            ),
+            if (username.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                username,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  color: ChatTokens.username,
+                ),
+              ),
+            ],
+            if (stats.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                stats,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  color: ChatTokens.emptyStats,
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Text(
+              'Message $name',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: ChatTokens.emptyStats,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _MessageBubble extends StatelessWidget {
   const _MessageBubble({required this.message, required this.isMine});
 
   final ChatMessage message;
   final bool isMine;
 
+  static String _formatTimestamp(DateTime dt) {
+    final local = dt.toLocal();
+    final now = DateTime.now();
+    final sameDay =
+        local.year == now.year &&
+        local.month == now.month &&
+        local.day == now.day;
+    final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+    final minute = local.minute.toString().padLeft(2, '0');
+    final amPm = local.hour >= 12 ? 'PM' : 'AM';
+    final time = '$hour:$minute $amPm';
+    if (sameDay) return time;
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${months[local.month - 1]} ${local.day}, $time';
+  }
+
   @override
   Widget build(BuildContext context) {
     final hasImage = message.imageUrl != null && message.imageUrl!.isNotEmpty;
     return Align(
       alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: hasImage
-            ? const EdgeInsets.all(4)
-            : const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.sizeOf(context).width * 0.7,
-        ),
-        decoration: BoxDecoration(
-          color: isMine ? AppColors.slate900 : AppColors.slate100,
-          borderRadius: BorderRadius.circular(AppDims.radiusMd),
-        ),
-        child: hasImage
-            ? ClipRRect(
-                borderRadius: BorderRadius.circular(AppDims.radiusMd - 4),
-                child: Image.network(message.imageUrl!, fit: BoxFit.cover),
-              )
-            : Text(
-                message.body ?? '',
-                style: GoogleFonts.inter(
-                  fontSize: 14,
-                  color: isMine ? AppColors.white : AppColors.slate800,
-                ),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Column(
+          crossAxisAlignment: isMine
+              ? CrossAxisAlignment.end
+              : CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: hasImage
+                  ? const EdgeInsets.all(4)
+                  : const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.sizeOf(context).width * 0.7,
               ),
+              decoration: BoxDecoration(
+                color: isMine ? AppColors.slate900 : AppColors.slate100,
+                borderRadius: BorderRadius.circular(AppDims.radiusMd),
+              ),
+              child: hasImage
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(AppDims.radiusMd - 4),
+                      child: Image.network(message.imageUrl!, fit: BoxFit.cover),
+                    )
+                  : Text(
+                      message.body ?? '',
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        color: isMine ? AppColors.white : AppColors.slate800,
+                      ),
+                    ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _formatTimestamp(message.createdAt),
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                color: ChatTokens.timestamp,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -84,6 +84,22 @@ class ChatService {
     return ChatThread.fromJson(data);
   }
 
+  /// Existing open/pending thread with [username], or null if compose is needed.
+  Future<ConversationSummary?> findConversationWith(String username) async {
+    final trimmed = username.trim();
+    if (trimmed.isEmpty) return null;
+    final encoded = Uri.encodeComponent(trimmed);
+    final json = await _api.get(
+      '/api/conversations/with/$encoded',
+      auth: true,
+    );
+    final data = _api.extractData(json);
+    if (data is! Map<String, dynamic>) return null;
+    final conversation = data['conversation'];
+    if (conversation is! Map<String, dynamic>) return null;
+    return ConversationSummary.fromJson(conversation);
+  }
+
   Future<ChatMessage> sendMessage(String id, {String? body, String? imageUrl}) async {
     final json = await _api.post(
       '/api/conversations/$id/messages',

@@ -148,6 +148,9 @@ class ChatThread {
     this.otherPartyUsername,
     this.otherPartyName,
     this.otherPartyAvatarUrl,
+    this.otherPartyFollowersCount,
+    this.otherPartyPiecesCount,
+    this.otherPartyIsFollowing,
     required this.status,
     required this.messages,
   });
@@ -157,6 +160,9 @@ class ChatThread {
   final String? otherPartyUsername;
   final String? otherPartyName;
   final String? otherPartyAvatarUrl;
+  final int? otherPartyFollowersCount;
+  final int? otherPartyPiecesCount;
+  final bool? otherPartyIsFollowing;
   final String status;
   final List<ChatMessage> messages;
 
@@ -172,6 +178,9 @@ class ChatThread {
       otherPartyUsername: otherParty?['username'] as String?,
       otherPartyName: otherParty?['name'] as String?,
       otherPartyAvatarUrl: otherParty?['profilePhotoUrl'] as String?,
+      otherPartyFollowersCount: (otherParty?['followersCount'] as num?)?.toInt(),
+      otherPartyPiecesCount: (otherParty?['piecesCount'] as num?)?.toInt(),
+      otherPartyIsFollowing: otherParty?['isFollowing'] as bool?,
       status: json['status'] as String? ?? 'open',
       messages: items is List
           ? items.whereType<Map<String, dynamic>>().map(ChatMessage.fromJson).toList()

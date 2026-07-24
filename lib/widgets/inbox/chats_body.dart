@@ -218,6 +218,29 @@ class _ChatsBodyState extends State<ChatsBody> {
   }
 
   Future<void> _openThreadWithUser(FollowUserSummary user) async {
+    // Prefer an already-loaded inbox/request row so we open with history
+    // immediately; ConversationThreadPage also resolves via API as a fallback.
+    ConversationSummary? existing;
+    for (final c in _conversations) {
+      if (c.otherPartyUsername == user.username) {
+        existing = c;
+        break;
+      }
+    }
+    if (existing == null) {
+      for (final c in _requests) {
+        if (c.otherPartyUsername == user.username) {
+          existing = c;
+          break;
+        }
+      }
+    }
+
+    if (existing != null) {
+      await _openThread(existing, isRequest: existing.status == 'pending');
+      return;
+    }
+
     await Navigator.push(
       context,
       MaterialPageRoute(
