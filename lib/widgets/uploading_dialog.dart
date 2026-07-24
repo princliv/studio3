@@ -28,7 +28,7 @@ Future<void> showUploadingDialog(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const StudioLoadingAnimation(iconSize: 44),
+              const StudioBubbleLoader(width: 88),
               const SizedBox(height: 16),
               Text(
                 message,

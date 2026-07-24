@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../services/saved_content_store.dart';
 import '../theme/home_feed_tokens.dart';
-import 'create_collection_dialog.dart';
+import 'collection_name_sheet.dart';
 
 /// Where a save action resolved to: the default "Saved" bucket (no
 /// collection) or a specific collection.
@@ -61,7 +61,7 @@ class SaveToCollectionSheet extends StatelessWidget {
   }
 
   Future<void> _createNewCollection(BuildContext context) async {
-    final name = await CreateCollectionDialog.show(context);
+    final name = await CollectionNameSheet.show(context);
     if (name == null || name.isEmpty || !context.mounted) return;
     final collection = await SavedContentStore.instance.createCollection(name);
     if (!context.mounted) return;

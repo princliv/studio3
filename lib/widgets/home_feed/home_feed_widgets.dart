@@ -8,7 +8,6 @@ import '../../models/feed_preview_item.dart';
 import '../../services/chat_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/social_service.dart';
-import '../../theme/app_theme.dart';
 import '../../theme/home_feed_tokens.dart';
 import '../../utils/profile_navigation.dart';
 import '../studio_logo.dart';
@@ -19,11 +18,16 @@ class FeedHomeHeader extends StatelessWidget {
     required this.filter,
     required this.onFilterChanged,
     required this.onAddTap,
+    this.hasAvailableItems = false,
   });
 
   final FeedAvailabilityFilter filter;
   final ValueChanged<FeedAvailabilityFilter> onFilterChanged;
   final VoidCallback onAddTap;
+
+  /// Shows a small green dot beside "Available" when there's at least one
+  /// item currently available to purchase.
+  final bool hasAvailableItems;
 
   static const _headerHeight = 52.0;
 
@@ -50,17 +54,18 @@ class FeedHomeHeader extends StatelessWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              FeedFilterTab(
+              _UnderlinedFilterTab(
                 label: 'All',
                 active: filter == FeedAvailabilityFilter.all,
                 onTap: () => onFilterChanged(FeedAvailabilityFilter.all),
               ),
               const SizedBox(width: 24),
-              FeedFilterTab(
+              _UnderlinedFilterTab(
                 label: 'Available',
                 active: filter == FeedAvailabilityFilter.available,
                 onTap: () =>
                     onFilterChanged(FeedAvailabilityFilter.available),
+                showDot: hasAvailableItems,
               ),
             ],
           ),
@@ -94,8 +99,65 @@ class FeedHomeHeader extends StatelessWidget {
   }
 }
 
-/// Right-side header icon that opens a small popup with
-/// "Notifications" and "Chats" entries.
+/// Home header's "All"/"Available" tab — a gap between the label (plus an
+/// optional trailing "available" dot) and its active-state underline,
+/// matching the Inbox page's tab treatment, instead of a text-decoration
+/// underline flush against the label.
+class _UnderlinedFilterTab extends StatelessWidget {
+  const _UnderlinedFilterTab({
+    required this.label,
+    required this.active,
+    required this.onTap,
+    this.showDot = false,
+  });
+
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+  final bool showDot;
+
+  @override
+  Widget build(BuildContext context) {
+    return IntrinsicWidth(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              FeedFilterTab(
+                label: label,
+                active: active,
+                onTap: onTap,
+                underline: false,
+              ),
+              if (showDot) ...[
+                const SizedBox(width: 6),
+                Container(
+                  width: HomeFeedTokens.dotSize,
+                  height: HomeFeedTokens.dotSize,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.green.shade500,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 6),
+          Container(
+            height: 1.5,
+            color: active ? HomeFeedTokens.textPrimary : Colors.transparent,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Right-side header icon that opens the full Inbox page (Notifications /
+/// Chats / Requests).
 class _InboxMenuButton extends StatefulWidget {
   const _InboxMenuButton();
 
@@ -136,65 +198,9 @@ class _InboxMenuButtonState extends State<_InboxMenuButton> {
     });
   }
 
-  Future<void> _openMenu(BuildContext context) async {
-    final box = context.findRenderObject() as RenderBox;
-    final overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox;
-    final position = RelativeRect.fromRect(
-      Rect.fromPoints(
-        box.localToGlobal(Offset(0, box.size.height), ancestor: overlay),
-        box.localToGlobal(
-          box.size.bottomRight(Offset.zero),
-          ancestor: overlay,
-        ),
-      ),
-      Offset.zero & overlay.size,
-    );
-
-    final selection = await showMenu<String>(
-      context: context,
-      position: position,
-      color: HomeFeedTokens.background,
-      surfaceTintColor: Colors.transparent,
-      elevation: 8,
-      shadowColor: Colors.black.withValues(alpha: 0.16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppDims.radiusMd),
-      ),
-      items: [
-        PopupMenuItem(
-          value: '/notifications',
-          child: _InboxMenuRow(
-            icon: Icons.notifications_none_rounded,
-            label: 'Notifications',
-            count: _unreadCount,
-          ),
-        ),
-        // Inquiries (piece-anchored) deferred to v2; this now opens the general-purpose
-        // chat feature (see screens/direct_messages_page.dart) instead of '/chat'.
-        PopupMenuItem(
-          value: '/direct-messages',
-          child: _InboxMenuRow(
-            icon: Icons.chat_bubble_outline_rounded,
-            label: 'Chats',
-            count: _chatUnreadCount,
-          ),
-        ),
-        PopupMenuItem(
-          value: '/follow-requests',
-          child: _InboxMenuRow(
-            icon: Icons.person_add_alt_outlined,
-            label: 'Follow requests',
-            count: _followRequestCount,
-          ),
-        ),
-      ],
-    );
-
-    if (selection != null && context.mounted) {
-      await Navigator.pushNamed(context, selection);
-      _refreshCounts();
-    }
+  Future<void> _openInbox(BuildContext context) async {
+    await Navigator.pushNamed(context, '/inbox');
+    if (context.mounted) _refreshCounts();
   }
 
   int get _badgeCount =>
@@ -204,7 +210,7 @@ class _InboxMenuButtonState extends State<_InboxMenuButton> {
   Widget build(BuildContext context) {
     return Builder(
       builder: (context) => GestureDetector(
-        onTap: () => _openMenu(context),
+        onTap: () => _openInbox(context),
         behavior: HitTestBehavior.opaque,
         child: Padding(
           padding: const EdgeInsets.all(8),
@@ -246,63 +252,21 @@ class _InboxMenuButtonState extends State<_InboxMenuButton> {
   }
 }
 
-class _InboxMenuRow extends StatelessWidget {
-  const _InboxMenuRow({required this.icon, required this.label, this.count = 0});
-
-  final IconData icon;
-  final String label;
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: HomeFeedTokens.textPrimary),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: HomeFeedTokens.textPrimary,
-            ),
-          ),
-        ),
-        if (count > 0) ...[
-          const SizedBox(width: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-            decoration: BoxDecoration(
-              color: HomeFeedTokens.textPrimary.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              '$count',
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: HomeFeedTokens.textPrimary,
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
 class FeedFilterTab extends StatelessWidget {
   const FeedFilterTab({
     super.key,
     required this.label,
     required this.active,
     required this.onTap,
+    this.fontSize = 16,
+    this.underline = true,
   });
 
   final String label;
   final bool active;
   final VoidCallback onTap;
+  final double fontSize;
+  final bool underline;
 
   @override
   Widget build(BuildContext context) {
@@ -312,12 +276,12 @@ class FeedFilterTab extends StatelessWidget {
       child: Text(
         label,
         style: GoogleFonts.inter(
-          fontSize: 16,
+          fontSize: fontSize,
           fontWeight: FontWeight.w400,
           color: active
               ? HomeFeedTokens.textPrimary
               : HomeFeedTokens.textSecondary,
-          decoration: active ? TextDecoration.underline : null,
+          decoration: active && underline ? TextDecoration.underline : null,
           decorationColor: HomeFeedTokens.textPrimary,
           decorationThickness: 1,
         ),

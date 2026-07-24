@@ -8,10 +8,19 @@ import '../utils/image_aspect_ratio_resolver.dart';
 /// Wraps a skeleton's placeholder blocks in an animated shimmer sweep —
 /// shared by every skeleton below so first-load placeholders read as
 /// "loading" rather than a static gray blob.
-Widget _shimmer(Widget child, {required Color baseColor}) {
+///
+/// [highlightColor] must be visibly lighter than [baseColor] — the sweep
+/// reads as a bright highlight crossing the placeholder shape, not a dimmer
+/// version of the same faint tint (which just fades toward the page
+/// background and stops looking like a shimmer at all).
+Widget _shimmer(
+  Widget child, {
+  required Color baseColor,
+  required Color highlightColor,
+}) {
   return Shimmer.fromColors(
     baseColor: baseColor,
-    highlightColor: baseColor.withValues(alpha: baseColor.a * 0.4),
+    highlightColor: highlightColor,
     period: const Duration(milliseconds: 1400),
     child: child,
   );
@@ -36,7 +45,9 @@ class FeedGridSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fill = color ?? HomeFeedTokens.textPrimary.withValues(alpha: 0.08);
+    final fill = color ?? HomeFeedTokens.skeletonBase;
+    final highlight =
+        color == null ? HomeFeedTokens.skeletonHighlight : Colors.white;
 
     return _shimmer(
       GridView.builder(
@@ -61,6 +72,7 @@ class FeedGridSkeleton extends StatelessWidget {
         },
       ),
       baseColor: fill,
+      highlightColor: highlight,
     );
   }
 }
@@ -76,8 +88,8 @@ class FeedListSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fill = HomeFeedTokens.textPrimary.withValues(alpha: 0.08);
-    final overlayFill = Colors.white.withValues(alpha: 0.5);
+    final fill = HomeFeedTokens.skeletonBase;
+    final overlayFill = Colors.white.withValues(alpha: 0.75);
 
     Widget line(double width, double height) {
       return Container(
@@ -154,6 +166,7 @@ class FeedListSkeleton extends StatelessWidget {
         ),
       ),
       baseColor: fill,
+      highlightColor: HomeFeedTokens.skeletonHighlight,
     );
   }
 }
@@ -164,7 +177,7 @@ class ExploreFeedSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fill = ExploreTokens.textPrimary.withValues(alpha: 0.08);
+    final fill = ExploreTokens.skeleton;
 
     Widget tile(double aspect) {
       return AspectRatio(
@@ -213,6 +226,7 @@ class ExploreFeedSkeleton extends StatelessWidget {
         ),
       ),
       baseColor: fill,
+      highlightColor: ExploreTokens.skeletonHighlight,
     );
   }
 }
@@ -223,7 +237,7 @@ class ProfileGridSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fill = HomeFeedTokens.textPrimary.withValues(alpha: 0.08);
+    final fill = HomeFeedTokens.skeletonBase;
 
     Widget tile(double height) {
       return Container(
@@ -265,6 +279,7 @@ class ProfileGridSkeleton extends StatelessWidget {
         ],
       ),
       baseColor: fill,
+      highlightColor: HomeFeedTokens.skeletonHighlight,
     );
   }
 }
@@ -277,9 +292,164 @@ class ReelSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const fill = Color(0x14FFFFFF);
+    const highlight = Color(0x33FFFFFF);
     return _shimmer(
       const DecoratedBox(decoration: BoxDecoration(color: fill)),
       baseColor: fill,
+      highlightColor: highlight,
+    );
+  }
+}
+
+/// Placeholder rows for card-list screens (Notifications / Requests / Chats)
+/// — a leading avatar circle plus two text-bar "lines", matching the
+/// [GlassCard] row shape those lists render once loaded.
+class ListRowSkeleton extends StatelessWidget {
+  const ListRowSkeleton({super.key, this.itemCount = 6});
+
+  final int itemCount;
+
+  @override
+  Widget build(BuildContext context) {
+    const fill = HomeFeedTokens.skeletonBase;
+    final overlayFill = Colors.white.withValues(alpha: 0.75);
+
+    Widget row() {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: fill,
+          borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
+        ),
+        child: Row(
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(color: overlayFill, shape: BoxShape.circle),
+              child: const SizedBox(width: 40, height: 40),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 140,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: overlayFill,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 90,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: overlayFill,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return _shimmer(
+      Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            for (var i = 0; i < itemCount; i++) ...[
+              row(),
+              if (i != itemCount - 1) const SizedBox(height: 8),
+            ],
+          ],
+        ),
+      ),
+      baseColor: fill,
+      highlightColor: HomeFeedTokens.skeletonHighlight,
+    );
+  }
+}
+
+/// Placeholder for Profile Settings' first load — section-header bars
+/// followed by [SettingsTile]-shaped rows (icon circle + text bar +
+/// trailing blob), so the page reads as "loading settings" instead of a
+/// full-screen logo overlay.
+class SettingsListSkeleton extends StatelessWidget {
+  const SettingsListSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    const fill = HomeFeedTokens.skeletonBase;
+
+    Widget sectionHeader() {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(4, 20, 4, 12),
+        child: Container(
+          width: 72,
+          height: 12,
+          decoration: BoxDecoration(
+            color: fill,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+      );
+    }
+
+    Widget tileRow({double labelWidth = 140}) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+        child: Row(
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(color: fill, shape: BoxShape.circle),
+              child: const SizedBox(width: 22, height: 22),
+            ),
+            const SizedBox(width: 14),
+            Container(
+              width: labelWidth,
+              height: 14,
+              decoration: BoxDecoration(
+                color: fill,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    Widget section(int rows) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          sectionHeader(),
+          for (var i = 0; i < rows; i++)
+            tileRow(labelWidth: 120 + (i * 37) % 80),
+        ],
+      );
+    }
+
+    return _shimmer(
+      Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            section(3),
+            section(4),
+            section(3),
+            section(2),
+          ],
+        ),
+      ),
+      baseColor: fill,
+      highlightColor: HomeFeedTokens.skeletonHighlight,
     );
   }
 }
