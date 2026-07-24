@@ -24,6 +24,7 @@ import 'profile/widgets/profile_tab_content.dart';
 import 'profile/widgets/profile_tabs.dart';
 import 'profile/widgets/profile_viewer_mode_capsule.dart';
 import 'reels_page.dart' show routeObserver;
+import '../utils/scrolls_to_top_on_double_tap.dart';
 
 /// Artist profile — own tab or pushed public profile by [username].
 class ProfilePage extends StatefulWidget {
@@ -39,7 +40,9 @@ class ProfilePage extends StatefulWidget {
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
-class _ProfilePageState extends State<ProfilePage> with RouteAware {
+class _ProfilePageState extends State<ProfilePage>
+    with RouteAware, ScrollsToTopOnDoubleTap<ProfilePage> {
+  final _scrollController = ScrollController();
   String _tab = 'pieces';
   UserProfile? _profile;
   List<PieceSummary> _pieces = [];
@@ -113,7 +116,20 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
       AuthSession.instance.removeListener(_onSessionChanged);
       routeObserver.unsubscribe(this);
     }
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  @override
+  void scrollToTopAndRefresh() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+    _loadProfile();
   }
 
   @override
@@ -586,6 +602,8 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
             RefreshIndicator(
               onRefresh: _loadProfile,
               child: CustomScrollView(
+                controller: _scrollController,
+                physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
               SliverToBoxAdapter(
                 child: Stack(

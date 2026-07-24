@@ -158,6 +158,7 @@ class NotificationsBodyState extends State<NotificationsBody> {
       onRefresh: () => _load(),
       child: ListView(
         controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
         children: [
           if (today.isNotEmpty) ...[

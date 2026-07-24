@@ -16,13 +16,13 @@ abstract final class BottomNavIndex {
 const Color _kNavGlassFill = Color(0x991A1A1A);
 const Color _kNavGlassBorder = Color(0x26FFFFFF);
 
-const double _kPillWidth = 255;
-const double _kPillHeight = 46;
+const double _kPillWidth = 275;
+const double _kPillHeight = 52;
 const double _kPillRadius = 100;
-const double _kAvatarSize = 44;
+const double _kAvatarSize = 50;
 const double _kPillAvatarGap = 8;
-const double _kIconSize = 22;
-const double _kIconHit = 44;
+const double _kIconSize = 24;
+const double _kIconHit = 48;
 const double _kBottomLift = 12;
 const double _kInactiveWhite = 0.4;
 

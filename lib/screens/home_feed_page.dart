@@ -12,13 +12,12 @@ import '../widgets/home_feed/home_feed_widgets.dart';
 import '../widgets/offline_state.dart';
 import '../services/connectivity_service.dart';
 import '../services/feed_service.dart';
+import '../utils/scrolls_to_top_on_double_tap.dart';
 import 'reels_page.dart' show routeObserver;
 
 /// Owns the "For You" feed's data/pagination — shared by both the "All" and
-/// "Available" slides (`HomeFeedSlide`) so they read from one fetch instead
-/// of each maintaining their own, since they're now separate pages in the
-/// shell's single Home/Discover/Video/Saved swipe sequence rather than
-/// children of one shared parent widget.
+/// "Available" tabs of [HomePage] so they read from one fetch instead of
+/// each maintaining their own.
 class HomeFeedStore extends ChangeNotifier {
   final List<FeedItem> apiItems = [];
   bool loading = true;
@@ -125,30 +124,26 @@ class HomeFeedStore extends ChangeNotifier {
   }
 }
 
-/// One slide of the "For You" feed — either "All" or "Available" — hosted
-/// as a page in the shell's Home/Discover/Video/Saved swipe sequence
-/// (`MainShell`, `lib/main.dart`). Both slides share one [HomeFeedStore] so
-/// switching between them doesn't refetch anything.
-class HomeFeedSlide extends StatefulWidget {
-  const HomeFeedSlide({
-    super.key,
-    required this.store,
-    required this.showAvailable,
-    required this.onFilterTap,
-  });
+/// The Home ("For You") page — a single page with one header and one
+/// `Scaffold`, whose "All"/"Available" tabs switch by *tapping* only (no
+/// swipe): both are just two views over the same [HomeFeedStore], toggled
+/// with local state, rather than separate pages in the shell's outer
+/// Home/Discover/Reels/Saved swipe sequence (`MainShell`, `lib/main.dart`).
+class HomePage extends StatefulWidget {
+  const HomePage({super.key, required this.store});
 
   final HomeFeedStore store;
-  final bool showAvailable;
-  final ValueChanged<FeedAvailabilityFilter> onFilterTap;
 
   @override
-  State<HomeFeedSlide> createState() => _HomeFeedSlideState();
+  State<HomePage> createState() => _HomePageState();
 }
 
-class _HomeFeedSlideState extends State<HomeFeedSlide> with RouteAware {
+class _HomePageState extends State<HomePage>
+    with RouteAware, ScrollsToTopOnDoubleTap<HomePage> {
   static const double _loadMoreThreshold = 200;
 
   final ScrollController _scrollController = ScrollController();
+  bool _showAvailable = false;
 
   @override
   void initState() {
@@ -196,12 +191,36 @@ class _HomeFeedSlideState extends State<HomeFeedSlide> with RouteAware {
     openExploreDetail(context, item);
   }
 
+  /// Tapping "All"/"Available" only ever swaps which items this single page
+  /// shows — no swipe/PageView is involved. Also snaps back to the top of
+  /// the list, matching how switching tabs behaves elsewhere in the app.
+  void _onFilterTap(FeedAvailabilityFilter filter) {
+    final showAvailable = filter == FeedAvailabilityFilter.available;
+    if (showAvailable == _showAvailable) return;
+    setState(() => _showAvailable = showAvailable);
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(0);
+    }
+  }
+
+  @override
+  void scrollToTopAndRefresh() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+    widget.store.refresh();
+  }
+
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.paddingOf(context).bottom + 100;
     final store = widget.store;
-    final items = widget.showAvailable ? store.availableItems : store.apiItems;
-    final filter = widget.showAvailable
+    final items = _showAvailable ? store.availableItems : store.apiItems;
+    final filter = _showAvailable
         ? FeedAvailabilityFilter.available
         : FeedAvailabilityFilter.all;
 
@@ -216,7 +235,7 @@ class _HomeFeedSlideState extends State<HomeFeedSlide> with RouteAware {
               padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
               child: FeedHomeHeader(
                 filter: filter,
-                onFilterChanged: widget.onFilterTap,
+                onFilterChanged: _onFilterTap,
                 onAddTap: () => Navigator.pushNamed(context, '/post'),
                 hasAvailableItems: store.availableItems.isNotEmpty,
               ),
@@ -225,7 +244,7 @@ class _HomeFeedSlideState extends State<HomeFeedSlide> with RouteAware {
               child: _buildFeed(
                 bottomInset,
                 items: items,
-                emptyMessage: widget.showAvailable
+                emptyMessage: _showAvailable
                     ? 'No available pieces yet'
                     : 'No feed items yet',
               ),
@@ -253,13 +272,22 @@ class _HomeFeedSlideState extends State<HomeFeedSlide> with RouteAware {
     }
 
     if (items.isEmpty) {
-      return Center(
-        child: Text(
-          emptyMessage,
-          style: TextStyle(
-            color: HomeFeedTokens.textSecondary,
-            fontSize: 14,
-          ),
+      return RefreshIndicator(
+        onRefresh: () => store.refresh(),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(height: MediaQuery.sizeOf(context).height * 0.35),
+            Center(
+              child: Text(
+                emptyMessage,
+                style: TextStyle(
+                  color: HomeFeedTokens.textSecondary,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -268,6 +296,7 @@ class _HomeFeedSlideState extends State<HomeFeedSlide> with RouteAware {
       onRefresh: () => store.refresh(),
       child: ListView.builder(
         controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.only(bottom: bottomInset),
         itemCount: items.length + (store.loadingMore ? 1 : 0),
         itemBuilder: (context, index) {

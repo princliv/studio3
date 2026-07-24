@@ -455,6 +455,7 @@ class _ChatsBodyState extends State<ChatsBody> {
       onRefresh: _load,
       child: ListView.builder(
         controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: _conversations.length + (_loadingMore ? 1 : 0),
         itemBuilder: (context, i) {
@@ -553,6 +554,7 @@ class _ChatsBodyState extends State<ChatsBody> {
       onRefresh: _loadRequests,
       child: ListView.builder(
         controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: _requests.length + (_requestsLoadingMore ? 1 : 0),
         itemBuilder: (context, i) {

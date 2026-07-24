@@ -28,10 +28,9 @@ class PostCropPreview extends StatefulWidget {
   /// renders exactly what will be uploaded — Fill maps the box to fill the
   /// frame edge-to-edge; Fit letterboxes the box (preserving its own
   /// aspect) centered in the frame. Shared by every read-only preview in
-  /// the posting flow (thumbnails, review screen) and by the live editor's
-  /// Fit-mode preview (which has no interactive box, so it just shows this
-  /// same final look directly) — see [buildCenteredOnPivot] for the live
-  /// editor's Fill-mode view instead, which needs the image pannable.
+  /// the posting flow (thumbnails, review screen) and by the live editor
+  /// itself (Fill mode wraps this in a pan/pinch-zoom/rotate gesture
+  /// detector; Fit mode shows it as-is, non-interactive).
   static Widget buildTransformedContent({
     required String imagePath,
     required PostImageTransform transform,
@@ -77,39 +76,6 @@ class PostCropPreview extends StatefulWidget {
           child: _applyColorAdjust(image, transform),
         );
       },
-    );
-  }
-
-  /// The live editor's Fill-mode base layer: the whole image, translated so
-  /// [pivotFraction] (the crop box's center, in image-fraction coordinates)
-  /// lands at the center of [viewportSize] — this is what makes the crop
-  /// box appear visually fixed in place while dragging instead pans the
-  /// photo underneath it. [viewportSize] must already be sized to the
-  /// image's own aspect ratio (e.g. via the editor's `_imageDisplaySize`),
-  /// so the image is shown undistorted before this translation is applied.
-  static Widget buildCenteredOnPivot({
-    required String imagePath,
-    required PostImageTransform transform,
-    required Offset pivotFraction,
-    required Size viewportSize,
-  }) {
-    final refSize = viewportSize;
-    final pivotInRef = Offset(
-      pivotFraction.dx * refSize.width,
-      pivotFraction.dy * refSize.height,
-    );
-    final image = _renderWindow(
-      refImage: _flippedImage(imagePath, transform),
-      refSize: refSize,
-      pivotInRef: pivotInRef,
-      scale: 1.0,
-      rotationRadians: transform.rotationDegrees * math.pi / 180,
-      windowSize: viewportSize,
-      frameSize: viewportSize,
-    );
-    return ColoredBox(
-      color: Colors.black,
-      child: _applyColorAdjust(image, transform),
     );
   }
 

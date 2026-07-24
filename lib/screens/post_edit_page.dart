@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -10,7 +11,7 @@ import '../data/post_media_assets.dart';
 import '../models/post_image_transform.dart';
 import '../theme/home_feed_tokens.dart';
 import '../utils/crop_cover_math.dart'
-    show Corner, CropAspectRatio, CropCoverMath, CropFitMode;
+    show CropAspectRatio, CropCoverMath, CropFitMode;
 import '../utils/image_adjust_math.dart';
 import '../widgets/post_crop_preview.dart';
 /// Image edit step — posting flow (Figma 1961:1453 / 1973:1223 / 1986:1416).
@@ -65,6 +66,13 @@ class _PostEditPageState extends State<PostEditPage> {
 
   bool _showAdjustValue = false;
   bool _showRotationValue = false;
+
+  // Snapshot of the crop box/rotation/focal-point taken at the start of a
+  // pan/pinch-zoom/rotate gesture — the update handler always derives the
+  // new state from this snapshot (not incrementally) so it can't drift.
+  Rect? _gestureStartBox;
+  double _gestureStartRotation = 0;
+  Offset _gestureStartFocalPoint = Offset.zero;
 
   bool get _isCropMode => _editTool == 'crop';
   bool get _isAdjustMode => _editTool == 'adjust';
@@ -142,43 +150,66 @@ class _PostEditPageState extends State<PostEditPage> {
     });
   }
 
-  void _onHandleDrag(Corner corner, Offset deltaNorm) {
+  /// Fill mode's photo is fully interactive: one finger pans, two fingers
+  /// pinch-zoom and rotate — all in a single `onScale*` gesture stream.
+  /// Everything is derived from the snapshot taken in [_onCropScaleStart],
+  /// never incrementally, so repeated updates can't accumulate drift.
+  void _onCropScaleStart(ScaleStartDetails details) {
     final imageAspect = _aspectForPath(_imagePaths[_activeImageIndex]);
+    _gestureStartBox = _currentTransform.resolvedCropRect(imageAspect);
+    _gestureStartRotation = _currentTransform.rotationDegrees;
+    _gestureStartFocalPoint = details.localFocalPoint;
+  }
+
+  void _onCropScaleUpdate(ScaleUpdateDetails details, Size frameSize) {
+    final startBox = _gestureStartBox;
+    if (startBox == null) return;
+    final imageAspect = _aspectForPath(_imagePaths[_activeImageIndex]);
+    final cropAspect = _currentTransform.aspectRatio.value;
+
+    // Pan: a drag spanning the full frame width/height should pan by one
+    // box-width/height across the image, so the photo tracks the finger
+    // 1:1 on screen regardless of current zoom.
+    final focalDelta = details.localFocalPoint - _gestureStartFocalPoint;
+    final dxNorm = frameSize.width == 0
+        ? 0.0
+        : focalDelta.dx / frameSize.width * startBox.width;
+    final dyNorm = frameSize.height == 0
+        ? 0.0
+        : focalDelta.dy / frameSize.height * startBox.height;
+    final panned = CropCoverMath.translateBox(
+      box: startBox,
+      deltaNorm: -Offset(dxNorm, dyNorm),
+    );
+
+    final scaled = CropCoverMath.scaleBox(
+      box: panned,
+      scaleFactor: details.scale,
+      cropAspect: cropAspect,
+      imageAspect: imageAspect,
+    );
+
+    final newRotation =
+        _gestureStartRotation + details.rotation * 180 / math.pi;
+
     setState(() {
-      final base = _currentTransform.resolvedCropRect(imageAspect);
-      final resized = _currentTransform.fitMode == CropFitMode.fill
-          ? CropCoverMath.resizeAspectLocked(
-              box: base,
-              corner: corner,
-              deltaNorm: deltaNorm,
-              cropAspect: _currentTransform.aspectRatio.value,
-              imageAspect: imageAspect,
-            )
-          : CropCoverMath.resizeFree(
-              box: base,
-              corner: corner,
-              deltaNorm: deltaNorm,
-            );
+      _currentTransform.rotationDegrees = newRotation;
       _currentTransform.cropRect = CropCoverMath.clampBoxWithinRotatedImage(
-        box: resized,
-        rotationDegrees: _currentTransform.rotationDegrees,
+        box: scaled,
+        rotationDegrees: newRotation,
         imageAspect: imageAspect,
       );
+      _showRotationValue = details.rotation.abs() > 0.001;
     });
   }
 
-  /// Dragging inside the box pans the *photo*, not the box — the box
-  /// stays visually fixed at the viewport center (see `build()`'s Fill
-  /// branch), so the crop rect moves opposite to the finger: dragging
-  /// right visually slides the photo right, revealing more of its left
-  /// side under the still-centered box.
-  void _onInteriorDrag(Offset deltaNorm) {
-    final imageAspect = _aspectForPath(_imagePaths[_activeImageIndex]);
-    setState(() {
-      final base = _currentTransform.resolvedCropRect(imageAspect);
-      _currentTransform.cropRect =
-          CropCoverMath.translateBox(box: base, deltaNorm: -deltaNorm);
-    });
+  void _onCropScaleEnd(ScaleEndDetails details) {
+    _gestureStartBox = null;
+    if (_showRotationValue) {
+      Future<void>.delayed(const Duration(milliseconds: 900), () {
+        if (mounted) setState(() => _showRotationValue = false);
+      });
+    }
   }
 
   void _toggleFitMode() {
@@ -288,22 +319,10 @@ class _PostEditPageState extends State<PostEditPage> {
     });
   }
 
-  /// Fill mode's display box is shaped to the image's own aspect ratio (not
-  /// the crop aspect) — the aspect ratio is expressed by the draggable box
-  /// drawn on top, not by the container itself.
-  Size _imageDisplaySize(double maxWidth, double maxHeight, double imageAspect) {
-    var width = maxWidth;
-    var height = width / imageAspect;
-    if (height > maxHeight) {
-      height = maxHeight;
-      width = height * imageAspect;
-    }
-    return Size(width, height);
-  }
-
-  /// Fit mode has no interactive box, so its preview is just shaped to the
-  /// selected crop aspect ratio directly and shows the true letterboxed
-  /// output (see `PostCropPreview.buildTransformedContent`).
+  /// Both Fill and Fit are always shaped to the selected crop aspect ratio
+  /// — Fill shows the true filled-edge-to-edge output (pannable/pinchable
+  /// in crop mode), Fit shows the true letterboxed output (never
+  /// interactive) — see `PostCropPreview.buildTransformedContent`.
   Size _cropFrameSize(double maxWidth, double maxHeight, CropAspectRatio ratio) {
     var width = maxWidth;
     var height = width / ratio.value;
@@ -325,18 +344,13 @@ class _PostEditPageState extends State<PostEditPage> {
     final maxCropHeight = screenHeight * _maxCropHeightFraction;
     final imageAspect = _aspectForPath(_imagePaths[_activeImageIndex]);
     final isFillMode = _currentTransform.fitMode == CropFitMode.fill;
-    // The full photo + draggable box only appear while Crop is actively
-    // open — everywhere else (the default landing view, Adjust mode)
-    // shows the real cropped result, matching what will be uploaded.
-    final showBoxEditor = isFillMode && _isCropMode;
-    final viewportSize = showBoxEditor
-        ? _imageDisplaySize(maxCropWidth, maxCropHeight, imageAspect)
-        : _cropFrameSize(maxCropWidth, maxCropHeight, _currentTransform.aspectRatio);
-    final resolvedRect = _currentTransform.resolvedCropRect(imageAspect);
-    final boxSize = Size(
-      resolvedRect.width * viewportSize.width,
-      resolvedRect.height * viewportSize.height,
-    );
+    // Interactive (pan/pinch-zoom/rotate) only while Crop is actively open
+    // and in Fill mode — Fit is always fully automatic (see
+    // `PostImageTransform.resolvedCropRect`), and outside crop mode this
+    // just shows the real, non-interactive result.
+    final isInteractive = isFillMode && _isCropMode;
+    final viewportSize =
+        _cropFrameSize(maxCropWidth, maxCropHeight, _currentTransform.aspectRatio);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -364,37 +378,25 @@ class _PostEditPageState extends State<PostEditPage> {
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        if (showBoxEditor) ...[
-                          IgnorePointer(
-                            child: PostCropPreview.buildCenteredOnPivot(
-                              imagePath: _imagePaths[_activeImageIndex],
-                              transform: _currentTransform,
-                              pivotFraction: resolvedRect.center,
-                              viewportSize: viewportSize,
-                            ),
-                          ),
-                          _CropBoxOverlay(
-                            boxSize: boxSize,
-                            viewportSize: viewportSize,
-                            interactive: _isCropMode,
-                            onHandleDrag: _onHandleDrag,
-                            onInteriorDrag: _onInteriorDrag,
-                          ),
-                        ] else
-                          IgnorePointer(
+                        if (isInteractive)
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onScaleStart: _onCropScaleStart,
+                            onScaleUpdate: (details) =>
+                                _onCropScaleUpdate(details, viewportSize),
+                            onScaleEnd: _onCropScaleEnd,
                             child: PostCropPreview.buildTransformedContent(
                               imagePath: _imagePaths[_activeImageIndex],
                               transform: _currentTransform,
                               imageAspect: imageAspect,
                             ),
-                          ),
-                        if (_isCropMode)
-                          Positioned(
-                            left: 12,
-                            bottom: 12,
-                            child: _FitFillToggleButton(
-                              fitMode: _currentTransform.fitMode,
-                              onTap: _toggleFitMode,
+                          )
+                        else
+                          IgnorePointer(
+                            child: PostCropPreview.buildTransformedContent(
+                              imagePath: _imagePaths[_activeImageIndex],
+                              transform: _currentTransform,
+                              imageAspect: imageAspect,
                             ),
                           ),
                         if (_isAdjustMode &&
@@ -466,30 +468,46 @@ class _PostEditPageState extends State<PostEditPage> {
           const Spacer(),
           if (_isCropMode) ...[
             const SizedBox(height: _gapAboveAspectSelector),
-            _CropAspectSelector(
-              selected: _currentTransform.aspectRatio,
-              onSelected: (ratio) {
-                // Applies to every image in the post, not just the active
-                // one — a multi-image post should share one output aspect
-                // ratio. Each image's own Fill/Fit mode and box position
-                // stay independent; only images currently in Fill get
-                // their box relocked (using their own imageAspect).
-                setState(() {
-                  for (var i = 0; i < _transforms.length; i++) {
-                    final t = _transforms[i];
-                    final imgAspect = _aspectForPath(_imagePaths[i]);
-                    final base = t.resolvedCropRect(imgAspect);
-                    t.aspectRatio = ratio;
-                    if (t.fitMode == CropFitMode.fill) {
-                      t.cropRect = CropCoverMath.relockToAspect(
-                        box: base,
-                        cropAspect: ratio.value,
-                        imageAspect: imgAspect,
-                      );
-                    }
-                  }
-                });
-              },
+            Padding(
+              // Left inset mirrors the button's own width + right inset so
+              // the aspect chips still land visually centered on screen.
+              padding: const EdgeInsets.only(left: 52, right: 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _CropAspectSelector(
+                      selected: _currentTransform.aspectRatio,
+                      onSelected: (ratio) {
+                        // Applies to every image in the post, not just the
+                        // active one — a multi-image post should share one
+                        // output aspect ratio. Each image's own Fill/Fit
+                        // mode and box position stay independent; only
+                        // images currently in Fill get their box relocked
+                        // (using their own imageAspect).
+                        setState(() {
+                          for (var i = 0; i < _transforms.length; i++) {
+                            final t = _transforms[i];
+                            final imgAspect = _aspectForPath(_imagePaths[i]);
+                            final base = t.resolvedCropRect(imgAspect);
+                            t.aspectRatio = ratio;
+                            if (t.fitMode == CropFitMode.fill) {
+                              t.cropRect = CropCoverMath.relockToAspect(
+                                box: base,
+                                cropAspect: ratio.value,
+                                imageAspect: imgAspect,
+                              );
+                            }
+                          }
+                        });
+                      },
+                    ),
+                  ),
+                  _FitFillToggleButton(
+                    fitMode: _currentTransform.fitMode,
+                    onTap: _toggleFitMode,
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 16),
             Padding(
@@ -688,105 +706,9 @@ class _EditThumbPreview extends StatelessWidget {
   }
 }
 
-/// The draggable/resizable crop box (Fill mode only) — a border always
-/// drawn centered within [viewportSize] at [boxSize], with 4 corner
-/// handles for resizing (aspect-locked, since only Fill uses this overlay)
-/// and a drag-anywhere-inside gesture for repositioning. The box's screen
-/// position never changes (dragging pans the photo underneath it instead —
-/// see `_onInteriorDrag`); only its size follows [boxSize]. The border
-/// stays visible outside crop mode (so the framing is always visible at a
-/// glance) but only [interactive] (crop mode) mounts the gesture detectors.
-class _CropBoxOverlay extends StatelessWidget {
-  const _CropBoxOverlay({
-    required this.boxSize,
-    required this.viewportSize,
-    required this.interactive,
-    required this.onHandleDrag,
-    required this.onInteriorDrag,
-  });
-
-  static const _handleHitSize = 44.0;
-  static const _handleVisualSize = 16.0;
-
-  final Size boxSize;
-  final Size viewportSize;
-  final bool interactive;
-  final void Function(Corner corner, Offset deltaNorm) onHandleDrag;
-  final void Function(Offset deltaNorm) onInteriorDrag;
-
-  Offset _normalize(Offset pixelDelta) => Offset(
-        pixelDelta.dx / viewportSize.width,
-        pixelDelta.dy / viewportSize.height,
-      );
-
-  Widget _handle(Corner corner, double fx, double fy, double left, double top,
-      double width, double height) {
-    return Positioned(
-      left: left + fx * width - _handleHitSize / 2,
-      top: top + fy * height - _handleHitSize / 2,
-      width: _handleHitSize,
-      height: _handleHitSize,
-      child: !interactive
-          ? const SizedBox.shrink()
-          : GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onPanUpdate: (details) =>
-                  onHandleDrag(corner, _normalize(details.delta)),
-              child: Center(
-                child: Container(
-                  width: _handleVisualSize,
-                  height: _handleVisualSize,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.black26, width: 1),
-                  ),
-                ),
-              ),
-            ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final left = (viewportSize.width - boxSize.width) / 2;
-    final top = (viewportSize.height - boxSize.height) / 2;
-    final width = boxSize.width;
-    final height = boxSize.height;
-
-    return Stack(
-      children: [
-        Positioned(
-          left: left,
-          top: top,
-          width: width,
-          height: height,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onPanUpdate: interactive
-                ? (details) => onInteriorDrag(_normalize(details.delta))
-                : null,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.white, width: 1.5),
-              ),
-            ),
-          ),
-        ),
-        if (interactive) ...[
-          _handle(Corner.tl, 0, 0, left, top, width, height),
-          _handle(Corner.tr, 1, 0, left, top, width, height),
-          _handle(Corner.bl, 0, 1, left, top, width, height),
-          _handle(Corner.br, 1, 1, left, top, width, height),
-        ],
-      ],
-    );
-  }
-}
-
-/// Bottom-left circular toggle: shows the icon for the mode a tap would
-/// switch *to* (Fit mode shows the Fill icon, and vice versa) — no
-/// existing custom SVG for this, so plain Material icons.
+/// Circular toggle shown below the aspect-ratio selector: shows the icon
+/// for the mode a tap would switch *to* (Fit mode shows the Fill icon, and
+/// vice versa) — no existing custom SVG for this, so plain Material icons.
 class _FitFillToggleButton extends StatelessWidget {
   const _FitFillToggleButton({
     required this.fitMode,
