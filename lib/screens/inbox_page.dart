@@ -58,8 +58,7 @@ class _InboxPageState extends State<InboxPage> {
           .then((requests) => requests.length)
           .catchError((_) => _requestsCount),
       ChatService.instance
-          .getInbox()
-          .then((page) => page.items.where((c) => c.unread).length)
+          .unreadCount()
           .catchError((_) => _chatsCount),
     ]);
     if (!mounted) return;
@@ -192,10 +191,10 @@ class _InboxPageState extends State<InboxPage> {
                 controller: _pageController,
                 physics: const SnappyPageScrollPhysics(),
                 onPageChanged: _onPageChanged,
-                children: const [
-                  NotificationsBody(),
-                  ChatsBody(),
-                  FollowRequestsBody(),
+                children: [
+                  NotificationsBody(onLiveNotification: _onLiveNotification),
+                  ChatsBody(onCountsChanged: _refreshCounts),
+                  const FollowRequestsBody(),
                 ],
               ),
             ),
@@ -203,6 +202,11 @@ class _InboxPageState extends State<InboxPage> {
         ),
       ),
     );
+  }
+
+  void _onLiveNotification() {
+    if (!mounted) return;
+    setState(() => _notificationsCount += 1);
   }
 }
 

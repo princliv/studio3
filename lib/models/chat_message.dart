@@ -151,6 +151,7 @@ class ChatThread {
     this.otherPartyFollowersCount,
     this.otherPartyPiecesCount,
     this.otherPartyIsFollowing,
+    this.otherPartyReadAt,
     required this.status,
     required this.messages,
   });
@@ -163,6 +164,7 @@ class ChatThread {
   final int? otherPartyFollowersCount;
   final int? otherPartyPiecesCount;
   final bool? otherPartyIsFollowing;
+  final DateTime? otherPartyReadAt;
   final String status;
   final List<ChatMessage> messages;
 
@@ -172,6 +174,8 @@ class ChatThread {
     final items = messagesJson is Map<String, dynamic>
         ? messagesJson['items']
         : messagesJson;
+    final readAtRaw = json['otherPartyReadAt'] as String? ??
+        otherParty?['otherPartyReadAt'] as String?;
     return ChatThread(
       id: json['id'] as String? ?? '',
       otherPartyId: otherParty?['id'] as String?,
@@ -181,6 +185,7 @@ class ChatThread {
       otherPartyFollowersCount: (otherParty?['followersCount'] as num?)?.toInt(),
       otherPartyPiecesCount: (otherParty?['piecesCount'] as num?)?.toInt(),
       otherPartyIsFollowing: otherParty?['isFollowing'] as bool?,
+      otherPartyReadAt: readAtRaw != null ? DateTime.tryParse(readAtRaw) : null,
       status: json['status'] as String? ?? 'open',
       messages: items is List
           ? items.whereType<Map<String, dynamic>>().map(ChatMessage.fromJson).toList()

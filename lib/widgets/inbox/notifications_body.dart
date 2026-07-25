@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../models/notification_item.dart';
+import '../../services/chat_socket_service.dart';
 import '../../services/connectivity_service.dart';
 import '../../services/notification_service.dart';
 import '../../theme/app_theme.dart';
@@ -14,7 +15,10 @@ import '../offline_state.dart';
 /// extracted from the former standalone NotificationsPage, minus its own
 /// Scaffold/back-button header.
 class NotificationsBody extends StatefulWidget {
-  const NotificationsBody({super.key});
+  const NotificationsBody({super.key, this.onLiveNotification});
+
+  /// Fired when a live `notification:new` arrives (so parent can bump badge).
+  final VoidCallback? onLiveNotification;
 
   @override
   State<NotificationsBody> createState() => NotificationsBodyState();
@@ -34,6 +38,7 @@ class NotificationsBodyState extends State<NotificationsBody> {
     super.initState();
     _scrollController.addListener(_onScroll);
     ConnectivityService.instance.addReconnectHook(_onReconnected);
+    ChatSocketService.instance.onNotificationNew(_onSocketNotification);
     _load();
   }
 
@@ -42,7 +47,18 @@ class NotificationsBodyState extends State<NotificationsBody> {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     ConnectivityService.instance.removeReconnectHook(_onReconnected);
+    ChatSocketService.instance.offNotificationNew(_onSocketNotification);
     super.dispose();
+  }
+
+  void _onSocketNotification(Map<String, dynamic> json) {
+    final item = NotificationItem.fromJson(json);
+    if (item.isInquiry || item.isChatMessage) return;
+    if (!mounted) return;
+    if (_items.any((n) => n.id == item.id)) return;
+    setState(() => _items.insert(0, item));
+    widget.onLiveNotification?.call();
+    NotificationService.instance.invalidateUnreadCache();
   }
 
   Future<void> _onReconnected() => _load(refresh: true);

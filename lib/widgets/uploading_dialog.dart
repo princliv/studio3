@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../theme/app_theme.dart';
 import '../theme/home_feed_tokens.dart';
-import 'glass_card.dart';
 import 'studio_loading.dart';
 
 /// Shows a centered, non-dismissible "Uploading…" card that blocks the
@@ -11,34 +11,44 @@ import 'studio_loading.dart';
 Future<void> showUploadingDialog(
   BuildContext context, {
   String message = 'Uploading…',
-}) {
-  // A still-focused text field's IME composing region can otherwise bleed
-  // its underline through the dialog barrier (seen as stray yellow lines
-  // under the message on some keyboards).
-  FocusScope.of(context).unfocus();
+}) async {
+  // A still-focused text field's IME composing underline can bleed through a
+  // translucent card (yellow line under the message). Clear focus and wait a
+  // frame before presenting an opaque dialog.
+  FocusManager.instance.primaryFocus?.unfocus();
+  await Future<void>.delayed(Duration.zero);
+  if (!context.mounted) return;
+
   return showDialog<void>(
     context: context,
+    useRootNavigator: true,
     barrierDismissible: false,
     barrierColor: Colors.black.withValues(alpha: 0.35),
     builder: (context) => PopScope(
       canPop: false,
       child: Center(
-        child: GlassCard(
-          padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const StudioBubbleLoader(width: 88),
-              const SizedBox(height: 16),
-              Text(
-                message,
-                style: GoogleFonts.inter(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: HomeFeedTokens.textPrimary,
+        child: Material(
+          color: HomeFeedTokens.background,
+          elevation: 8,
+          borderRadius: BorderRadius.circular(AppDims.radiusLg),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const StudioBubbleLoader(width: 88),
+                const SizedBox(height: 16),
+                Text(
+                  message,
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: HomeFeedTokens.textPrimary,
+                    decoration: TextDecoration.none,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../data/nav_assets.dart';
 import '../../models/feed_preview_item.dart';
 import '../../services/chat_service.dart';
+import '../../services/chat_socket_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/social_service.dart';
 import '../../theme/home_feed_tokens.dart';
@@ -174,6 +175,21 @@ class _InboxMenuButtonState extends State<_InboxMenuButton> {
   void initState() {
     super.initState();
     _refreshCounts();
+    ChatSocketService.instance.onNotificationNew(_onLiveNotification);
+  }
+
+  @override
+  void dispose() {
+    ChatSocketService.instance.offNotificationNew(_onLiveNotification);
+    super.dispose();
+  }
+
+  void _onLiveNotification(Map<String, dynamic> json) {
+    final type = json['type'] as String?;
+    if (type == 'message' || type == 'inquiry') return;
+    if (!mounted) return;
+    setState(() => _unreadCount += 1);
+    NotificationService.instance.invalidateUnreadCache();
   }
 
   Future<void> _refreshCounts() async {
@@ -186,8 +202,7 @@ class _InboxMenuButtonState extends State<_InboxMenuButton> {
           .then((requests) => requests.length)
           .catchError((_) => _followRequestCount),
       ChatService.instance
-          .getInbox()
-          .then((page) => page.items.where((c) => c.unread).length)
+          .unreadCount()
           .catchError((_) => _chatUnreadCount),
     ]);
     if (!mounted) return;

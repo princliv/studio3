@@ -12,6 +12,8 @@ class ChatSocketService {
   static final ChatSocketService instance = ChatSocketService._();
 
   io.Socket? _socket;
+  final _notificationListeners =
+      <void Function(Map<String, dynamic> json)>{};
 
   void connect() {
     final token = AuthSession.instance.accessToken;
@@ -26,11 +28,23 @@ class ChatSocketService {
           .enableReconnection()
           .build(),
     );
+    _wireNotificationFanout();
   }
 
   void disconnect() {
     _socket?.dispose();
     _socket = null;
+    _notificationListeners.clear();
+  }
+
+  void _wireNotificationFanout() {
+    _socket?.off('notification:new');
+    _socket?.on('notification:new', (data) {
+      final json = Map<String, dynamic>.from(data as Map);
+      for (final cb in List.of(_notificationListeners)) {
+        cb(json);
+      }
+    });
   }
 
   void joinConversation(String conversationId) {
@@ -100,4 +114,59 @@ class ChatSocketService {
   }
 
   void offPresenceUpdate() => _socket?.off('presence:update');
+
+  void onConversationRead(
+    void Function(String conversationId, String readerId, DateTime readAt)
+        callback,
+  ) {
+    _socket?.off('conversation:read');
+    _socket?.on('conversation:read', (data) {
+      final json = Map<String, dynamic>.from(data as Map);
+      final readAt = DateTime.tryParse(json['readAt'] as String? ?? '') ??
+          DateTime.now();
+      callback(
+        json['conversationId'] as String? ?? '',
+        json['readerId'] as String? ?? '',
+        readAt,
+      );
+    });
+  }
+
+  void offConversationRead() => _socket?.off('conversation:read');
+
+  /// Additive — home badge and Notifications tab can both listen.
+  void onNotificationNew(void Function(Map<String, dynamic> json) callback) {
+    _notificationListeners.add(callback);
+    _wireNotificationFanout();
+  }
+
+  void offNotificationNew([void Function(Map<String, dynamic> json)? callback]) {
+    if (callback != null) {
+      _notificationListeners.remove(callback);
+    } else {
+      _notificationListeners.clear();
+    }
+  }
+  void joinTarget({required String targetType, required String targetId}) {
+    _socket?.emit('target:join', {
+      'targetType': targetType,
+      'targetId': targetId,
+    });
+  }
+
+  void leaveTarget({required String targetType, required String targetId}) {
+    _socket?.emit('target:leave', {
+      'targetType': targetType,
+      'targetId': targetId,
+    });
+  }
+
+  void onCommentNew(void Function(Map<String, dynamic> json) callback) {
+    _socket?.off('comment:new');
+    _socket?.on('comment:new', (data) {
+      callback(Map<String, dynamic>.from(data as Map));
+    });
+  }
+
+  void offCommentNew() => _socket?.off('comment:new');
 }

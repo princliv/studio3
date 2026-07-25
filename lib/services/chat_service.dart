@@ -129,10 +129,13 @@ class ChatService {
         .toList(growable: false);
   }
 
-  /// Total unread count across the open inbox — used for the nav badge. Fetches
-  /// a single page; good enough for a badge count without a dedicated endpoint.
+  /// Total unread open conversations — used for the nav / inbox badge.
   Future<int> unreadCount() async {
-    final page = await getInbox(limit: 50);
-    return page.items.where((c) => c.unread).length;
+    final json = await _api.get('/api/conversations/unread-count', auth: true);
+    final data = _api.extractData(json);
+    if (data is Map<String, dynamic>) {
+      return (data['count'] as num?)?.toInt() ?? 0;
+    }
+    return 0;
   }
 }

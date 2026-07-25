@@ -101,4 +101,9 @@ class NotificationService {
     final data = _api.extractData(json);
     return data is Map<String, dynamic> ? (data['count'] as num?)?.toInt() ?? 0 : 0;
   }
+
+  Future<void> invalidateUnreadCache() async {
+    await CacheService.instance.invalidate('notifications.list');
+    await CacheService.instance.invalidate('notifications.unreadCount');
+  }
 }

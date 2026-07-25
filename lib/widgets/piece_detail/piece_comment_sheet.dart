@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../models/comment_page.dart';
 import '../../models/feed_item.dart';
 import '../../services/auth_session.dart';
+import '../../services/chat_socket_service.dart';
 import '../../services/social_service.dart';
 import '../../theme/home_feed_tokens.dart';
 import '../../utils/profile_navigation.dart';
@@ -62,20 +63,44 @@ class _PieceCommentSheetState extends State<PieceCommentSheet> {
   bool _sending = false;
   String? _error;
 
+  String get _targetType => widget.isScene ? 'post' : 'piece';
+
   bool get _hasMore => _nextCursor != null && _nextCursor!.isNotEmpty;
 
   @override
   void initState() {
     super.initState();
     widget.scrollController.addListener(_onScroll);
+    ChatSocketService.instance.joinTarget(
+      targetType: _targetType,
+      targetId: widget.contentId,
+    );
+    ChatSocketService.instance.onCommentNew(_onLiveComment);
     _loadInitial();
   }
 
   @override
   void dispose() {
     widget.scrollController.removeListener(_onScroll);
+    ChatSocketService.instance.leaveTarget(
+      targetType: _targetType,
+      targetId: widget.contentId,
+    );
+    ChatSocketService.instance.offCommentNew();
     _textController.dispose();
     super.dispose();
+  }
+
+  void _onLiveComment(Map<String, dynamic> json) {
+    final targetType = json['targetType'] as String?;
+    final targetId = json['targetId'] as String?;
+    if (targetType != _targetType || targetId != widget.contentId) return;
+    final comment = CommentSummary.fromJson(json);
+    if (comment.id.isEmpty) return;
+    if (!mounted) return;
+    if (_comments.any((c) => c.id == comment.id)) return;
+    // Skip if we already have an optimistic local copy that will be replaced.
+    setState(() => _comments.insert(0, comment));
   }
 
   void _onScroll() {
@@ -162,7 +187,15 @@ class _PieceCommentSheetState extends State<PieceCommentSheet> {
       if (!mounted) return;
       setState(() {
         final index = _comments.indexWhere((c) => c.id == tempId);
-        if (index != -1) _comments[index] = saved;
+        if (index != -1) {
+          _comments[index] = saved;
+        } else if (!_comments.any((c) => c.id == saved.id)) {
+          // Socket may have already inserted the real comment.
+          _comments.insert(0, saved);
+        }
+        _comments.removeWhere(
+          (c) => c.id != saved.id && c.id == tempId,
+        );
       });
     } catch (e) {
       if (!mounted) return;

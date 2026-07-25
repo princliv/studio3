@@ -21,7 +21,10 @@ enum _ChatsTab { all, requests }
 /// looks up people from the user's own following/followers lists to start
 /// or jump back into a conversation with them.
 class ChatsBody extends StatefulWidget {
-  const ChatsBody({super.key});
+  const ChatsBody({super.key, this.onCountsChanged});
+
+  /// Called after opening/returning from a thread so the parent can refresh badges.
+  final VoidCallback? onCountsChanged;
 
   @override
   State<ChatsBody> createState() => _ChatsBodyState();
@@ -251,11 +254,21 @@ class _ChatsBodyState extends State<ChatsBody> {
         ),
       ),
     );
-    // Refresh in case a new conversation was started in the meantime.
     _load();
+    widget.onCountsChanged?.call();
   }
 
   Future<void> _openThread(ConversationSummary conversation, {required bool isRequest}) async {
+    // Optimistic: clear unread dot immediately when opening.
+    if (conversation.unread) {
+      setState(() {
+        final list = isRequest ? _requests : _conversations;
+        final i = list.indexWhere((c) => c.id == conversation.id);
+        if (i != -1) list[i] = list[i].copyWith(unread: false);
+      });
+      widget.onCountsChanged?.call();
+    }
+
     await Navigator.push(
       context,
       MaterialPageRoute(
@@ -272,6 +285,7 @@ class _ChatsBodyState extends State<ChatsBody> {
     // Refresh both lists on return — accept/decline/read may have changed status.
     _load();
     if (_requestsLoaded) _loadRequests();
+    widget.onCountsChanged?.call();
   }
 
   Future<void> _acceptRequest(ConversationSummary request) async {

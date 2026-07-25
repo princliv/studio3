@@ -63,6 +63,7 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
   String? _otherPartyId;
   int? _followersCount;
   int? _piecesCount;
+  DateTime? _otherPartyReadAt;
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
   Timer? _typingStopTimer;
@@ -121,6 +122,7 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
     ChatSocketService.instance.onTypingStart(_onTypingStart);
     ChatSocketService.instance.onTypingStop(_onTypingStop);
     ChatSocketService.instance.onPresenceUpdate(_onPresenceUpdate);
+    ChatSocketService.instance.onConversationRead(_onConversationRead);
   }
 
   @override
@@ -132,6 +134,7 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
       ChatSocketService.instance.offTypingStart();
       ChatSocketService.instance.offTypingStop();
       ChatSocketService.instance.offPresenceUpdate();
+      ChatSocketService.instance.offConversationRead();
     }
     _typingStopTimer?.cancel();
     _textController.removeListener(_onTextChanged);
@@ -171,6 +174,18 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
     _otherPartyId = thread.otherPartyId ?? _otherPartyId;
     _followersCount = thread.otherPartyFollowersCount ?? _followersCount;
     _piecesCount = thread.otherPartyPiecesCount ?? _piecesCount;
+    _otherPartyReadAt = thread.otherPartyReadAt ?? _otherPartyReadAt;
+  }
+
+  void _onConversationRead(
+    String conversationId,
+    String readerId,
+    DateTime readAt,
+  ) {
+    if (conversationId != _conversationId || !mounted) return;
+    // Only the other party's read advances blue ticks on my messages.
+    if (_otherPartyId != null && readerId != _otherPartyId) return;
+    setState(() => _otherPartyReadAt = readAt);
   }
 
   void _onSocketMessage(String conversationId, ChatMessage message) {
@@ -361,6 +376,66 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
     return u.startsWith('@') ? u : '@$u';
   }
 
+  /// Flat list length including date headers between day changes.
+  int get _threadItemCount {
+    if (_messages.isEmpty) return 0;
+    var count = _messages.length;
+    for (var i = 1; i < _messages.length; i++) {
+      if (!_sameCalendarDay(_messages[i - 1].createdAt, _messages[i].createdAt)) {
+        count++;
+      }
+    }
+    // Leading date header for the first message.
+    count++;
+    return count;
+  }
+
+  Object _threadItemAt(int index) {
+    var cursor = 0;
+    DateTime? prevDay;
+    for (final message in _messages) {
+      final day = DateTime(
+        message.createdAt.toLocal().year,
+        message.createdAt.toLocal().month,
+        message.createdAt.toLocal().day,
+      );
+      if (prevDay == null || day != prevDay) {
+        if (cursor == index) {
+          return _DateHeaderData(_dateLabel(message.createdAt));
+        }
+        cursor++;
+        prevDay = day;
+      }
+      if (cursor == index) return message;
+      cursor++;
+    }
+    return _messages.last;
+  }
+
+  static bool _sameCalendarDay(DateTime a, DateTime b) {
+    final al = a.toLocal();
+    final bl = b.toLocal();
+    return al.year == bl.year && al.month == bl.month && al.day == bl.day;
+  }
+
+  static String _dateLabel(DateTime dt) {
+    final local = dt.toLocal();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(local.year, local.month, local.day);
+    final diff = today.difference(day).inDays;
+    if (diff == 0) return 'Today';
+    if (diff == 1) return 'Yesterday';
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    if (local.year == now.year) {
+      return '${months[local.month - 1]} ${local.day}';
+    }
+    return '${months[local.month - 1]} ${local.day}, ${local.year}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final myUsername = AuthSession.instance.user?.username;
@@ -467,14 +542,23 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
                         horizontal: 16,
                         vertical: 8,
                       ),
-                      itemCount: _messages.length,
+                      itemCount: _threadItemCount,
                       itemBuilder: (context, i) {
-                        final message = _messages[i];
+                        final item = _threadItemAt(i);
+                        if (item is _DateHeaderData) {
+                          return _DateSeparator(label: item.label);
+                        }
+                        final message = item as ChatMessage;
+                        final isMine = myUsername != null &&
+                            message.senderUsername == myUsername;
                         return _MessageBubble(
                           message: message,
-                          isMine:
-                              myUsername != null &&
-                              message.senderUsername == myUsername,
+                          isMine: isMine,
+                          seen: isMine &&
+                              _otherPartyReadAt != null &&
+                              !message.createdAt
+                                  .toUtc()
+                                  .isAfter(_otherPartyReadAt!.toUtc()),
                         );
                       },
                     ),
@@ -545,6 +629,41 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DateHeaderData {
+  const _DateHeaderData(this.label);
+  final String label;
+}
+
+class _DateSeparator extends StatelessWidget {
+  const _DateSeparator({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.slate200,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: AppColors.slate600,
+            ),
+          ),
         ),
       ),
     );
@@ -652,38 +771,22 @@ class _NewChatEmptyState extends StatelessWidget {
 }
 
 class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.message, required this.isMine});
+  const _MessageBubble({
+    required this.message,
+    required this.isMine,
+    this.seen = false,
+  });
 
   final ChatMessage message;
   final bool isMine;
+  final bool seen;
 
-  static String _formatTimestamp(DateTime dt) {
+  static String _formatTime(DateTime dt) {
     final local = dt.toLocal();
-    final now = DateTime.now();
-    final sameDay =
-        local.year == now.year &&
-        local.month == now.month &&
-        local.day == now.day;
     final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
     final minute = local.minute.toString().padLeft(2, '0');
     final amPm = local.hour >= 12 ? 'PM' : 'AM';
-    final time = '$hour:$minute $amPm';
-    if (sameDay) return time;
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return '${months[local.month - 1]} ${local.day}, $time';
+    return '$hour:$minute $amPm';
   }
 
   @override
@@ -723,12 +826,25 @@ class _MessageBubble extends StatelessWidget {
                     ),
             ),
             const SizedBox(height: 4),
-            Text(
-              _formatTimestamp(message.createdAt),
-              style: GoogleFonts.inter(
-                fontSize: 11,
-                color: ChatTokens.timestamp,
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _formatTime(message.createdAt),
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: ChatTokens.timestamp,
+                  ),
+                ),
+                if (isMine) ...[
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.done_all,
+                    size: 14,
+                    color: seen ? const Color(0xFF53BDEB) : ChatTokens.timestamp,
+                  ),
+                ],
+              ],
             ),
           ],
         ),
