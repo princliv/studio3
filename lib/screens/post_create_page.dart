@@ -32,7 +32,6 @@ class PostCreatePage extends StatefulWidget {
   const PostCreatePage({
     super.key,
     required this.postType,
-    required this.selectedCellIndices,
     required this.imagePaths,
     required this.transforms,
     required this.previewImageIndex,
@@ -43,7 +42,6 @@ class PostCreatePage extends StatefulWidget {
   });
 
   final String postType;
-  final List<int> selectedCellIndices;
   final List<String> imagePaths;
   final List<PostImageTransform> transforms;
   final int previewImageIndex;
@@ -62,13 +60,12 @@ class _PostCreatePageState extends State<PostCreatePage> {
 
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _altTextController = TextEditingController();
   final _listingFormKey = GlobalKey<ListingDetailsFormState>();
   bool _aiToolsUsed = false;
   bool _isProcess = false;
   bool _publishing = false;
   bool _listForSale = false;
-  final List<PostLocationOption> _selectedLocations = [];
+  PostLocationOption? _selectedLocation;
   String? _selectedMediumId;
   final Set<String> _selectedStyleIds = {};
   final List<PostMaterialOption> _selectedMaterials = [];
@@ -92,7 +89,6 @@ class _PostCreatePageState extends State<PostCreatePage> {
     AuthSession.instance.removeListener(_onSessionChanged);
     _nameController.dispose();
     _descriptionController.dispose();
-    _altTextController.dispose();
     super.dispose();
   }
 
@@ -131,12 +127,8 @@ class _PostCreatePageState extends State<PostCreatePage> {
   void _openLocationPicker() {
     ChooseLocationSheet.show(
       context,
-      selectedIds: _selectedLocations.map((l) => l.id).toSet(),
       onLocationSelected: (location) {
-        setState(() {
-          if (_selectedLocations.any((l) => l.id == location.id)) return;
-          _selectedLocations.add(location);
-        });
+        setState(() => _selectedLocation = location);
       },
     );
   }
@@ -147,8 +139,7 @@ class _PostCreatePageState extends State<PostCreatePage> {
       title: 'Select medium',
       searchHint: 'Search medium',
       options: PostMediumOptions.all,
-      selectedIds:
-          _selectedMediumId != null ? {_selectedMediumId!} : const {},
+      selectedIds: _selectedMediumId != null ? {_selectedMediumId!} : const {},
       mode: PostPickerSelectionMode.singleRadio,
       closeOnSelection: true,
       onSelectionChanged: (ids) {
@@ -228,10 +219,8 @@ class _PostCreatePageState extends State<PostCreatePage> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.5),
-      builder: (context) => _LinkedPiecePickerSheet(
-        pieces: pieces,
-        selectedId: _linkedPieceId,
-      ),
+      builder: (context) =>
+          _LinkedPiecePickerSheet(pieces: pieces, selectedId: _linkedPieceId),
     );
     if (!mounted) return;
     setState(() {
@@ -278,7 +267,7 @@ class _PostCreatePageState extends State<PostCreatePage> {
       description: _descriptionController.text,
       mediumId: _selectedMediumId,
       styleTags: _selectedStyleIds.toList(),
-      locations: List<PostLocationOption>.from(_selectedLocations),
+      location: _selectedLocation?.displayName,
       materials: List<PostMaterialOption>.from(_selectedMaterials),
       listingDetails: listingDetails,
       selectedSeriesId: _selectedSeriesId,
@@ -286,7 +275,6 @@ class _PostCreatePageState extends State<PostCreatePage> {
       transforms: widget.transforms,
       previewImageIndex: widget.previewImageIndex,
       aiDisclosed: _aiToolsUsed,
-      altText: _altTextController.text,
       linkedPieceId: _linkedPieceId,
       isProcess: _isProcess,
       isForSale: _isPiece && _listForSale,
@@ -304,13 +292,44 @@ class _PostCreatePageState extends State<PostCreatePage> {
       final message = draft.isForSale
           ? 'Piece listed for sale'
           : 'Published successfully';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.white,
+          elevation: 6,
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          content: Row(
+            children: [
+              const Icon(
+                Icons.check_circle,
+                color: Color(0xFF3BA55D),
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  message,
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: HomeFeedTokens.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       hideUploadingDialog(context);
       final message = e is ApiException ? e.message : e.toString();
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) setState(() => _publishing = false);
     }
@@ -354,8 +373,10 @@ class _PostCreatePageState extends State<PostCreatePage> {
                     child: widget.mediaKind == 'video'
                         ? _VideoPreviewCard(videoPath: widget.videoPath)
                         : _PreviewCard(
-                            imagePath: widget.imagePaths[widget.previewImageIndex],
-                            transform: widget.transforms[widget.previewImageIndex],
+                            imagePath:
+                                widget.imagePaths[widget.previewImageIndex],
+                            transform:
+                                widget.transforms[widget.previewImageIndex],
                             onEdit: widget.onEdit,
                           ),
                   ),
@@ -371,7 +392,9 @@ class _PostCreatePageState extends State<PostCreatePage> {
                   ),
                   const SizedBox(height: 8),
                   const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: createFlowHorizontalInset),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: createFlowHorizontalInset,
+                    ),
                     child: CreateFlowDivider(),
                   ),
                   Padding(
@@ -387,7 +410,9 @@ class _PostCreatePageState extends State<PostCreatePage> {
                   ),
                   const SizedBox(height: 16),
                   const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: createFlowHorizontalInset),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: createFlowHorizontalInset,
+                    ),
                     child: CreateFlowDivider(),
                   ),
                   const SizedBox(height: 4),
@@ -396,31 +421,9 @@ class _PostCreatePageState extends State<PostCreatePage> {
                     iconWidth: 12,
                     iconHeight: 16,
                     label: 'Location',
-                    trailing: _selectedLocations.isNotEmpty
-                        ? _selectedLocations.last.name
-                        : null,
+                    trailing: _selectedLocation?.name,
                     onTap: _openLocationPicker,
                   ),
-                  if (_selectedLocations.isNotEmpty)
-                    SizedBox(
-                      height: 26,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.fromLTRB(28, 4, 16, 4),
-                        itemCount: _selectedLocations.length,
-                        separatorBuilder: (context, _) =>
-                            const SizedBox(width: 8),
-                        itemBuilder: (context, index) {
-                          final location = _selectedLocations[index];
-                          return CreateFlowLocationChip(
-                            label: location.name,
-                            onRemove: () => setState(
-                              () => _selectedLocations.removeAt(index),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
                   CreateFlowMetadataRow(
                     iconAsset: PostMediaAssets.createMediumIcon,
                     iconWidth: 12,
@@ -462,17 +465,6 @@ class _PostCreatePageState extends State<PostCreatePage> {
                       iconHeight: 11,
                       label: 'Related scenes',
                       onTap: () {},
-                    ),
-                    const SizedBox(height: 8),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-                      child: CreateFlowTextField(
-                        controller: _altTextController,
-                        hint: 'Alt text — describe the image for accessibility',
-                        style: CreateFlowTextFieldStyle.body,
-                        maxLines: 2,
-                        minLines: 1,
-                      ),
                     ),
                   ] else ...[
                     CreateFlowMetadataRow(
@@ -579,11 +571,7 @@ class _VideoPreviewCard extends StatelessWidget {
                         const SizedBox.shrink(),
                   ),
                 ),
-              const Icon(
-                Icons.play_circle_fill,
-                color: Colors.white,
-                size: 56,
-              ),
+              const Icon(Icons.play_circle_fill, color: Colors.white, size: 56),
             ],
           ),
         ),
@@ -649,87 +637,93 @@ class _PreviewCard extends StatelessWidget {
 
 /// Single-select picker for linking a scene to one of the user's pieces.
 class _LinkedPiecePickerSheet extends StatelessWidget {
-  const _LinkedPiecePickerSheet({
-    required this.pieces,
-    this.selectedId,
-  });
+  const _LinkedPiecePickerSheet({required this.pieces, this.selectedId});
 
   final List<PieceSummary> pieces;
   final String? selectedId;
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final safeAreaBottom = MediaQuery.paddingOf(context).bottom;
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.45,
-      minChildSize: 0.32,
-      maxChildSize: 0.88,
-      builder: (context, scrollController) {
-        return DecoratedBox(
-          decoration: const BoxDecoration(
-            color: Color(0xFF231F1B),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: 10),
-              Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF4A4843),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                child: Text(
-                  'Link to piece',
-                  style: GoogleFonts.inter(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
+    return Padding(
+      padding: EdgeInsets.only(bottom: keyboardInset),
+      child: DraggableScrollableSheet(
+        initialChildSize: 0.45,
+        minChildSize: 0.32,
+        maxChildSize: 0.88,
+        builder: (context, scrollController) {
+          return DecoratedBox(
+            decoration: const BoxDecoration(
+              color: Color(0xFF231F1B),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            child: Column(
+              children: [
+                const SizedBox(height: 10),
+                Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4A4843),
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-              ),
-              Expanded(
-                child: pieces.isEmpty
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Text(
-                            'You don\'t have any pieces yet.',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              color: const Color(0xFF8C8880),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                  child: Text(
+                    'Link to piece',
+                    style: GoogleFonts.inter(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: pieces.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Text(
+                              'You don\'t have any pieces yet.',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                color: const Color(0xFF8C8880),
+                              ),
                             ),
                           ),
-                        ),
-                      )
-                    : ListView(
-                        controller: scrollController,
-                        padding: EdgeInsets.fromLTRB(8, 0, 8, bottomInset + 16),
-                        children: [
-                          _LinkedPieceTile(
-                            title: 'None',
-                            selected: selectedId == null,
-                            onTap: () => Navigator.pop(context),
+                        )
+                      : ListView(
+                          controller: scrollController,
+                          padding: EdgeInsets.fromLTRB(
+                            8,
+                            0,
+                            8,
+                            safeAreaBottom + 16,
                           ),
-                          for (final piece in pieces)
+                          children: [
                             _LinkedPieceTile(
-                              title: piece.title,
-                              selected: selectedId == piece.id,
-                              onTap: () => Navigator.pop(context, piece),
+                              title: 'None',
+                              selected: selectedId == null,
+                              onTap: () => Navigator.pop(context),
                             ),
-                        ],
-                      ),
-              ),
-            ],
-          ),
-        );
-      },
+                            for (final piece in pieces)
+                              _LinkedPieceTile(
+                                title: piece.title,
+                                selected: selectedId == piece.id,
+                                onTap: () => Navigator.pop(context, piece),
+                              ),
+                          ],
+                        ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }

@@ -69,6 +69,7 @@ class FeedPreviewItem {
     this.relatedScenes = const [],
     this.priceCents,
     this.shippingRegion,
+    this.location,
     this.framingNote,
     this.provenanceNote,
     this.heroImageUrl,
@@ -80,6 +81,7 @@ class FeedPreviewItem {
     this.authorAvatarUrl,
     this.authorIsFollowing = false,
     this.status,
+    this.materials = const [],
   });
 
   final String id;
@@ -99,6 +101,7 @@ class FeedPreviewItem {
   final List<RelatedScene> relatedScenes;
   final int? priceCents;
   final String? shippingRegion;
+  final String? location;
   final String? framingNote;
   final String? provenanceNote;
   final String? heroImageUrl;
@@ -110,6 +113,7 @@ class FeedPreviewItem {
   final String? authorAvatarUrl;
   final bool authorIsFollowing;
   final String? status;
+  final List<String> materials;
 
   bool get isLive => status == null || status == 'live';
 
@@ -157,6 +161,7 @@ class FeedPreviewItem {
     List<RelatedScene>? relatedScenes,
     int? priceCents,
     String? shippingRegion,
+    String? location,
     String? framingNote,
     String? provenanceNote,
     String? heroImageUrl,
@@ -168,6 +173,7 @@ class FeedPreviewItem {
     String? authorAvatarUrl,
     bool? authorIsFollowing,
     String? status,
+    List<String>? materials,
   }) {
     return FeedPreviewItem(
       id: id ?? this.id,
@@ -187,6 +193,7 @@ class FeedPreviewItem {
       relatedScenes: relatedScenes ?? this.relatedScenes,
       priceCents: priceCents ?? this.priceCents,
       shippingRegion: shippingRegion ?? this.shippingRegion,
+      location: location ?? this.location,
       framingNote: framingNote ?? this.framingNote,
       provenanceNote: provenanceNote ?? this.provenanceNote,
       heroImageUrl: heroImageUrl ?? this.heroImageUrl,
@@ -198,6 +205,7 @@ class FeedPreviewItem {
       authorAvatarUrl: authorAvatarUrl ?? this.authorAvatarUrl,
       authorIsFollowing: authorIsFollowing ?? this.authorIsFollowing,
       status: status ?? this.status,
+      materials: materials ?? this.materials,
     );
   }
 
@@ -228,6 +236,7 @@ class FeedPreviewItem {
       aspectRatio: aspectRatioFromDimensions(piece.dimensions),
       priceCents: piece.priceCents,
       shippingRegion: piece.shippingRegion,
+      location: piece.location,
       framingNote: piece.framingMounting,
       provenanceNote: piece.provenance,
       heroImageUrl: piece.mediaUrl,
@@ -242,6 +251,7 @@ class FeedPreviewItem {
       authorAvatarUrl: piece.authorAvatarUrl,
       authorIsFollowing: piece.authorIsFollowing,
       status: piece.status,
+      materials: piece.materials,
     );
   }
 
@@ -268,6 +278,7 @@ class FeedPreviewItem {
           ? FeedAspectRatio.landscape16x9
           : FeedAspectRatio.portrait3x4,
       heroImageUrl: post.mediaUrl,
+      location: post.location,
       isProcess: post.isProcess,
       isLiked: post.isLiked,
       isSaved: post.isSaved,
@@ -301,6 +312,7 @@ class FeedPreviewItem {
         'relatedScenes': relatedScenes.map((s) => s.toJson()).toList(),
         if (priceCents != null) 'priceCents': priceCents,
         if (shippingRegion != null) 'shippingRegion': shippingRegion,
+        if (location != null) 'location': location,
         if (framingNote != null) 'framingNote': framingNote,
         if (provenanceNote != null) 'provenanceNote': provenanceNote,
         if (heroImageUrl != null) 'heroImageUrl': heroImageUrl,
@@ -312,6 +324,7 @@ class FeedPreviewItem {
         if (authorAvatarUrl != null) 'authorAvatarUrl': authorAvatarUrl,
         'authorIsFollowing': authorIsFollowing,
         if (status != null) 'status': status,
+        'materials': materials,
       };
 
   factory FeedPreviewItem.fromCacheJson(Map<String, dynamic> json) {
@@ -340,6 +353,7 @@ class FeedPreviewItem {
           const [],
       priceCents: json['priceCents'] as int?,
       shippingRegion: json['shippingRegion'] as String?,
+      location: json['location'] as String?,
       framingNote: json['framingNote'] as String?,
       provenanceNote: json['provenanceNote'] as String?,
       heroImageUrl: json['heroImageUrl'] as String?,
@@ -351,6 +365,9 @@ class FeedPreviewItem {
       authorAvatarUrl: json['authorAvatarUrl'] as String?,
       authorIsFollowing: json['authorIsFollowing'] as bool? ?? false,
       status: json['status'] as String?,
+      materials:
+          (json['materials'] as List?)?.whereType<String>().toList() ??
+              const [],
     );
   }
 

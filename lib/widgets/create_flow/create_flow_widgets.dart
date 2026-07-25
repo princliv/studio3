@@ -243,7 +243,10 @@ class CreateFlowMetadataRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        FocusScope.of(context).unfocus();
+        onTap();
+      },
       behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
@@ -398,7 +401,10 @@ class CreateFlowToggleRow extends StatelessWidget {
             ),
           ),
           GestureDetector(
-            onTap: () => onChanged(!value),
+            onTap: () {
+              FocusScope.of(context).unfocus();
+              onChanged(!value);
+            },
             behavior: HitTestBehavior.opaque,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),

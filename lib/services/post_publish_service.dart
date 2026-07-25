@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import '../data/post_location_options.dart';
 import '../data/post_material_options.dart';
 import '../models/listing_details.dart';
 import '../models/post_image_transform.dart';
@@ -22,7 +21,7 @@ class PostDraft {
     this.description = '',
     this.mediumId,
     this.styleTags = const [],
-    this.locations = const [],
+    this.location,
     this.materials = const [],
     this.listingDetails,
     this.selectedSeriesId,
@@ -44,7 +43,7 @@ class PostDraft {
   final String description;
   final String? mediumId;
   final List<String> styleTags;
-  final List<PostLocationOption> locations;
+  final String? location;
   final List<PostMaterialOption> materials;
   final ListingDetails? listingDetails;
   final String? selectedSeriesId;
@@ -68,7 +67,7 @@ class PostDraft {
     String? description,
     String? mediumId,
     List<String>? styleTags,
-    List<PostLocationOption>? locations,
+    String? location,
     List<PostMaterialOption>? materials,
     ListingDetails? listingDetails,
     String? selectedSeriesId,
@@ -90,7 +89,7 @@ class PostDraft {
       description: description ?? this.description,
       mediumId: mediumId ?? this.mediumId,
       styleTags: styleTags ?? this.styleTags,
-      locations: locations ?? this.locations,
+      location: location ?? this.location,
       materials: materials ?? this.materials,
       listingDetails: listingDetails ?? this.listingDetails,
       selectedSeriesId: selectedSeriesId ?? this.selectedSeriesId,
@@ -139,6 +138,8 @@ class PostPublishService {
           'caption': draft.description.trim(),
         if (draft.linkedPieceId != null && draft.linkedPieceId!.isNotEmpty)
           'linkedPieceId': draft.linkedPieceId,
+        if (draft.location != null && draft.location!.isNotEmpty)
+          'location': draft.location,
         'isProcess': draft.isProcess,
       });
       return;
@@ -171,6 +172,8 @@ class PostPublishService {
           'caption': draft.description.trim(),
         if (draft.linkedPieceId != null && draft.linkedPieceId!.isNotEmpty)
           'linkedPieceId': draft.linkedPieceId,
+        if (draft.location != null && draft.location!.isNotEmpty)
+          'location': draft.location,
         'isProcess': draft.isProcess,
       });
       return;
@@ -195,6 +198,8 @@ class PostPublishService {
         'handlingNotes': draft.listingDetails!.handlingNotes!.trim(),
       if (materials.isNotEmpty) 'materials': materials,
       if (draft.styleTags.isNotEmpty) 'styleTags': draft.styleTags,
+      if (draft.location != null && draft.location!.isNotEmpty)
+        'location': draft.location,
       'aiDisclosed': draft.aiDisclosed,
       if (draft.altText != null && draft.altText!.trim().isNotEmpty)
         'altText': draft.altText!.trim(),

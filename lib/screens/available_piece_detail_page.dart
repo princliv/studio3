@@ -16,8 +16,10 @@ import '../widgets/piece_detail/detail_follow_state.dart';
 import '../widgets/piece_detail/detail_hero_image.dart';
 import '../widgets/piece_detail/detail_save_state.dart';
 import '../widgets/piece_detail/detail_scroll_handoff.dart';
+import '../widgets/piece_detail/materials_sheet.dart';
 import '../widgets/piece_detail/piece_action_bar.dart';
 import '../widgets/piece_detail/piece_comment_sheet.dart';
+import '../widgets/piece_detail/piece_location_row.dart';
 import '../widgets/piece_detail/piece_related_scenes_row.dart';
 import '../widgets/piece_detail/piece_share_sheet.dart';
 import '../widgets/piece_detail/piece_series_row.dart';
@@ -292,21 +294,24 @@ class _AvailablePieceDetailPageState extends State<AvailablePieceDetailPage>
                               ],
                             ),
                           ),
-                          GestureDetector(
-                            onTap: () {},
-                            child: Text(
-                              'View Materials →',
-                              style: GoogleFonts.inter(
-                                fontSize: CollectDetailTokens.linkSize,
-                                fontWeight: FontWeight.w400,
-                                height: 15.6 / CollectDetailTokens.linkSize,
-                                color: CollectDetailTokens.link,
+                          if (item.materials.isNotEmpty)
+                            GestureDetector(
+                              onTap: () =>
+                                  showMaterialsSheet(context, item.materials),
+                              child: Text(
+                                'View Materials →',
+                                style: GoogleFonts.inter(
+                                  fontSize: CollectDetailTokens.linkSize,
+                                  fontWeight: FontWeight.w400,
+                                  height: 15.6 / CollectDetailTokens.linkSize,
+                                  color: CollectDetailTokens.link,
+                                ),
                               ),
                             ),
-                          ),
                         ],
                       ),
                     ),
+                    PieceLocationRow(location: item.location),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(
                         CollectDetailTokens.horizontalPadding,

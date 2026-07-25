@@ -263,15 +263,39 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
     return _messages.isNotEmpty ? _messages.last : null;
   }
 
+  /// Shows the message immediately (optimistic) instead of waiting for the
+  /// send request to complete — the request can legitimately take a while
+  /// (slow network, or the backend waking from an idle cold-start), and
+  /// there's no reason the thread should sit empty/frozen for that whole
+  /// time when we already know exactly what's being sent.
   Future<void> _sendText() async {
     final text = _textController.text.trim();
     if (text.isEmpty || _sending) return;
-    setState(() => _sending = true);
-    _textController.clear();
     final id = _conversationId;
     if (id != null) ChatSocketService.instance.stopTyping(id);
+
+    _textController.clear();
+    final me = AuthSession.instance.user;
+    final tempId = 'pending-${DateTime.now().microsecondsSinceEpoch}';
+    final pending = ChatMessage(
+      id: tempId,
+      body: text,
+      senderUsername: me?.username,
+      senderName: me?.name,
+      senderAvatarUrl: me?.profilePhotoUrl,
+      createdAt: DateTime.now(),
+      isPending: true,
+    );
+    setState(() {
+      _sending = true;
+      _messages.add(pending);
+    });
+    _scrollToBottom();
     try {
       if (id == null) {
+        // `_startWithFirstMessage` re-syncs `_messages` wholesale from the
+        // server thread once the conversation exists, which already
+        // replaces this pending bubble with the real one.
         await _startWithFirstMessage(body: text);
         if (!mounted) return;
         setState(() => _sending = false);
@@ -279,6 +303,7 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
         final message = await ChatService.instance.sendMessage(id, body: text);
         if (!mounted) return;
         setState(() {
+          _messages.removeWhere((m) => m.id == tempId);
           _appendMessage(message);
           _status = 'open';
           _sending = false;
@@ -287,7 +312,11 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      setState(() => _sending = false);
+      setState(() {
+        _messages.removeWhere((m) => m.id == tempId);
+        _sending = false;
+      });
+      _textController.text = text;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to send: $e')));
@@ -801,29 +830,33 @@ class _MessageBubble extends StatelessWidget {
               ? CrossAxisAlignment.end
               : CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: hasImage
-                  ? const EdgeInsets.all(4)
-                  : const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.sizeOf(context).width * 0.7,
-              ),
-              decoration: BoxDecoration(
-                color: isMine ? AppColors.slate900 : AppColors.slate100,
-                borderRadius: BorderRadius.circular(AppDims.radiusMd),
-              ),
-              child: hasImage
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(AppDims.radiusMd - 4),
-                      child: Image.network(message.imageUrl!, fit: BoxFit.cover),
-                    )
-                  : Text(
-                      message.body ?? '',
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        color: isMine ? AppColors.white : AppColors.slate800,
+            AnimatedOpacity(
+              duration: const Duration(milliseconds: 150),
+              opacity: message.isPending ? 0.6 : 1.0,
+              child: Container(
+                padding: hasImage
+                    ? const EdgeInsets.all(4)
+                    : const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.sizeOf(context).width * 0.7,
+                ),
+                decoration: BoxDecoration(
+                  color: isMine ? AppColors.slate900 : AppColors.slate100,
+                  borderRadius: BorderRadius.circular(AppDims.radiusMd),
+                ),
+                child: hasImage
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(AppDims.radiusMd - 4),
+                        child: Image.network(message.imageUrl!, fit: BoxFit.cover),
+                      )
+                    : Text(
+                        message.body ?? '',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          color: isMine ? AppColors.white : AppColors.slate800,
+                        ),
                       ),
-                    ),
+              ),
             ),
             const SizedBox(height: 4),
             Row(

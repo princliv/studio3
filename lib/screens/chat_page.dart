@@ -195,11 +195,43 @@ class _ChatPageState extends State<ChatPage> {
     });
   }
 
+  /// Shows the reply immediately (optimistic) instead of waiting for the
+  /// request to complete — see `ConversationThreadPage._sendText` for the
+  /// same pattern and why.
   Future<void> _sendReply() async {
     final id = _selectedId;
     final text = _replyController.text.trim();
     if (id == null || text.isEmpty || _sending) return;
-    setState(() => _sending = true);
+
+    _replyController.clear();
+    final me = AuthSession.instance.user;
+    final tempId = 'pending-${DateTime.now().microsecondsSinceEpoch}';
+    final pending = InquiryMessage(
+      id: tempId,
+      body: text,
+      senderUsername: me?.username,
+      senderName: me?.name,
+      senderAvatarUrl: me?.profilePhotoUrl,
+      createdAt: DateTime.now(),
+      isPending: true,
+    );
+    setState(() {
+      _sending = true;
+      final thread = _thread;
+      if (thread != null) {
+        _thread = InquiryThread(
+          id: thread.id,
+          pieceId: thread.pieceId,
+          pieceTitle: thread.pieceTitle,
+          pieceThumbnailUrl: thread.pieceThumbnailUrl,
+          otherPartyUsername: thread.otherPartyUsername,
+          otherPartyName: thread.otherPartyName,
+          otherPartyAvatarUrl: thread.otherPartyAvatarUrl,
+          status: thread.status,
+          messages: [...thread.messages, pending],
+        );
+      }
+    });
     try {
       final message = await InquiryService.instance.reply(id, text);
       if (!mounted) return;
@@ -215,17 +247,40 @@ class _ChatPageState extends State<ChatPage> {
             otherPartyName: thread.otherPartyName,
             otherPartyAvatarUrl: thread.otherPartyAvatarUrl,
             status: 'open',
-            messages: [...thread.messages, message],
+            messages: [
+              for (final m in thread.messages)
+                if (m.id != tempId) m,
+              message,
+            ],
           );
         }
-        _replyController.clear();
         _sending = false;
       });
       // Replying to a pending request implicitly accepts it — move it over.
       if (_selectedIsRequest) _moveRequestToAll(id);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _sending = false);
+      setState(() {
+        final thread = _thread;
+        if (thread != null) {
+          _thread = InquiryThread(
+            id: thread.id,
+            pieceId: thread.pieceId,
+            pieceTitle: thread.pieceTitle,
+            pieceThumbnailUrl: thread.pieceThumbnailUrl,
+            otherPartyUsername: thread.otherPartyUsername,
+            otherPartyName: thread.otherPartyName,
+            otherPartyAvatarUrl: thread.otherPartyAvatarUrl,
+            status: thread.status,
+            messages: [
+              for (final m in thread.messages)
+                if (m.id != tempId) m,
+            ],
+          );
+        }
+        _sending = false;
+      });
+      _replyController.text = text;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to send reply: $e')));
@@ -776,21 +831,25 @@ class _MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     return Align(
       alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.sizeOf(context).width * 0.7,
-        ),
-        decoration: BoxDecoration(
-          color: isMine ? AppColors.slate900 : AppColors.slate100,
-          borderRadius: BorderRadius.circular(AppDims.radiusMd),
-        ),
-        child: Text(
-          message.body,
-          style: GoogleFonts.inter(
-            fontSize: 14,
-            color: isMine ? AppColors.white : AppColors.slate800,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 150),
+        opacity: message.isPending ? 0.6 : 1.0,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.sizeOf(context).width * 0.7,
+          ),
+          decoration: BoxDecoration(
+            color: isMine ? AppColors.slate900 : AppColors.slate100,
+            borderRadius: BorderRadius.circular(AppDims.radiusMd),
+          ),
+          child: Text(
+            message.body,
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              color: isMine ? AppColors.white : AppColors.slate800,
+            ),
           ),
         ),
       ),

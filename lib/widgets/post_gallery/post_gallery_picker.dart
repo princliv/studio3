@@ -187,7 +187,7 @@ class _PostGalleryPickerState extends State<PostGalleryPicker> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          _AssetThumbnail(asset: asset, size: 200),
+          _AssetThumbnail(key: ValueKey(asset.id), asset: asset, size: 200),
           if (isVideo)
             Container(
               color: Colors.black.withValues(alpha: 0.22),
@@ -258,7 +258,11 @@ class _PostGalleryPickerState extends State<PostGalleryPicker> {
                 width: 44,
                 height: 44,
                 child: entry.cover != null
-                    ? _AssetThumbnail(asset: entry.cover!, size: 100)
+                    ? _AssetThumbnail(
+                        key: ValueKey(entry.cover!.id),
+                        asset: entry.cover!,
+                        size: 100,
+                      )
                     : const ColoredBox(color: Colors.white10),
               ),
             ),
@@ -281,16 +285,39 @@ class _PostGalleryPickerState extends State<PostGalleryPicker> {
   }
 }
 
-class _AssetThumbnail extends StatelessWidget {
-  const _AssetThumbnail({required this.asset, required this.size});
+class _AssetThumbnail extends StatefulWidget {
+  const _AssetThumbnail({super.key, required this.asset, required this.size});
 
   final AssetEntity asset;
   final int size;
 
   @override
+  State<_AssetThumbnail> createState() => _AssetThumbnailState();
+}
+
+class _AssetThumbnailState extends State<_AssetThumbnail> {
+  late Future<Uint8List?> _future = _load();
+
+  Future<Uint8List?> _load() =>
+      widget.asset.thumbnailDataWithSize(ThumbnailSize.square(widget.size));
+
+  @override
+  void didUpdateWidget(covariant _AssetThumbnail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Only re-fetch if this slot now represents a different asset/size
+    // (e.g. switching albums reuses the same grid slots for new assets) —
+    // not just because the parent rebuilt (which happens on every
+    // select/deselect tap and must not re-trigger a fresh fetch, or
+    // `FutureBuilder` flashes back to its placeholder each time).
+    if (oldWidget.asset.id != widget.asset.id || oldWidget.size != widget.size) {
+      _future = _load();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return FutureBuilder<Uint8List?>(
-      future: asset.thumbnailDataWithSize(ThumbnailSize.square(size)),
+      future: _future,
       builder: (context, snapshot) {
         final bytes = snapshot.data;
         if (bytes == null) return const ColoredBox(color: Colors.white10);
@@ -314,7 +341,7 @@ class _PermissionFallback extends StatelessWidget {
           const Icon(Icons.photo_library_outlined, color: Colors.white, size: 56),
           const SizedBox(height: 16),
           Text(
-            'Photo access needed',
+            'Please give access to your gallery',
             style: GoogleFonts.inter(
               fontSize: 15,
               fontWeight: FontWeight.w500,

@@ -115,6 +115,7 @@ class ChatMessage {
     this.senderName,
     this.senderAvatarUrl,
     required this.createdAt,
+    this.isPending = false,
   });
 
   final String id;
@@ -124,6 +125,11 @@ class ChatMessage {
   final String? senderName;
   final String? senderAvatarUrl;
   final DateTime createdAt;
+  /// True for a locally-created optimistic message shown immediately while
+  /// its send request is still in flight — never set from the server
+  /// (`fromJson` never sets it, so it defaults false for every real
+  /// message).
+  final bool isPending;
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
     final sender = json['sender'] as Map<String, dynamic>?;

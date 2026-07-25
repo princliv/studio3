@@ -17,7 +17,9 @@ import '../widgets/piece_detail/detail_save_state.dart';
 import '../widgets/piece_detail/detail_scroll_handoff.dart';
 import '../widgets/piece_detail/piece_action_bar.dart';
 import '../widgets/piece_detail/piece_artist_row.dart';
+import '../widgets/piece_detail/materials_sheet.dart';
 import '../widgets/piece_detail/piece_comment_sheet.dart';
+import '../widgets/piece_detail/piece_location_row.dart';
 import '../widgets/piece_detail/piece_related_scenes_row.dart';
 import '../widgets/piece_detail/piece_share_sheet.dart';
 import '../widgets/piece_detail/piece_series_row.dart';
@@ -252,20 +254,23 @@ class _PieceDetailPageState extends State<PieceDetailPage>
                           ],
                         ),
                       ),
-                      GestureDetector(
-                        onTap: () {},
-                        child: Text(
-                          'View Materials →',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w400,
-                            color: HomeFeedTokens.sky600,
+                      if (item.materials.isNotEmpty)
+                        GestureDetector(
+                          onTap: () =>
+                              showMaterialsSheet(context, item.materials),
+                          child: Text(
+                            'View Materials →',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w400,
+                              color: HomeFeedTokens.sky600,
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ),
+                PieceLocationRow(location: item.location),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                   child: Text(

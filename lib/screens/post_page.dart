@@ -224,7 +224,6 @@ class _PostPageState extends State<PostPage> {
     return PostEditPage(
       key: ValueKey('edit-$_postType-${(_pickedImagePaths ?? const []).join(",")}'),
       postType: _postType,
-      selectedCellIndices: const [],
       customImagePaths: isPicked ? _pickedImagePaths : null,
       initialImageIndex: _previewImageIndex,
       initialTransforms:
@@ -238,7 +237,6 @@ class _PostPageState extends State<PostPage> {
     return PostCreatePage(
       key: const ValueKey('details'),
       postType: _postType,
-      selectedCellIndices: const [],
       imagePaths: _editImagePaths,
       transforms: _editTransforms,
       previewImageIndex: _previewImageIndex,

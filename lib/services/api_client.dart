@@ -16,7 +16,7 @@ class ApiClient {
   Dio? _dio;
   CookieJar? _cookieJar;
   Future<void>? _initFuture;
-  bool _refreshing = false;
+  Future<void>? _refreshFuture;
 
   // All 5 bottom-nav tabs fire their first request concurrently (they're
   // mounted together in an IndexedStack), so initialization must be shared
@@ -208,22 +208,40 @@ class ApiClient {
     }
   }
 
-  Future<void> _refreshToken() async {
-    if (_refreshing) return;
-    _refreshing = true;
-    try {
-      final json = await post('/api/auth/refresh');
-      final data = json['data'] as Map<String, dynamic>? ?? {};
-      final token = data['accessToken'] as String?;
-      final userJson = data['user'] as Map<String, dynamic>?;
-      if (token != null) {
-        await AuthSession.instance.updateToken(token);
-        if (userJson != null) {
-          await AuthSession.instance.updateUserFromJson(userJson);
-        }
+  // Concurrent 401s (e.g. presign + create firing close together) must all
+  // await the SAME refresh — a bool guard lets the second caller return
+  // early without a new token and retry with the still-stale one, which
+  // then fails permanently since a retried request isn't retried again.
+  //
+  // Must reset via `then(onError:)`/`catchError`, NOT `whenComplete` —
+  // whenComplete doesn't count as "handling" the error for Dart's zone-level
+  // unhandled-exception tracking, so a rejected shared future gets reported
+  // as unhandled independently of whether callers actually await it (this
+  // crashed the app: every 401 fired at startup threw as an unhandled
+  // exception even though the interceptor's try/catch does await it).
+  Future<void> _refreshToken() {
+    return _refreshFuture ??= _performRefresh().then(
+      (value) {
+        _refreshFuture = null;
+        return value;
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        _refreshFuture = null;
+        Error.throwWithStackTrace(error, stackTrace);
+      },
+    );
+  }
+
+  Future<void> _performRefresh() async {
+    final json = await post('/api/auth/refresh');
+    final data = json['data'] as Map<String, dynamic>? ?? {};
+    final token = data['accessToken'] as String?;
+    final userJson = data['user'] as Map<String, dynamic>?;
+    if (token != null) {
+      await AuthSession.instance.updateToken(token);
+      if (userJson != null) {
+        await AuthSession.instance.updateUserFromJson(userJson);
       }
-    } finally {
-      _refreshing = false;
     }
   }
 

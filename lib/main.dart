@@ -368,6 +368,8 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   }
 
   void _onPageChanged(int page) {
+    // Covers swipe-to-switch too, not just bottom-nav taps (see _onNavTap).
+    FocusManager.instance.primaryFocus?.unfocus();
     _currentPage = page;
     final navIndex = _navIndexForPage(page);
     _selectedNavIndex.value = navIndex;
@@ -379,6 +381,11 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   /// within [_kDoubleTapWindow], scrolls that page to top and refreshes it
   /// — matching Instagram's bottom-nav double-tap convention.
   void _onNavTap(int navIndex) {
+    // Every tab stays mounted in the PageView/Offstage rather than being
+    // disposed on switch, so a field focused on one tab (e.g. the Explore
+    // search bar) keeps the keyboard open even after navigating away —
+    // dismiss it on every tab switch so no tab ever inherits it.
+    FocusManager.instance.primaryFocus?.unfocus();
     final now = DateTime.now();
     final isDoubleTap = _selectedNavIndex.value == navIndex &&
         _lastNavTapIndex == navIndex &&

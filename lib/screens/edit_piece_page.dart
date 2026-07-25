@@ -87,7 +87,6 @@ class _EditPiecePageState extends State<EditPiecePage> {
   void _openShippingRegionPicker() {
     ChooseLocationSheet.show(
       context,
-      selectedIds: const {},
       onLocationSelected: (loc) {
         setState(() => _shippingRegion = loc.name);
         Navigator.pop(context);

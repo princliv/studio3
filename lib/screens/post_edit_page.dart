@@ -19,7 +19,6 @@ class PostEditPage extends StatefulWidget {
   const PostEditPage({
     super.key,
     required this.postType,
-    required this.selectedCellIndices,
     this.customImagePaths,
     this.initialImageIndex = 0,
     this.initialTransforms,
@@ -28,7 +27,6 @@ class PostEditPage extends StatefulWidget {
   });
 
   final String postType;
-  final List<int> selectedCellIndices;
   final List<String>? customImagePaths;
   final int initialImageIndex;
   final List<PostImageTransform>? initialTransforms;
@@ -87,14 +85,7 @@ class _PostEditPageState extends State<PostEditPage> {
   @override
   void initState() {
     super.initState();
-    if (widget.customImagePaths != null && widget.customImagePaths!.isNotEmpty) {
-      _imagePaths = List<String>.from(widget.customImagePaths!);
-    } else {
-      _imagePaths = PostMediaAssets.assetPathsForCells(
-        postType: widget.postType,
-        cellIndices: widget.selectedCellIndices,
-      );
-    }
+    _imagePaths = List<String>.from(widget.customImagePaths ?? const []);
     _transforms = widget.initialTransforms != null &&
             widget.initialTransforms!.length == _imagePaths.length
         ? widget.initialTransforms!.map((t) => t.copy()).toList()

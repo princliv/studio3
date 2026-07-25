@@ -156,87 +156,90 @@ class _PostCreateOptionSheetState extends State<PostCreateOptionSheet> {
   Widget build(BuildContext context) {
     final showCounter =
         widget.mode == PostPickerSelectionMode.multiCheckbox &&
-            widget.maxSelections != null;
+        widget.maxSelections != null;
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
-    return DraggableScrollableSheet(
-      initialChildSize: _initialSize,
-      minChildSize: _initialSize,
-      maxChildSize: _maxSize,
-      expand: false,
-      builder: (context, scrollController) {
-        return DecoratedBox(
-          decoration: const BoxDecoration(
-            color: _sheetBg,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: 10),
-              Container(
-                width: 82,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: _handleColor,
-                  borderRadius: BorderRadius.circular(100),
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: DraggableScrollableSheet(
+        initialChildSize: _initialSize,
+        minChildSize: _initialSize,
+        maxChildSize: _maxSize,
+        expand: false,
+        builder: (context, scrollController) {
+          return DecoratedBox(
+            decoration: const BoxDecoration(
+              color: _sheetBg,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Column(
+              children: [
+                const SizedBox(height: 10),
+                Container(
+                  width: 82,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: _handleColor,
+                    borderRadius: BorderRadius.circular(100),
+                  ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        widget.title,
-                        style: GoogleFonts.inter(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                          color: HomeFeedTokens.textInverse,
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.title,
+                          style: GoogleFonts.inter(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: HomeFeedTokens.textInverse,
+                          ),
                         ),
                       ),
-                    ),
-                    if (showCounter)
-                      Text(
-                        '${_selectedIds.length}/${widget.maxSelections}',
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w400,
-                          color: _textSecondary,
+                      if (showCounter)
+                        Text(
+                          '${_selectedIds.length}/${widget.maxSelections}',
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w400,
+                            color: _textSecondary,
+                          ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 12, 10, 8),
-                child: PostPickerSearchField(
-                  controller: _searchController,
-                  hintText: widget.searchHint,
-                  onChanged: (value) => setState(() => _query = value),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 12, 10, 8),
+                  child: PostPickerSearchField(
+                    controller: _searchController,
+                    hintText: widget.searchHint,
+                    onChanged: (value) => setState(() => _query = value),
+                  ),
                 ),
-              ),
-              Expanded(
-                child: ListView.separated(
-                  controller: scrollController,
-                  padding: const EdgeInsets.fromLTRB(4, 4, 4, 24),
-                  itemCount: _filtered.length,
-                  separatorBuilder: (context, _) =>
-                      const SizedBox(height: 3),
-                  itemBuilder: (context, index) {
-                    final option = _filtered[index];
-                    final selected = _selectedIds.contains(option.id);
-                    return _OptionListTile(
-                      label: option.name,
-                      selected: selected,
-                      mode: widget.mode,
-                      onTap: () => _toggleOption(option),
-                    );
-                  },
+                Expanded(
+                  child: ListView.separated(
+                    controller: scrollController,
+                    padding: const EdgeInsets.fromLTRB(4, 4, 4, 24),
+                    itemCount: _filtered.length,
+                    separatorBuilder: (context, _) => const SizedBox(height: 3),
+                    itemBuilder: (context, index) {
+                      final option = _filtered[index];
+                      final selected = _selectedIds.contains(option.id);
+                      return _OptionListTile(
+                        label: option.name,
+                        selected: selected,
+                        mode: widget.mode,
+                        onTap: () => _toggleOption(option),
+                      );
+                    },
+                  ),
                 ),
-              ),
-            ],
-          ),
-        );
-      },
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -276,10 +279,7 @@ class _OptionListTile extends StatelessWidget {
                   ),
                 ),
               ),
-              _SelectionIndicator(
-                selected: selected,
-                mode: mode,
-              ),
+              _SelectionIndicator(selected: selected, mode: mode),
             ],
           ),
         ),
@@ -289,10 +289,7 @@ class _OptionListTile extends StatelessWidget {
 }
 
 class _SelectionIndicator extends StatelessWidget {
-  const _SelectionIndicator({
-    required this.selected,
-    required this.mode,
-  });
+  const _SelectionIndicator({required this.selected, required this.mode});
 
   static const _borderColor = Color(0xFF8C8880);
 
@@ -339,11 +336,7 @@ class _SelectionIndicator extends StatelessWidget {
       ),
       alignment: Alignment.center,
       child: selected
-          ? const Icon(
-              Icons.check,
-              size: 12,
-              color: HomeFeedTokens.textPrimary,
-            )
+          ? const Icon(Icons.check, size: 12, color: HomeFeedTokens.textPrimary)
           : null,
     );
   }

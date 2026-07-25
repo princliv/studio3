@@ -105,7 +105,6 @@ class ListingDetailsFormState extends State<ListingDetailsForm> {
   void _openLocationPicker() {
     ChooseLocationSheet.show(
       context,
-      selectedIds: const {},
       onLocationSelected: (loc) {
         setState(() => _location = loc.name);
         Navigator.pop(context);

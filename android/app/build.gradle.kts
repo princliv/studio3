@@ -42,9 +42,22 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }
+
+// NOTE on distributable size: don't add a manual `splits { abi {...} }`
+// block here — it conflicts with the NDK abiFilters the Flutter Gradle
+// Plugin already manages itself ("Conflicting configuration ... in ndk
+// abiFilters cannot be present when splits abi filters are set"). Ship via
+// `flutter build appbundle` instead: Play Store already serves per-device
+// ABI/density/language splits from a single AAB without needing this.
 
 flutter {
     source = "../.."

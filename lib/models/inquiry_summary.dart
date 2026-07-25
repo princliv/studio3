@@ -103,6 +103,7 @@ class InquiryMessage {
     this.senderName,
     this.senderAvatarUrl,
     required this.createdAt,
+    this.isPending = false,
   });
 
   final String id;
@@ -111,6 +112,9 @@ class InquiryMessage {
   final String? senderName;
   final String? senderAvatarUrl;
   final DateTime createdAt;
+  /// True for a locally-created optimistic message shown immediately while
+  /// its send request is still in flight — never set from the server.
+  final bool isPending;
 
   factory InquiryMessage.fromJson(Map<String, dynamic> json) {
     final sender = json['sender'] as Map<String, dynamic>?;

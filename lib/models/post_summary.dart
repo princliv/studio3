@@ -6,6 +6,7 @@ class PostSummary {
     this.caption,
     this.mediaUrl,
     this.mediaType,
+    this.location,
     this.pieceId,
     this.isProcess = false,
     this.likeCount = 0,
@@ -23,6 +24,7 @@ class PostSummary {
   final String? caption;
   final String? mediaUrl;
   final String? mediaType;
+  final String? location;
   final String? pieceId;
   final bool isProcess;
   final int likeCount;
@@ -44,6 +46,7 @@ class PostSummary {
       caption: json['caption'] as String? ?? json['body'] as String?,
       mediaUrl: json['mediaUrl'] as String?,
       mediaType: json['mediaType'] as String?,
+      location: json['location'] as String?,
       pieceId: json['linkedPieceId'] as String? ?? json['pieceId'] as String?,
       isProcess: json['isProcess'] as bool? ?? false,
       likeCount: _intFrom(json['likeCount'] ?? json['likes']) ?? 0,
@@ -80,6 +83,7 @@ class PostSummary {
         if (caption != null) 'caption': caption,
         if (mediaUrl != null) 'mediaUrl': mediaUrl,
         if (mediaType != null) 'mediaType': mediaType,
+        if (location != null) 'location': location,
         if (pieceId != null) 'linkedPieceId': pieceId,
         'isProcess': isProcess,
         'likeCount': likeCount,

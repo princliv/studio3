@@ -13,6 +13,7 @@ class PieceSummary {
     this.priceCents,
     this.dimensions,
     this.shippingRegion,
+    this.location,
     this.yearCreated,
     this.framingMounting,
     this.provenance,
@@ -44,6 +45,7 @@ class PieceSummary {
   final int? priceCents;
   final String? dimensions;
   final String? shippingRegion;
+  final String? location;
   final int? yearCreated;
   final String? framingMounting;
   final String? provenance;
@@ -82,6 +84,7 @@ class PieceSummary {
       priceCents: json['priceCents'] as int?,
       dimensions: json['dimensions'] as String?,
       shippingRegion: json['shippingRegion'] as String?,
+      location: json['location'] as String?,
       yearCreated: _intFrom(json['yearCreated']),
       framingMounting: json['framingMounting'] as String?,
       provenance: json['provenance'] as String?,
@@ -139,6 +142,7 @@ class PieceSummary {
         if (priceCents != null) 'priceCents': priceCents,
         if (dimensions != null) 'dimensions': dimensions,
         if (shippingRegion != null) 'shippingRegion': shippingRegion,
+        if (location != null) 'location': location,
         if (yearCreated != null) 'yearCreated': yearCreated,
         if (framingMounting != null) 'framingMounting': framingMounting,
         if (provenance != null) 'provenance': provenance,
