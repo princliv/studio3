@@ -47,14 +47,36 @@ class ExploreFeaturedCard extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              _HeroImage(url: item.mediaUrl),
+              _HeroImage(
+                url: item.isVideo
+                    ? (item.thumbnailUrl ?? item.mediaUrl)
+                    : item.mediaUrl,
+              ),
+              if (item.isVideo)
+                Center(
+                  child: Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.45),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.play_arrow_rounded,
+                      color: Colors.white,
+                      size: 32,
+                    ),
+                  ),
+                ),
               const FeedCardBottomScrim(),
               Positioned(
                 left: 12,
                 top: 12,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: ExploreTokens.textPrimary.withValues(alpha: 0.72),
                     borderRadius: BorderRadius.circular(4),
@@ -105,7 +127,9 @@ class ExploreFeaturedCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 12,
-                          color: ExploreTokens.textInverse.withValues(alpha: 0.85),
+                          color: ExploreTokens.textInverse.withValues(
+                            alpha: 0.85,
+                          ),
                         ),
                       ),
                     ],
@@ -136,7 +160,8 @@ class _HeroImage extends StatelessWidget {
       width: double.infinity,
       height: double.infinity,
       memCacheWidth:
-          (MediaQuery.sizeOf(context).width * MediaQuery.devicePixelRatioOf(context))
+          (MediaQuery.sizeOf(context).width *
+                  MediaQuery.devicePixelRatioOf(context))
               .round(),
       errorWidget: (context, error, stackTrace) =>
           const ColoredBox(color: ExploreTokens.skeleton),

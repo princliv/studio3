@@ -39,11 +39,12 @@ class PieceActionBar extends StatelessWidget {
             label: 'Comment',
             onTap: onComment,
           ),
-          _ActionButton(
-            icon: Icons.ios_share_outlined,
-            label: 'Share',
-            onTap: onShare,
-          ),
+          // Share hidden for now — see plan/task history to re-enable.
+          // _ActionButton(
+          //   icon: Icons.ios_share_outlined,
+          //   label: 'Share',
+          //   onTap: onShare,
+          // ),
           _ActionButton(
             icon: saved ? Icons.bookmark : Icons.bookmark_border,
             label: 'Save',

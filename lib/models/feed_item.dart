@@ -37,9 +37,8 @@ class FeedItem {
   String? get authorName =>
       type == FeedItemType.piece ? piece!.authorName : post!.authorName;
 
-  String? get authorUsername => type == FeedItemType.piece
-      ? piece!.authorUsername
-      : post!.authorUsername;
+  String? get authorUsername =>
+      type == FeedItemType.piece ? piece!.authorUsername : post!.authorUsername;
 
   String? get authorAvatarUrl => type == FeedItemType.piece
       ? piece!.authorAvatarUrl
@@ -57,6 +56,10 @@ class FeedItem {
   String? get mediaAspectRatio => type == FeedItemType.piece
       ? piece?.mediaAspectRatio
       : post?.mediaAspectRatio;
+
+  /// Video poster frame — pieces are never video, so this is post-only.
+  String? get thumbnailUrl =>
+      type == FeedItemType.piece ? null : post?.thumbnailUrl;
 
   bool get isVideo {
     final t = mediaType?.toLowerCase();
@@ -92,11 +95,11 @@ class CommentSummary {
     return CommentSummary(
       id: json['id'] as String? ?? json['_id'] as String? ?? '',
       body: json['body'] as String? ?? '',
-      authorUsername: author?['username'] as String? ??
-          user?['username'] as String?,
-      authorName:
-          author?['name'] as String? ?? user?['name'] as String?,
-      authorAvatarUrl: author?['profilePhotoUrl'] as String? ??
+      authorUsername:
+          author?['username'] as String? ?? user?['username'] as String?,
+      authorName: author?['name'] as String? ?? user?['name'] as String?,
+      authorAvatarUrl:
+          author?['profilePhotoUrl'] as String? ??
           user?['profilePhotoUrl'] as String?,
       createdAt: json['createdAt'] as String?,
     );

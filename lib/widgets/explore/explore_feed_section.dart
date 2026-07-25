@@ -30,8 +30,7 @@ class _ExploreFeedTileViewState extends State<ExploreFeedTileView> {
   }
 
   BorderRadius get _radius =>
-      widget.borderRadius ??
-      BorderRadius.circular(ExploreTokens.tileRadius);
+      widget.borderRadius ?? BorderRadius.circular(ExploreTokens.tileRadius);
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +57,12 @@ class _ExploreFeedTileViewState extends State<ExploreFeedTileView> {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  ExploreFeedImage(url: widget.tile.item.mediaUrl),
+                  ExploreFeedImage(
+                    url: widget.tile.item.isVideo
+                        ? (widget.tile.item.thumbnailUrl ??
+                              widget.tile.item.mediaUrl)
+                        : widget.tile.item.mediaUrl,
+                  ),
                   if (widget.tile.item.isVideo)
                     Container(
                       color: Colors.black.withValues(alpha: 0.18),
@@ -130,13 +134,13 @@ class ExploreFeedBlockView extends StatelessWidget {
             ],
           ),
         ExploreTwoUpBlock(:final left, :final right) => Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: ExploreFeedTileView(tile: left)),
-              const SizedBox(width: ExploreTokens.gutter),
-              Expanded(child: ExploreFeedTileView(tile: right)),
-            ],
-          ),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: ExploreFeedTileView(tile: left)),
+            const SizedBox(width: ExploreTokens.gutter),
+            Expanded(child: ExploreFeedTileView(tile: right)),
+          ],
+        ),
         ExploreFullWidthBlock(:final tile) => ExploreFeedTileView(tile: tile),
       },
     );

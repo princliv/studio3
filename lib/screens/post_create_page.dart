@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -39,6 +39,7 @@ class PostCreatePage extends StatefulWidget {
     this.onEdit,
     this.mediaKind = 'image',
     this.videoPath,
+    this.videoThumbnailBytes,
   });
 
   final String postType;
@@ -49,6 +50,7 @@ class PostCreatePage extends StatefulWidget {
   final VoidCallback? onEdit;
   final String mediaKind;
   final String? videoPath;
+  final Uint8List? videoThumbnailBytes;
 
   @override
   State<PostCreatePage> createState() => _PostCreatePageState();
@@ -263,6 +265,7 @@ class _PostCreatePageState extends State<PostCreatePage> {
       imagePaths: widget.imagePaths,
       mediaKind: widget.mediaKind,
       videoPath: widget.videoPath,
+      videoThumbnailBytes: widget.videoThumbnailBytes,
       title: _nameController.text,
       description: _descriptionController.text,
       mediumId: _selectedMediumId,
@@ -371,7 +374,10 @@ class _PostCreatePageState extends State<PostCreatePage> {
                   const SizedBox(height: 13),
                   Center(
                     child: widget.mediaKind == 'video'
-                        ? _VideoPreviewCard(videoPath: widget.videoPath)
+                        ? _VideoPreviewCard(
+                            thumbnailBytes: widget.videoThumbnailBytes,
+                            onEdit: widget.onEdit,
+                          )
                         : _PreviewCard(
                             imagePath:
                                 widget.imagePaths[widget.previewImageIndex],
@@ -539,42 +545,71 @@ class _PostCreatePageState extends State<PostCreatePage> {
 }
 
 class _VideoPreviewCard extends StatelessWidget {
-  const _VideoPreviewCard({this.videoPath});
+  const _VideoPreviewCard({this.thumbnailBytes, this.onEdit});
 
   static const _cardWidth = 200.0;
   static const _cardHeight = 266.0;
   static const _cardRadius = 8.0;
 
-  final String? videoPath;
+  final Uint8List? thumbnailBytes;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       width: _cardWidth,
       height: _cardHeight,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(_cardRadius),
-        child: ColoredBox(
-          color: const Color(0xFF4A4843),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              if (videoPath != null)
-                Opacity(
-                  opacity: 0.35,
-                  child: Image.file(
-                    File(videoPath!),
-                    width: _cardWidth,
-                    height: _cardHeight,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) =>
-                        const SizedBox.shrink(),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(_cardRadius),
+            child: ColoredBox(
+              color: const Color(0xFF4A4843),
+              child: Stack(
+                fit: StackFit.expand,
+                alignment: Alignment.center,
+                children: [
+                  if (thumbnailBytes != null)
+                    Image.memory(
+                      thumbnailBytes!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          const SizedBox.shrink(),
+                    ),
+                  const Icon(
+                    Icons.play_circle_fill,
+                    color: Colors.white,
+                    size: 56,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (onEdit != null)
+            Positioned(
+              top: 8,
+              right: 8,
+              child: GestureDetector(
+                onTap: onEdit,
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  alignment: Alignment.center,
+                  child: SvgPicture.asset(
+                    PostMediaAssets.createPencilIcon,
+                    width: 12,
+                    height: 12,
                   ),
                 ),
-              const Icon(Icons.play_circle_fill, color: Colors.white, size: 56),
-            ],
-          ),
-        ),
+              ),
+            ),
+        ],
       ),
     );
   }

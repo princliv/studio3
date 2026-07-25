@@ -22,7 +22,7 @@ abstract final class ImageAspectRatioResolver {
     if (cached != null) return cached;
 
     final raw = await _decode(url);
-    final snapped = _snap(raw ?? portrait3x4);
+    final snapped = snap(raw ?? portrait3x4);
     _cache[url] = snapped;
     return snapped;
   }
@@ -49,7 +49,10 @@ abstract final class ImageAspectRatioResolver {
     return completer.future;
   }
 
-  static double _snap(double raw) {
+  /// Snaps any raw width/height ratio to whichever of the two posting
+  /// ratios (3:4 or 16:9) it's closer to — shared by the image feed and the
+  /// video player so both agree on the same boundary.
+  static double snap(double raw) {
     final portraitDiff = (raw - portrait3x4).abs();
     final landscapeDiff = (raw - landscape16x9).abs();
     return portraitDiff <= landscapeDiff ? portrait3x4 : landscape16x9;

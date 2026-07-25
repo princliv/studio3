@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -10,8 +12,9 @@ import '../widgets/permission_denied_sheet.dart';
 import '../widgets/post_gallery/post_gallery_picker.dart';
 import 'post_create_page.dart';
 import 'post_edit_page.dart';
+import 'post_video_edit_page.dart';
 
-enum _PostFlowStep { gallery, edit, details }
+enum _PostFlowStep { gallery, edit, videoEdit, details }
 
 /// Single-route posting flow: gallery → edit → details (Figma 1609:1975).
 class PostPage extends StatefulWidget {
@@ -31,6 +34,7 @@ class _PostPageState extends State<PostPage> {
   List<AssetEntity> _pickedAssets = [];
   List<String>? _pickedImagePaths;
   String? _pickedVideoPath;
+  Uint8List? _pickedVideoThumbnailBytes;
   final ValueNotifier<bool> _albumMenuOpen = ValueNotifier(false);
   String _selectedAlbumName = 'Recents';
 
@@ -53,6 +57,7 @@ class _PostPageState extends State<PostPage> {
       _pickedAssets = [];
       _pickedImagePaths = null;
       _pickedVideoPath = null;
+      _pickedVideoThumbnailBytes = null;
     });
   }
 
@@ -67,12 +72,21 @@ class _PostPageState extends State<PostPage> {
     }
     if (video != null) {
       final file = await video.file;
+      // Same proven thumbnail source the gallery grid itself uses
+      // (`_AssetThumbnail` in post_gallery_picker.dart) — captured now,
+      // before the AssetEntity reference is gone, so both the compose
+      // preview and the published thumbnail show a real poster frame
+      // instead of a broken attempt to decode the video file as an image.
+      final thumbnail = await video.thumbnailDataWithSize(
+        const ThumbnailSize.square(720),
+      );
       if (file == null || !mounted) return;
       setState(() {
         _pickedVideoPath = file.path;
+        _pickedVideoThumbnailBytes = thumbnail;
         _pickedImagePaths = null;
+        _step = _PostFlowStep.videoEdit;
       });
-      _goToDetailsFromVideo();
       return;
     }
     final paths = <String>[];
@@ -87,9 +101,9 @@ class _PostPageState extends State<PostPage> {
     });
   }
 
-  void _goToDetailsFromVideo() {
-    if (_pickedVideoPath == null) return;
+  void _goToDetailsFromVideoEdit(String finalVideoPath) {
     setState(() {
+      _pickedVideoPath = finalVideoPath;
       _editImagePaths = [];
       _editTransforms = [];
       _previewImageIndex = 0;
@@ -123,11 +137,12 @@ class _PostPageState extends State<PostPage> {
       case _PostFlowStep.gallery:
         return true;
       case _PostFlowStep.edit:
+      case _PostFlowStep.videoEdit:
         _backToGallery();
         return false;
       case _PostFlowStep.details:
         if (_pickedVideoPath != null) {
-          _backToGallery();
+          setState(() => _step = _PostFlowStep.videoEdit);
         } else {
           _backToEdit();
         }
@@ -146,6 +161,7 @@ class _PostPageState extends State<PostPage> {
       child: switch (_step) {
         _PostFlowStep.gallery => _buildGallery(),
         _PostFlowStep.edit => _buildEdit(),
+        _PostFlowStep.videoEdit => _buildVideoEdit(),
         _PostFlowStep.details => _buildDetails(),
       },
     );
@@ -222,14 +238,24 @@ class _PostPageState extends State<PostPage> {
   Widget _buildEdit() {
     final isPicked = _pickedImagePaths != null && _pickedImagePaths!.isNotEmpty;
     return PostEditPage(
-      key: ValueKey('edit-$_postType-${(_pickedImagePaths ?? const []).join(",")}'),
+      key: ValueKey(
+        'edit-$_postType-${(_pickedImagePaths ?? const []).join(",")}',
+      ),
       postType: _postType,
       customImagePaths: isPicked ? _pickedImagePaths : null,
       initialImageIndex: _previewImageIndex,
-      initialTransforms:
-          _editTransforms.isNotEmpty ? _editTransforms : null,
+      initialTransforms: _editTransforms.isNotEmpty ? _editTransforms : null,
       onClose: _exitFlow,
       onNext: _goToDetails,
+    );
+  }
+
+  Widget _buildVideoEdit() {
+    return PostVideoEditPage(
+      key: ValueKey('video-edit-$_pickedVideoPath'),
+      videoPath: _pickedVideoPath!,
+      onClose: _exitFlow,
+      onNext: _goToDetailsFromVideoEdit,
     );
   }
 
@@ -241,9 +267,12 @@ class _PostPageState extends State<PostPage> {
       transforms: _editTransforms,
       previewImageIndex: _previewImageIndex,
       onClose: _exitFlow,
-      onEdit: _pickedVideoPath != null ? null : _backToEdit,
+      onEdit: _pickedVideoPath != null
+          ? () => setState(() => _step = _PostFlowStep.videoEdit)
+          : _backToEdit,
       mediaKind: _pickedVideoPath != null ? 'video' : 'image',
       videoPath: _pickedVideoPath,
+      videoThumbnailBytes: _pickedVideoThumbnailBytes,
     );
   }
 }
@@ -365,10 +394,7 @@ class _PostingBanner extends StatelessWidget {
 }
 
 class _PostingSelector extends StatelessWidget {
-  const _PostingSelector({
-    required this.postType,
-    required this.onChanged,
-  });
+  const _PostingSelector({required this.postType, required this.onChanged});
 
   static const _selectorBg = Color(0xE6231F1B);
 

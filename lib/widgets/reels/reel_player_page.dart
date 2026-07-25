@@ -27,6 +27,8 @@ class _ReelPlayerPageState extends State<ReelPlayerPage> {
   VideoPlayerController? _controller;
   bool _initializing = false;
   bool _failed = false;
+  final _overlayKey = GlobalKey<ReelOverlayState>();
+  bool _showHeart = false;
 
   @override
   void initState() {
@@ -34,6 +36,14 @@ class _ReelPlayerPageState extends State<ReelPlayerPage> {
     if (widget.isActive) {
       _initController();
     }
+  }
+
+  void _onDoubleTap() {
+    _overlayKey.currentState?.likeIfNotAlready();
+    setState(() => _showHeart = true);
+    Future<void>.delayed(const Duration(milliseconds: 700), () {
+      if (mounted) setState(() => _showHeart = false);
+    });
   }
 
   @override
@@ -74,7 +84,7 @@ class _ReelPlayerPageState extends State<ReelPlayerPage> {
     });
     final controller = VideoPlayerController.networkUrl(
       Uri.parse(url),
-      formatHint: VideoFormat.mp4,
+      formatHint: VideoFormat.other,
       viewType: _viewType,
     );
     try {
@@ -113,58 +123,85 @@ class _ReelPlayerPageState extends State<ReelPlayerPage> {
   Widget build(BuildContext context) {
     return ColoredBox(
       color: Colors.black,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (_controller != null && _controller!.value.isInitialized)
-            // Explicit cover layout (not FittedBox scale) so Android platform
-            // views fill the frame correctly without texture-transform glitches.
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final size = _controller!.value.size;
-                final videoAspect =
-                    size.width == 0 ? 9 / 16 : size.width / size.height;
-                final frameAspect =
-                    constraints.maxWidth / constraints.maxHeight;
-                late final double width;
-                late final double height;
-                if (videoAspect > frameAspect) {
-                  height = constraints.maxHeight;
-                  width = height * videoAspect;
-                } else {
-                  width = constraints.maxWidth;
-                  height = width / videoAspect;
-                }
-                return SizedBox.expand(
-                  child: ClipRect(
-                    child: Center(
-                      child: SizedBox(
-                        width: width,
-                        height: height,
-                        child: VideoPlayer(_controller!),
-                      ),
+      child: GestureDetector(
+        onDoubleTap: _onDoubleTap,
+        behavior: HitTestBehavior.opaque,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (_controller != null && _controller!.value.isInitialized)
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final size = _controller!.value.size;
+                  final rawAspect = size.width == 0
+                      ? 9 / 16
+                      : size.width / size.height;
+
+                  // Plain contain-fit at the video's real, original aspect
+                  // ratio — no cropping, no forcing into 3:4/16:9. Whatever
+                  // doesn't fill the screen on one axis shows as letterbox
+                  // bars from the screen's own black background.
+                  final screenAspect =
+                      constraints.maxWidth / constraints.maxHeight;
+                  late final double frameWidth;
+                  late final double frameHeight;
+                  if (rawAspect > screenAspect) {
+                    frameWidth = constraints.maxWidth;
+                    frameHeight = frameWidth / rawAspect;
+                  } else {
+                    frameHeight = constraints.maxHeight;
+                    frameWidth = frameHeight * rawAspect;
+                  }
+
+                  return Center(
+                    child: SizedBox(
+                      width: frameWidth,
+                      height: frameHeight,
+                      child: VideoPlayer(_controller!),
+                    ),
+                  );
+                },
+              )
+            else if (_failed)
+              const Center(
+                child: Icon(
+                  Icons.videocam_off_outlined,
+                  color: Colors.white54,
+                  size: 48,
+                ),
+              )
+            else
+              const Center(
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              ),
+            IgnorePointer(
+              child: Center(
+                child: AnimatedOpacity(
+                  opacity: _showHeart ? 1 : 0,
+                  duration: const Duration(milliseconds: 150),
+                  child: AnimatedScale(
+                    scale: _showHeart ? 1 : 0.6,
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOut,
+                    child: const Icon(
+                      Icons.favorite,
+                      color: Colors.white,
+                      size: 100,
                     ),
                   ),
-                );
-              },
-            )
-          else if (_failed)
-            const Center(
-              child: Icon(Icons.videocam_off_outlined,
-                  color: Colors.white54, size: 48),
-            )
-          else
-            const Center(
-              child: CircularProgressIndicator(
-                color: Colors.white,
-                strokeWidth: 2,
+                ),
               ),
             ),
-          ReelOverlay(
-            item: widget.item,
-            bottomPadding: widget.bottomOverlayPadding,
-          ),
-        ],
+            ReelOverlay(
+              key: _overlayKey,
+              item: widget.item,
+              bottomPadding: widget.bottomOverlayPadding,
+            ),
+          ],
+        ),
       ),
     );
   }

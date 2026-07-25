@@ -20,7 +20,20 @@ subprojects {
     // float to whatever the resolved Kotlin Gradle Plugin version defaults
     // to — which can drift out of sync with the Java target ("Inconsistent
     // JVM Target Compatibility"). Force both to the same value everywhere.
+    //
+    // Other plugins (e.g. easy_video_editor) go the other way: they pin
+    // Java 1.8 via `android.compileOptions` directly. AGP re-reads that DSL
+    // value onto the JavaCompile task when it wires up the variant, which
+    // happens as part of the *same* afterEvaluate phase — so a plain
+    // `tasks.withType<JavaCompile>().configureEach { sourceCompatibility = ... }`
+    // can lose that race depending on callback registration order. Overriding
+    // `android.compileOptions` itself (the actual source AGP reads from) is
+    // the reliable fix, so do that too, for both library and app modules.
     afterEvaluate {
+        extensions.findByType<com.android.build.gradle.BaseExtension>()?.let { android ->
+            android.compileOptions.sourceCompatibility = JavaVersion.VERSION_17
+            android.compileOptions.targetCompatibility = JavaVersion.VERSION_17
+        }
         tasks.withType<JavaCompile>().configureEach {
             sourceCompatibility = "17"
             targetCompatibility = "17"

@@ -30,6 +30,11 @@ class HomeFeedStore extends ChangeNotifier {
   List<FeedItem> get availableItems =>
       apiItems.where((item) => item.isForSale).toList();
 
+  /// The "All" tab never shows video scenes — those live in Explore/Reels
+  /// only.
+  List<FeedItem> get feedItems =>
+      apiItems.where((item) => !item.isVideo).toList();
+
   /// Paints instantly from whatever's already cached (if anything) instead
   /// of starting from an empty spinner, then kicks off a fetch to silently
   /// refresh in the background. Safe to call from both slides — only runs
@@ -219,7 +224,7 @@ class _HomePageState extends State<HomePage>
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.paddingOf(context).bottom + 100;
     final store = widget.store;
-    final items = _showAvailable ? store.availableItems : store.apiItems;
+    final items = _showAvailable ? store.availableItems : store.feedItems;
     final filter = _showAvailable
         ? FeedAvailabilityFilter.available
         : FeedAvailabilityFilter.all;
@@ -402,9 +407,10 @@ class _ApiFeedTileState extends State<_ApiFeedTile> {
                 CachedNetworkImage(
                   imageUrl: url,
                   fit: BoxFit.cover,
-                  memCacheWidth: (MediaQuery.sizeOf(context).width *
-                          MediaQuery.devicePixelRatioOf(context))
-                      .round(),
+                  memCacheWidth:
+                      (MediaQuery.sizeOf(context).width *
+                              MediaQuery.devicePixelRatioOf(context))
+                          .round(),
                   errorWidget: (context, error, stackTrace) =>
                       ColoredBox(color: Colors.grey.shade300),
                 )

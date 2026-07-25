@@ -12,20 +12,16 @@ import '../save_to_collection_sheet.dart';
 import 'scene_video_comment_sheet.dart';
 
 class ReelOverlay extends StatefulWidget {
-  const ReelOverlay({
-    super.key,
-    required this.item,
-    this.bottomPadding = 96,
-  });
+  const ReelOverlay({super.key, required this.item, this.bottomPadding = 96});
 
   final FeedItem item;
   final double bottomPadding;
 
   @override
-  State<ReelOverlay> createState() => _ReelOverlayState();
+  State<ReelOverlay> createState() => ReelOverlayState();
 }
 
-class _ReelOverlayState extends State<ReelOverlay> {
+class ReelOverlayState extends State<ReelOverlay> {
   late bool _liked;
   late bool _saved;
   late int _likeCount;
@@ -38,11 +34,17 @@ class _ReelOverlayState extends State<ReelOverlay> {
     final postId = post?.id;
     _liked = post?.isLiked ?? false;
     _saved = postId != null
-        ? SavedContentStore.instance.isSaved(postId) ||
-            (post?.isSaved ?? false)
+        ? SavedContentStore.instance.isSaved(postId) || (post?.isSaved ?? false)
         : false;
     _likeCount = post?.likeCount ?? 0;
     _commentCount = 0;
+  }
+
+  /// For double-tap-to-like on the video itself: only ever turns liking on,
+  /// never off (matches every app that has this gesture).
+  void likeIfNotAlready() {
+    if (_liked) return;
+    _toggleLike();
   }
 
   Future<void> _toggleLike() async {
@@ -78,27 +80,28 @@ class _ReelOverlayState extends State<ReelOverlay> {
     );
     if (!mounted || posted != true) return;
     setState(() => _commentCount += 1);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Comment posted')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Comment posted')));
   }
 
-  Future<void> _shareScene() async {
-    final post = widget.item.post;
-    final author = widget.item.authorName ?? 'an artist';
-    final caption = post?.caption?.trim();
-    final mediaUrl = widget.item.mediaUrl;
-    final lines = <String>[
-      'Scene by $author on Studio',
-      if (caption != null && caption.isNotEmpty) caption,
-      if (mediaUrl != null && mediaUrl.isNotEmpty) mediaUrl,
-    ];
-    await Clipboard.setData(ClipboardData(text: lines.join('\n\n')));
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Scene link copied')),
-    );
-  }
+  // Share hidden for now — see plan/task history to re-enable.
+  // Future<void> _shareScene() async {
+  //   final post = widget.item.post;
+  //   final author = widget.item.authorName ?? 'an artist';
+  //   final caption = post?.caption?.trim();
+  //   final mediaUrl = widget.item.mediaUrl;
+  //   final lines = <String>[
+  //     'Scene by $author on Studio',
+  //     if (caption != null && caption.isNotEmpty) caption,
+  //     if (mediaUrl != null && mediaUrl.isNotEmpty) mediaUrl,
+  //   ];
+  //   await Clipboard.setData(ClipboardData(text: lines.join('\n\n')));
+  //   if (!mounted) return;
+  //   ScaffoldMessenger.of(
+  //     context,
+  //   ).showSnackBar(const SnackBar(content: Text('Scene link copied')));
+  // }
 
   Future<void> _toggleSave() async {
     final postId = widget.item.post?.id;
@@ -136,7 +139,11 @@ class _ReelOverlayState extends State<ReelOverlay> {
       // Keep local saved state for scene videos when API is unavailable.
     }
     if (mounted && nextSaved && hadCollections) {
-      showCollectionSavedToast(context, saved: true, thumbnailUrl: widget.item.mediaUrl);
+      showCollectionSavedToast(
+        context,
+        saved: true,
+        thumbnailUrl: widget.item.mediaUrl,
+      );
     }
   }
 
@@ -166,10 +173,7 @@ class _ReelOverlayState extends State<ReelOverlay> {
                       behavior: authorUsername != null
                           ? HitTestBehavior.opaque
                           : HitTestBehavior.deferToChild,
-                      child: ProfileAvatar(
-                        url: null,
-                        size: 36,
-                      ),
+                      child: ProfileAvatar(url: null, size: 36),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -227,18 +231,16 @@ class _ReelOverlayState extends State<ReelOverlay> {
                 label: _commentCount > 0 ? '$_commentCount' : 'Comment',
                 onTap: _openComments,
               ),
+              // Share hidden for now — see plan/task history to re-enable.
+              // const SizedBox(height: 18),
+              // _ActionButton(
+              //   icon: Icons.ios_share_rounded,
+              //   iconColor: Colors.white,
+              //   label: 'Share',
+              //   onTap: _shareScene,
+              // ),
               const SizedBox(height: 18),
-              _ActionButton(
-                icon: Icons.ios_share_rounded,
-                iconColor: Colors.white,
-                label: 'Share',
-                onTap: _shareScene,
-              ),
-              const SizedBox(height: 18),
-              _SaveActionButton(
-                saved: _saved,
-                onTap: _toggleSave,
-              ),
+              _SaveActionButton(saved: _saved, onTap: _toggleSave),
             ],
           ),
         ],
@@ -289,10 +291,7 @@ class _LikeActionButton extends StatelessWidget {
 }
 
 class _SaveActionButton extends StatelessWidget {
-  const _SaveActionButton({
-    required this.saved,
-    required this.onTap,
-  });
+  const _SaveActionButton({required this.saved, required this.onTap});
 
   final bool saved;
   final VoidCallback onTap;

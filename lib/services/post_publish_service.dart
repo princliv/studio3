@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import '../data/post_material_options.dart';
 import '../models/listing_details.dart';
@@ -18,6 +19,7 @@ class PostDraft {
     required this.imagePaths,
     this.mediaKind = 'image',
     this.videoPath,
+    this.videoThumbnailBytes,
     this.title = '',
     this.description = '',
     this.mediumId,
@@ -40,6 +42,7 @@ class PostDraft {
   final List<String> imagePaths;
   final String mediaKind;
   final String? videoPath;
+  final Uint8List? videoThumbnailBytes;
   final String title;
   final String description;
   final String? mediumId;
@@ -135,6 +138,10 @@ class PostPublishService {
         // and contentTypeForPath would otherwise fall back to image/jpeg.
         contentType: 'video/mp4',
       );
+      final thumbnailUrl = await _uploadVideoThumbnail(
+        draft.videoThumbnailBytes,
+        purpose,
+      );
       await _posts.create({
         'mediaUrl': mediaUrl,
         'mediaType': 'video',
@@ -144,6 +151,7 @@ class PostPublishService {
           'linkedPieceId': draft.linkedPieceId,
         if (draft.location != null && draft.location!.isNotEmpty)
           'location': draft.location,
+        if (thumbnailUrl != null) 'thumbnailUrl': thumbnailUrl,
         'isProcess': draft.isProcess,
       });
       return;
@@ -152,8 +160,10 @@ class PostPublishService {
     if (draft.imagePaths.isEmpty) {
       throw Exception('No image selected');
     }
-    final imageIndex =
-        draft.previewImageIndex.clamp(0, draft.imagePaths.length - 1);
+    final imageIndex = draft.previewImageIndex.clamp(
+      0,
+      draft.imagePaths.length - 1,
+    );
     final imagePath = draft.imagePaths[imageIndex];
     final transform = imageIndex < draft.transforms.length
         ? draft.transforms[imageIndex]
@@ -167,8 +177,9 @@ class PostPublishService {
       bytes: bytes,
       contentType: 'image/png',
     );
-    final mediaAspectRatio =
-        transform.aspectRatio == CropAspectRatio.ratio16x9 ? '16:9' : '3:4';
+    final mediaAspectRatio = transform.aspectRatio == CropAspectRatio.ratio16x9
+        ? '16:9'
+        : '3:4';
 
     if (isScene) {
       await _posts.create({
@@ -224,6 +235,28 @@ class PostPublishService {
 
     final piece = await _pieces.create(body);
     await _assignPieceToSeries(draft, piece.id);
+  }
+
+  /// Uploads the poster-frame bytes captured at pick-time (via
+  /// `AssetEntity.thumbnailDataWithSize`, the same proven mechanism the
+  /// gallery grid itself uses — see `post_page.dart`) as a still image
+  /// (same presign/S3 path as any other image), so Explore can show a real
+  /// thumbnail instead of trying to decode the video file itself.
+  /// Best-effort — a failure here shouldn't block the video post.
+  Future<String?> _uploadVideoThumbnail(
+    Uint8List? thumbnailBytes,
+    String purpose,
+  ) async {
+    if (thumbnailBytes == null) return null;
+    try {
+      return await _media.uploadBytes(
+        purpose: purpose,
+        bytes: thumbnailBytes,
+        contentType: 'image/jpeg',
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _assignPieceToSeries(PostDraft draft, String pieceId) async {
