@@ -244,10 +244,11 @@ packages:
   easy_video_editor:
     dependency: "direct main"
     description:
-      name: easy_video_editor
-      sha256: fceb12106779039c684a787f9d929d91d97ae7aa3a3c4c98061dc25b4820644f
-      url: "https://pub.dev"
-    source: hosted
+      path: "."
+      ref: "17989b573f88442e49243820d7dbb7889e9cb15e"
+      resolved-ref: "17989b573f88442e49243820d7dbb7889e9cb15e"
+      url: "https://github.com/iawtk2302/easy_video_editor.git"
+    source: git
     version: "0.1.6"
   fake_async:
     dependency: transitive

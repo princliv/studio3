@@ -31,7 +31,6 @@ import 'screens/saved_page.dart';
 import 'screens/profile_page.dart';
 import 'screens/post_page.dart';
 import 'screens/inbox_page.dart';
-import 'screens/chat_page.dart';
 import 'screens/onboarding/onboarding_page.dart';
 import 'screens/edit_profile_page.dart';
 import 'screens/manage_series_page.dart';
@@ -147,7 +146,8 @@ class Studio3App extends StatelessWidget {
           );
         },
         '/post': (context) => const PostPage(),
-        '/chat': (context) => const ChatPage(),
+        // Inquiries deferred to v2 — legacy /chat route redirects to Conversations inbox.
+        '/chat': (context) => const InboxPage(initialTab: InboxTab.chats),
         '/inbox': (context) {
           final tab = ModalRoute.of(context)?.settings.arguments as InboxTab?;
           return InboxPage(initialTab: tab ?? InboxTab.notifications);

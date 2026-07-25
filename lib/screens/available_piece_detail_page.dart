@@ -70,9 +70,10 @@ class _AvailablePieceDetailPageState extends State<AvailablePieceDetailPage>
 
   @override
   void initState() {
-    _item = widget.item;
+    _item = engagementStore.applyToPreview(widget.item);
     super.initState();
     liked = _item.isLiked;
+    likeCount = _item.likeCount;
     applyFollowState(_item);
     _loadDetail();
   }
@@ -113,8 +114,12 @@ class _AvailablePieceDetailPageState extends State<AvailablePieceDetailPage>
       if (saved == true) _loadDetail();
     } catch (e) {
       if (!mounted) return;
-      final message = e is ApiException ? e.message : 'Could not load for editing';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      final message = e is ApiException
+          ? e.message
+          : 'Could not load for editing';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
@@ -253,7 +258,8 @@ class _AvailablePieceDetailPageState extends State<AvailablePieceDetailPage>
                         style: GoogleFonts.inter(
                           fontSize: CollectDetailTokens.titleSize,
                           fontWeight: FontWeight.w400,
-                          height: CollectDetailTokens.titleLineHeight /
+                          height:
+                              CollectDetailTokens.titleLineHeight /
                               CollectDetailTokens.titleSize,
                           color: CollectDetailTokens.textPrimary,
                         ),
@@ -275,7 +281,8 @@ class _AvailablePieceDetailPageState extends State<AvailablePieceDetailPage>
                                   style: GoogleFonts.inter(
                                     fontSize: CollectDetailTokens.metaSize,
                                     fontWeight: FontWeight.w400,
-                                    height: CollectDetailTokens.metaLineHeight /
+                                    height:
+                                        CollectDetailTokens.metaLineHeight /
                                         CollectDetailTokens.metaSize,
                                     color: CollectDetailTokens.textSecondary,
                                   ),
@@ -286,7 +293,8 @@ class _AvailablePieceDetailPageState extends State<AvailablePieceDetailPage>
                                   style: GoogleFonts.inter(
                                     fontSize: CollectDetailTokens.metaSize,
                                     fontWeight: FontWeight.w400,
-                                    height: CollectDetailTokens.metaLineHeight /
+                                    height:
+                                        CollectDetailTokens.metaLineHeight /
                                         CollectDetailTokens.metaSize,
                                     color: CollectDetailTokens.textSecondary,
                                   ),
@@ -331,7 +339,8 @@ class _AvailablePieceDetailPageState extends State<AvailablePieceDetailPage>
                             style: GoogleFonts.inter(
                               fontSize: CollectDetailTokens.storySize,
                               fontWeight: FontWeight.w400,
-                              height: CollectDetailTokens.storyLineHeight /
+                              height:
+                                  CollectDetailTokens.storyLineHeight /
                                   CollectDetailTokens.storySize,
                               color: CollectDetailTokens.textPrimary,
                             ),

@@ -8,6 +8,7 @@ import '../models/feed_preview_item.dart';
 import '../models/piece_summary.dart';
 import '../models/post_summary.dart';
 import 'cache_service.dart';
+import 'engagement_store.dart';
 import 'social_service.dart';
 
 enum SavedContentKind { piece, scene }
@@ -43,12 +44,12 @@ class SavedEntry {
       feedItem?.isVideo == true || preview?.medium == 'Video';
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'kind': kind.name,
-        'savedAt': savedAt,
-        if (preview != null) 'preview': preview!.toJson(),
-        if (feedItem != null) 'feedItem': feedItem!.toJson(),
-      };
+    'id': id,
+    'kind': kind.name,
+    'savedAt': savedAt,
+    if (preview != null) 'preview': preview!.toJson(),
+    if (feedItem != null) 'feedItem': feedItem!.toJson(),
+  };
 
   factory SavedEntry.fromJson(Map<String, dynamic> json) {
     final feedItemJson = json['feedItem'] as Map<String, dynamic>?;
@@ -59,7 +60,9 @@ class SavedEntry {
           : SavedContentKind.scene,
       savedAt: json['savedAt'] as int? ?? 0,
       preview: json['preview'] != null
-          ? FeedPreviewItem.fromCacheJson(json['preview'] as Map<String, dynamic>)
+          ? FeedPreviewItem.fromCacheJson(
+              json['preview'] as Map<String, dynamic>,
+            )
           : null,
       feedItem: feedItemJson != null ? FeedItem.fromJson(feedItemJson) : null,
     );
@@ -82,7 +85,8 @@ class SavedCollection {
   /// Ids of saved entries in this collection, most-recently-added first.
   final List<String> entryIds;
 
-  SavedCollection copyWith({String? name, List<String>? entryIds}) => SavedCollection(
+  SavedCollection copyWith({String? name, List<String>? entryIds}) =>
+      SavedCollection(
         id: id,
         name: name ?? this.name,
         createdAt: createdAt,
@@ -90,11 +94,11 @@ class SavedCollection {
       );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'createdAt': createdAt.millisecondsSinceEpoch,
-        'entryIds': entryIds,
-      };
+    'id': id,
+    'name': name,
+    'createdAt': createdAt.millisecondsSinceEpoch,
+    'entryIds': entryIds,
+  };
 
   factory SavedCollection.fromJson(Map<String, dynamic> json) {
     return SavedCollection(
@@ -148,14 +152,18 @@ class SavedContentStore extends ChangeNotifier {
       }
     }
 
-    final rawCollections = CacheService.instance.readRaw(_collectionsStorageKey);
+    final rawCollections = CacheService.instance.readRaw(
+      _collectionsStorageKey,
+    );
     if (rawCollections != null) {
       try {
         final list = jsonDecode(rawCollections) as List;
         _collections
           ..clear()
           ..addAll(
-            list.map((e) => SavedCollection.fromJson(e as Map<String, dynamic>)),
+            list.map(
+              (e) => SavedCollection.fromJson(e as Map<String, dynamic>),
+            ),
           );
       } catch (_) {
         // Corrupt collections cache — keep saved entries intact regardless.
@@ -166,14 +174,14 @@ class SavedContentStore extends ChangeNotifier {
   }
 
   Future<void> _persistEntries() => CacheService.instance.writeRaw(
-        _storageKey,
-        jsonEncode(_entries.values.map((e) => e.toJson()).toList()),
-      );
+    _storageKey,
+    jsonEncode(_entries.values.map((e) => e.toJson()).toList()),
+  );
 
   Future<void> _persistCollections() => CacheService.instance.writeRaw(
-        _collectionsStorageKey,
-        jsonEncode(_collections.map((c) => c.toJson()).toList()),
-      );
+    _collectionsStorageKey,
+    jsonEncode(_collections.map((c) => c.toJson()).toList()),
+  );
 
   /// Clears saved items and collections on logout so a second account on
   /// the same device never sees the previous account's saved list.
@@ -211,7 +219,11 @@ class SavedContentStore extends ChangeNotifier {
     } catch (_) {
       // Offline or API error — keep the locally-generated id.
     }
-    final collection = SavedCollection(id: id, name: trimmed, createdAt: createdAt);
+    final collection = SavedCollection(
+      id: id,
+      name: trimmed,
+      createdAt: createdAt,
+    );
     _collections.add(collection);
     notifyListeners();
     unawaited(_persistCollections());
@@ -259,13 +271,15 @@ class SavedContentStore extends ChangeNotifier {
         final id = json['id'] as String? ?? '';
         if (id.isEmpty || _collections.any((c) => c.id == id)) continue;
         final createdAtRaw = json['createdAt'] as String?;
-        _collections.add(SavedCollection(
-          id: id,
-          name: json['name'] as String? ?? '',
-          createdAt: createdAtRaw != null
-              ? DateTime.tryParse(createdAtRaw) ?? DateTime.now()
-              : DateTime.now(),
-        ));
+        _collections.add(
+          SavedCollection(
+            id: id,
+            name: json['name'] as String? ?? '',
+            createdAt: createdAtRaw != null
+                ? DateTime.tryParse(createdAtRaw) ?? DateTime.now()
+                : DateTime.now(),
+          ),
+        );
         changed = true;
       }
       if (changed) {
@@ -283,17 +297,21 @@ class SavedContentStore extends ChangeNotifier {
   /// another device appear too.
   Future<void> loadCollectionDetailFromApi(String collectionId) async {
     try {
-      final detail = await SocialService.instance.getCollectionDetail(collectionId);
+      final detail = await SocialService.instance.getCollectionDetail(
+        collectionId,
+      );
       final items = (detail['items'] as List? ?? const [])
           .whereType<Map<String, dynamic>>()
           .toList(growable: false);
 
       final ids = items
-          .map((json) => switch (json['targetType']) {
-                'piece' => PieceSummary.fromJson(json).id,
-                'post' => PostSummary.fromJson(json).id,
-                _ => null,
-              })
+          .map(
+            (json) => switch (json['targetType']) {
+              'piece' => PieceSummary.fromJson(json).id,
+              'post' => PostSummary.fromJson(json).id,
+              _ => null,
+            },
+          )
           .whereType<String>()
           .toList(growable: false);
 
@@ -303,7 +321,9 @@ class SavedContentStore extends ChangeNotifier {
       for (final json in items.reversed) {
         switch (json['targetType']) {
           case 'piece':
-            savePreview(FeedPreviewItem.fromPieceSummary(PieceSummary.fromJson(json)));
+            savePreview(
+              FeedPreviewItem.fromPieceSummary(PieceSummary.fromJson(json)),
+            );
           case 'post':
             saveFeedItem(FeedItem.post(PostSummary.fromJson(json)));
         }
@@ -417,7 +437,9 @@ class SavedContentStore extends ChangeNotifier {
     return sorted.isEmpty ? null : sorted.first;
   }
 
-  List<SavedEntry> entries({SavedContentFilter filter = SavedContentFilter.all}) {
+  List<SavedEntry> entries({
+    SavedContentFilter filter = SavedContentFilter.all,
+  }) {
     final all = _entries.values.toList(growable: false);
     switch (filter) {
       case SavedContentFilter.all:
@@ -434,16 +456,17 @@ class SavedContentStore extends ChangeNotifier {
   }
 
   List<FeedItem> get videoSceneFeedItems => _entries.values
-      .where((entry) =>
-          entry.kind == SavedContentKind.scene &&
-          entry.feedItem != null &&
-          entry.feedItem!.isVideo)
+      .where(
+        (entry) =>
+            entry.kind == SavedContentKind.scene &&
+            entry.feedItem != null &&
+            entry.feedItem!.isVideo,
+      )
       .map((entry) => entry.feedItem!)
       .toList(growable: false);
 
   void savePreview(FeedPreviewItem item) {
-    final kind =
-        item.isScene ? SavedContentKind.scene : SavedContentKind.piece;
+    final kind = item.isScene ? SavedContentKind.scene : SavedContentKind.piece;
     FeedItem? feedItem;
     if (item.isScene && item.medium == 'Video') {
       feedItem = FeedItem.post(
@@ -465,6 +488,7 @@ class SavedContentStore extends ChangeNotifier {
       feedItem: feedItem,
       savedAt: DateTime.now().millisecondsSinceEpoch,
     );
+    EngagementStore.instance.setSaved(item.id, true);
     notifyListeners();
     unawaited(_persistEntries());
   }
@@ -481,6 +505,7 @@ class SavedContentStore extends ChangeNotifier {
       feedItem: item,
       savedAt: DateTime.now().millisecondsSinceEpoch,
     );
+    EngagementStore.instance.setSaved(item.id, true);
     notifyListeners();
     unawaited(_persistEntries());
   }
@@ -488,6 +513,7 @@ class SavedContentStore extends ChangeNotifier {
   void unsave(String id) {
     final removedEntry = _entries.remove(id);
     if (removedEntry != null) {
+      EngagementStore.instance.setSaved(id, false);
       notifyListeners();
       unawaited(_persistEntries());
     }

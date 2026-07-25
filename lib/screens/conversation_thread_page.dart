@@ -119,6 +119,7 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
     if (id == null) return;
     ChatSocketService.instance.joinConversation(id);
     ChatSocketService.instance.onNewMessage(_onSocketMessage);
+    ChatSocketService.instance.onMessageError(_onSocketMessageError);
     ChatSocketService.instance.onTypingStart(_onTypingStart);
     ChatSocketService.instance.onTypingStop(_onTypingStop);
     ChatSocketService.instance.onPresenceUpdate(_onPresenceUpdate);
@@ -131,6 +132,7 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
     if (id != null) {
       ChatSocketService.instance.leaveConversation(id);
       ChatSocketService.instance.offNewMessage();
+      ChatSocketService.instance.offMessageError();
       ChatSocketService.instance.offTypingStart();
       ChatSocketService.instance.offTypingStop();
       ChatSocketService.instance.offPresenceUpdate();
@@ -195,6 +197,13 @@ class _ConversationThreadPageState extends State<ConversationThreadPage> {
       _status = 'open';
     });
     _scrollToBottom();
+  }
+
+  void _onSocketMessageError(String message, {String? code}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   void _onTypingStart(String conversationId, String userId) {

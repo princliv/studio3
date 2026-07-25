@@ -60,7 +60,12 @@ dependencies:
   shimmer: ^3.0.0
   app_links: ^7.2.1
   socket_io_client: ^3.1.2
-  easy_video_editor: ^0.1.6
+  # Pub.dev 0.1.6 is missing `import Foundation` in OperationManager.swift,
+  # which breaks iOS compilation. Pin the upstream commit containing the fix.
+  easy_video_editor:
+    git:
+      url: https://github.com/iawtk2302/easy_video_editor.git
+      ref: 17989b573f88442e49243820d7dbb7889e9cb15e
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -6,6 +6,9 @@ import '../../services/inquiry_service.dart';
 import '../../theme/collect_detail_tokens.dart';
 
 /// Compose sheet for starting a new inquiry about a piece.
+///
+/// Deferred to v2 with the inquiries API. Detail pages keep the Ask entry
+/// commented; launch messaging uses Conversations instead.
 class AskAboutPieceSheet extends StatefulWidget {
   const AskAboutPieceSheet({super.key, required this.pieceId});
 

@@ -55,13 +55,8 @@ class ChatSocketService {
     _socket?.emit('conversation:leave', {'conversationId': conversationId});
   }
 
-  void sendMessage(String conversationId, {String? body, String? imageUrl}) {
-    _socket?.emit('message:send', {
-      'conversationId': conversationId,
-      if (body != null) 'body': body,
-      if (imageUrl != null) 'imageUrl': imageUrl,
-    });
-  }
+  // Writes stay on REST ([ChatService.sendMessage]); socket is receive-only
+  // for launch. Do not emit message:send from the client.
 
   void startTyping(String conversationId) =>
       _socket?.emit('typing:start', {'conversationId': conversationId});
@@ -84,6 +79,21 @@ class ChatSocketService {
   }
 
   void offNewMessage() => _socket?.off('message:new');
+
+  void onMessageError(void Function(String message, {String? code}) callback) {
+    _socket?.off('message:error');
+    _socket?.on('message:error', (data) {
+      final json = data is Map
+          ? Map<String, dynamic>.from(data)
+          : <String, dynamic>{'message': data?.toString() ?? 'Message error'};
+      callback(
+        json['message'] as String? ?? 'Message error',
+        code: json['code'] as String?,
+      );
+    });
+  }
+
+  void offMessageError() => _socket?.off('message:error');
 
   void onTypingStart(void Function(String conversationId, String userId) callback) {
     _socket?.off('typing:start');

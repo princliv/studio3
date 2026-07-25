@@ -96,8 +96,12 @@ class _PieceDetailPageState extends State<PieceDetailPage>
       }
     } catch (e) {
       if (!mounted) return;
-      final message = e is ApiException ? e.message : 'Could not load for editing';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      final message = e is ApiException
+          ? e.message
+          : 'Could not load for editing';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
@@ -112,9 +116,10 @@ class _PieceDetailPageState extends State<PieceDetailPage>
 
   @override
   void initState() {
-    _item = widget.item;
+    _item = engagementStore.applyToPreview(widget.item);
     super.initState();
     liked = _item.isLiked;
+    likeCount = _item.likeCount;
     applyFollowState(_item);
     _loadDetail();
   }
@@ -122,6 +127,8 @@ class _PieceDetailPageState extends State<PieceDetailPage>
   Future<void> _loadDetail() async {
     final loaded = await ContentDetailLoader.load(_item);
     if (!mounted) return;
+    // Engagement overrides already merged in the loader — keep local
+    // optimistic like/save if a toggle is still in flight via apply*.
     setState(() => _item = loaded);
     applySaveItem(loaded);
     applyLikeItem(loaded);
@@ -156,8 +163,8 @@ class _PieceDetailPageState extends State<PieceDetailPage>
                     icon: const Icon(Icons.arrow_back_ios_new_rounded),
                     color: HomeFeedTokens.textPrimary,
                     style: IconButton.styleFrom(
-                      backgroundColor:
-                          HomeFeedTokens.detailBackground.withValues(alpha: 0.7),
+                      backgroundColor: HomeFeedTokens.detailBackground
+                          .withValues(alpha: 0.7),
                     ),
                   ),
                 ),
@@ -170,8 +177,8 @@ class _PieceDetailPageState extends State<PieceDetailPage>
                       icon: const Icon(Icons.edit_outlined),
                       color: HomeFeedTokens.textPrimary,
                       style: IconButton.styleFrom(
-                        backgroundColor:
-                            HomeFeedTokens.detailBackground.withValues(alpha: 0.7),
+                        backgroundColor: HomeFeedTokens.detailBackground
+                            .withValues(alpha: 0.7),
                       ),
                     ),
                   ),

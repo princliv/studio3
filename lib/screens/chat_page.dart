@@ -1,3 +1,7 @@
+/// Legacy inquiries inbox UI — deferred to v2.
+///
+/// `/chat` now redirects to [InboxPage] Conversations. This file is kept only
+/// as reference for the future piece-scoped Ask UX; do not re-route to it.
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 

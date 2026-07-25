@@ -1,3 +1,8 @@
+/// Piece-scoped inquiries — deferred to v2.
+///
+/// Launch messaging uses Conversations (`ChatService` + Socket.IO). Do not
+/// wire this service into live navigation until the backend inquiries
+/// blueprint is re-registered.
 import '../models/inquiry_summary.dart';
 import 'api_client.dart';
 

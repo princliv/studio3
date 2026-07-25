@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -98,6 +99,29 @@ class _CollectPieceSheetState extends State<CollectPieceSheet> {
         addressId: shipping.address.id,
         shippingMethod: shipping.method.id,
       );
+
+      // Real Stripe PaymentIntent flow is not wired yet. Debug/profile may
+      // use the server's auto-pay confirm; release builds skip confirm unless
+      // explicitly enabled via --dart-define=ALLOW_DEV_CHECKOUT=true.
+      const allowDevCheckout = bool.fromEnvironment(
+        'ALLOW_DEV_CHECKOUT',
+        defaultValue: false,
+      );
+      final canConfirm = kDebugMode || allowDevCheckout;
+
+      if (!canConfirm) {
+        if (!mounted) return;
+        setState(() => _collecting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Payments are not live yet. Checkout confirm is disabled in this build.',
+            ),
+          ),
+        );
+        return;
+      }
+
       final confirmed = await OrderService.instance.confirm(order.id);
       if (!mounted) return;
       Navigator.pop(context);
@@ -105,8 +129,11 @@ class _CollectPieceSheetState extends State<CollectPieceSheet> {
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _collecting = false);
+      final message = e.statusCode == 501
+          ? 'Card payments are not set up yet (Stripe pending).'
+          : e.message;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
+        SnackBar(content: Text(message)),
       );
     } catch (_) {
       if (!mounted) return;

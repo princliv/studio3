@@ -145,6 +145,8 @@ class FeedService {
     final rawItems = data is Map<String, dynamic> ? data['items'] : data;
     final nextCursor =
         data is Map<String, dynamic> ? data['nextCursor'] as String? : null;
+    final stub =
+        data is Map<String, dynamic> ? data['stub'] as bool? ?? false : false;
 
     var items = _api
         .extractList(json)
@@ -161,6 +163,6 @@ class FeedService {
           .toList(growable: false);
     }
 
-    return FeedPage(items: items, nextCursor: nextCursor);
+    return FeedPage(items: items, nextCursor: nextCursor, stub: stub);
   }
 }

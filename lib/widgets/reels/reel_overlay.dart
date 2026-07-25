@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../models/feed_item.dart';
+import '../../services/engagement_store.dart';
 import '../../services/saved_content_store.dart';
 import '../../services/social_service.dart';
 import '../../utils/profile_navigation.dart';
@@ -37,6 +38,12 @@ class ReelOverlayState extends State<ReelOverlay>
   late bool _saved;
   late int _likeCount;
   int _commentCount = 0;
+  bool _likeBusy = false;
+  bool _saveBusy = false;
+  int _likeGeneration = 0;
+  int _saveGeneration = 0;
+
+  EngagementStore get _engagement => EngagementStore.instance;
 
   @override
   String get followUsername => widget.item.authorUsername ?? '';
@@ -44,11 +51,38 @@ class ReelOverlayState extends State<ReelOverlay>
   @override
   void initState() {
     super.initState();
+    _syncFromItem();
+    _engagement.addListener(_onEngagementChanged);
+    SavedContentStore.instance.addListener(_onEngagementChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant ReelOverlay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.item.id != widget.item.id) {
+      _syncFromItem();
+    }
+  }
+
+  @override
+  void dispose() {
+    _engagement.removeListener(_onEngagementChanged);
+    SavedContentStore.instance.removeListener(_onEngagementChanged);
+    super.dispose();
+  }
+
+  void _syncFromItem() {
     final post = widget.item.post;
     final postId = post?.id;
-    _liked = post?.isLiked ?? false;
+    _liked = postId != null
+        ? _engagement.resolveLiked(postId, post?.isLiked ?? false)
+        : false;
     _saved = postId != null
-        ? SavedContentStore.instance.isSaved(postId) || (post?.isSaved ?? false)
+        ? _engagement.resolveSaved(
+            postId,
+            SavedContentStore.instance.isSaved(postId) ||
+                (post?.isSaved ?? false),
+          )
         : false;
     _likeCount = post?.likeCount ?? 0;
     _commentCount = 0;
@@ -57,33 +91,68 @@ class ReelOverlayState extends State<ReelOverlay>
         : FollowState.none;
   }
 
-  /// For double-tap-to-like on the video itself: only ever turns liking on,
-  /// never off (matches every app that has this gesture).
+  void _onEngagementChanged() {
+    if (!mounted || _likeBusy || _saveBusy) return;
+    final postId = widget.item.post?.id;
+    if (postId == null) return;
+    final nextLiked = _engagement.resolveLiked(
+      postId,
+      widget.item.post?.isLiked ?? false,
+    );
+    final nextSaved = _engagement.resolveSaved(
+      postId,
+      SavedContentStore.instance.isSaved(postId) ||
+          (widget.item.post?.isSaved ?? false),
+    );
+    if (nextLiked != _liked || nextSaved != _saved) {
+      setState(() {
+        if (nextLiked != _liked) {
+          _likeCount += nextLiked ? 1 : -1;
+          if (_likeCount < 0) _likeCount = 0;
+          _liked = nextLiked;
+        }
+        _saved = nextSaved;
+      });
+    }
+  }
+
+  /// Double-tap like — no-op if already liked or a request is in flight.
   void likeIfNotAlready() {
-    if (_liked) return;
+    if (_liked || _likeBusy) return;
     _toggleLike();
   }
 
   Future<void> _toggleLike() async {
     final postId = widget.item.post?.id;
-    if (postId == null) return;
+    if (postId == null || _likeBusy) return;
     final nextLiked = !_liked;
+    final generation = ++_likeGeneration;
     setState(() {
       _liked = nextLiked;
       _likeCount += nextLiked ? 1 : -1;
+      if (_likeCount < 0) _likeCount = 0;
     });
+    _engagement.setLiked(postId, nextLiked);
+    _likeBusy = true;
     try {
-      if (nextLiked) {
-        await SocialService.instance.likePost(postId);
-      } else {
-        await SocialService.instance.unlikePost(postId);
+      final result = nextLiked
+          ? await SocialService.instance.likePost(postId)
+          : await SocialService.instance.unlikePost(postId);
+      if (!mounted || generation != _likeGeneration) return;
+      if (result.likeCount != null) {
+        setState(() => _likeCount = result.likeCount!);
+        _engagement.setLiked(postId, nextLiked, likeCount: result.likeCount);
       }
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || generation != _likeGeneration) return;
       setState(() {
         _liked = !nextLiked;
         _likeCount += nextLiked ? -1 : 1;
+        if (_likeCount < 0) _likeCount = 0;
       });
+      _engagement.setLiked(postId, !nextLiked, likeCount: _likeCount);
+    } finally {
+      if (generation == _likeGeneration) _likeBusy = false;
     }
   }
 
@@ -132,7 +201,7 @@ class ReelOverlayState extends State<ReelOverlay>
 
   Future<void> _toggleSave() async {
     final postId = widget.item.post?.id;
-    if (postId == null) return;
+    if (postId == null || _saveBusy) return;
     final nextSaved = !_saved;
 
     String? collectionId;
@@ -143,7 +212,9 @@ class ReelOverlayState extends State<ReelOverlay>
       collectionId = resolution.collectionId;
     }
 
+    final generation = ++_saveGeneration;
     setState(() => _saved = nextSaved);
+    _engagement.setSaved(postId, nextSaved);
     if (nextSaved) {
       SavedContentStore.instance.saveFeedItem(widget.item);
       if (collectionId != null) {
@@ -156,21 +227,36 @@ class ReelOverlayState extends State<ReelOverlay>
     } else {
       SavedContentStore.instance.unsave(postId);
     }
+
+    _saveBusy = true;
     try {
       if (nextSaved) {
         await SocialService.instance.savePost(postId);
       } else {
         await SocialService.instance.unsavePost(postId);
       }
+      if (mounted &&
+          nextSaved &&
+          hadCollections &&
+          generation == _saveGeneration) {
+        showCollectionSavedToast(
+          context,
+          saved: true,
+          thumbnailUrl: widget.item.mediaUrl,
+        );
+      }
     } catch (_) {
-      // Keep local saved state for scene videos when API is unavailable.
-    }
-    if (mounted && nextSaved && hadCollections) {
-      showCollectionSavedToast(
-        context,
-        saved: true,
-        thumbnailUrl: widget.item.mediaUrl,
-      );
+      // Roll back local state so client/server stay aligned.
+      if (!mounted || generation != _saveGeneration) return;
+      setState(() => _saved = !nextSaved);
+      _engagement.setSaved(postId, !nextSaved);
+      if (nextSaved) {
+        SavedContentStore.instance.unsave(postId);
+      } else {
+        SavedContentStore.instance.saveFeedItem(widget.item);
+      }
+    } finally {
+      if (generation == _saveGeneration) _saveBusy = false;
     }
   }
 
@@ -244,7 +330,8 @@ class ReelOverlayState extends State<ReelOverlay>
                         ),
                       ),
                     ),
-                    if (authorUsername != null && authorUsername.isNotEmpty) ...[
+                    if (authorUsername != null &&
+                        authorUsername.isNotEmpty) ...[
                       const SizedBox(width: 8),
                       FollowButton(
                         state: followState,
@@ -291,14 +378,6 @@ class ReelOverlayState extends State<ReelOverlay>
                 label: _commentCount > 0 ? '$_commentCount' : 'Comment',
                 onTap: _openComments,
               ),
-              // Share hidden for now — see plan/task history to re-enable.
-              // const SizedBox(height: 18),
-              // _ActionButton(
-              //   icon: Icons.ios_share_rounded,
-              //   iconColor: Colors.white,
-              //   label: 'Share',
-              //   onTap: _shareScene,
-              // ),
               const SizedBox(height: 18),
               _SaveActionButton(saved: _saved, onTap: _toggleSave),
               const SizedBox(height: 18),

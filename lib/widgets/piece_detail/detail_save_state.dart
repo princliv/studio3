@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/feed_preview_item.dart';
+import '../../services/engagement_store.dart';
 import '../../services/saved_content_store.dart';
 import '../../services/social_service.dart';
 import '../collection_saved_toast.dart';
@@ -9,9 +10,11 @@ import '../save_to_collection_sheet.dart';
 /// Shared save-state wiring for piece detail pages.
 mixin DetailSaveState<T extends StatefulWidget> on State<T> {
   final SavedContentStore savedStore = SavedContentStore.instance;
+  final EngagementStore engagementStore = EngagementStore.instance;
   bool saved = false;
   bool _saveBusy = false;
   bool _ownStoreWrite = false;
+  int _saveGeneration = 0;
 
   FeedPreviewItem get saveItem;
 
@@ -19,33 +22,39 @@ mixin DetailSaveState<T extends StatefulWidget> on State<T> {
   /// any bottom bar/overlay sitting above the default SnackBar position.
   double get saveToastBottomMargin => 16;
 
+  bool _resolveSaved(FeedPreviewItem item) {
+    return engagementStore.resolveSaved(
+      item.id,
+      savedStore.isSaved(item.id) || item.isSaved,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
-    saved = saveItem.isApiBacked
-        ? saveItem.isSaved
-        : savedStore.isSaved(saveItem.id);
+    saved = _resolveSaved(saveItem);
     savedStore.addListener(onSavedStoreChanged);
+    engagementStore.addListener(onSavedStoreChanged);
   }
 
   @override
   void dispose() {
     savedStore.removeListener(onSavedStoreChanged);
+    engagementStore.removeListener(onSavedStoreChanged);
     super.dispose();
   }
 
   void applySaveItem(FeedPreviewItem item) {
-    if (!mounted) return;
-    setState(() {
-      saved = item.isApiBacked ? item.isSaved : savedStore.isSaved(item.id);
-    });
+    if (!mounted || _saveBusy) return;
+    final nextSaved = _resolveSaved(item);
+    if (nextSaved != saved) {
+      setState(() => saved = nextSaved);
+    }
   }
 
   void onSavedStoreChanged() {
-    if (_ownStoreWrite) return;
-    final nextSaved = saveItem.isApiBacked
-        ? saveItem.isSaved
-        : savedStore.isSaved(saveItem.id);
+    if (_ownStoreWrite || _saveBusy) return;
+    final nextSaved = _resolveSaved(saveItem);
     if (nextSaved != saved && mounted) {
       setState(() => saved = nextSaved);
     }
@@ -63,7 +72,10 @@ mixin DetailSaveState<T extends StatefulWidget> on State<T> {
       collectionId = resolution.collectionId;
     }
 
+    final generation = ++_saveGeneration;
     setState(() => saved = nextSaved);
+    engagementStore.setSaved(item.id, nextSaved);
+
     if (!item.isApiBacked) {
       if (nextSaved) {
         savedStore.savePreview(item);
@@ -108,7 +120,7 @@ mixin DetailSaveState<T extends StatefulWidget> on State<T> {
         savedStore.unsave(item.id);
         _ownStoreWrite = false;
       }
-      if (mounted) {
+      if (mounted && generation == _saveGeneration) {
         showCollectionSavedToast(
           context,
           saved: nextSaved,
@@ -117,9 +129,12 @@ mixin DetailSaveState<T extends StatefulWidget> on State<T> {
         );
       }
     } catch (_) {
-      if (mounted) setState(() => saved = !nextSaved);
+      if (mounted && generation == _saveGeneration) {
+        setState(() => saved = !nextSaved);
+        engagementStore.setSaved(item.id, !nextSaved);
+      }
     } finally {
-      _saveBusy = false;
+      if (generation == _saveGeneration) _saveBusy = false;
     }
   }
 }
@@ -127,44 +142,79 @@ mixin DetailSaveState<T extends StatefulWidget> on State<T> {
 /// Like toggle for API-backed piece/scene detail pages.
 mixin DetailLikeState<T extends StatefulWidget> on State<T> {
   bool liked = false;
+  int likeCount = 0;
   bool _likeBusy = false;
+  int _likeGeneration = 0;
 
   FeedPreviewItem get likeItem;
 
+  EngagementStore get _likeEngagement => EngagementStore.instance;
+
   void applyLikeItem(FeedPreviewItem item) {
-    if (!mounted) return;
-    setState(() => liked = item.isLiked);
+    // Never overwrite an in-flight optimistic like with a stale detail fetch.
+    if (!mounted || _likeBusy) return;
+    final next = _likeEngagement.resolveLiked(item.id, item.isLiked);
+    final nextCount = _likeEngagement.resolveLikeCount(item.id, item.likeCount);
+    if (next != liked || nextCount != likeCount) {
+      setState(() {
+        liked = next;
+        likeCount = nextCount;
+      });
+    }
   }
 
   Future<void> toggleLike() async {
     if (_likeBusy) return;
     final item = likeItem;
     if (!item.isApiBacked) {
-      setState(() => liked = !liked);
+      final nextLiked = !liked;
+      final nextCount = (likeCount + (nextLiked ? 1 : -1)).clamp(0, 1 << 30);
+      setState(() {
+        liked = nextLiked;
+        likeCount = nextCount;
+      });
+      _likeEngagement.setLiked(item.id, nextLiked, likeCount: nextCount);
       return;
     }
 
     final nextLiked = !liked;
-    setState(() => liked = nextLiked);
+    final optimisticCount =
+        (likeCount + (nextLiked ? 1 : -1)).clamp(0, 1 << 30);
+    final generation = ++_likeGeneration;
+    setState(() {
+      liked = nextLiked;
+      likeCount = optimisticCount;
+    });
+    _likeEngagement.setLiked(item.id, nextLiked, likeCount: optimisticCount);
     _likeBusy = true;
     try {
+      final EngagementToggleResult result;
       if (item.isScene) {
-        if (nextLiked) {
-          await SocialService.instance.likePost(item.id);
-        } else {
-          await SocialService.instance.unlikePost(item.id);
-        }
+        result = nextLiked
+            ? await SocialService.instance.likePost(item.id)
+            : await SocialService.instance.unlikePost(item.id);
       } else {
-        if (nextLiked) {
-          await SocialService.instance.likePiece(item.id);
-        } else {
-          await SocialService.instance.unlikePiece(item.id);
-        }
+        result = nextLiked
+            ? await SocialService.instance.likePiece(item.id)
+            : await SocialService.instance.unlikePiece(item.id);
+      }
+      if (!mounted || generation != _likeGeneration) return;
+      final serverCount = result.likeCount;
+      if (serverCount != null) {
+        setState(() => likeCount = serverCount);
+        _likeEngagement.setLiked(item.id, nextLiked, likeCount: serverCount);
       }
     } catch (_) {
-      if (mounted) setState(() => liked = !nextLiked);
+      if (mounted && generation == _likeGeneration) {
+        final reverted = (likeCount + (nextLiked ? -1 : 1)).clamp(0, 1 << 30);
+        setState(() {
+          liked = !nextLiked;
+          likeCount = reverted;
+        });
+        _likeEngagement.setLiked(item.id, !nextLiked, likeCount: reverted);
+      }
     } finally {
-      _likeBusy = false;
+      if (generation == _likeGeneration) _likeBusy = false;
     }
   }
 }

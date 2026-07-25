@@ -152,18 +152,15 @@ class FeedListSkeleton extends StatelessWidget {
     }
 
     return _shimmer(
-      Padding(
-        padding:
-            const EdgeInsets.symmetric(horizontal: HomeFeedTokens.sideMargin),
-        child: Column(
-          children: [
-            for (var i = 0; i < itemCount; i++) ...[
-              card(),
-              if (i != itemCount - 1)
-                const SizedBox(height: HomeFeedTokens.rowGap),
-            ],
-          ],
+      ListView.separated(
+        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(
+          horizontal: HomeFeedTokens.sideMargin,
         ),
+        itemCount: itemCount,
+        separatorBuilder: (_, __) =>
+            const SizedBox(height: HomeFeedTokens.rowGap),
+        itemBuilder: (_, __) => card(),
       ),
       baseColor: fill,
       highlightColor: HomeFeedTokens.skeletonHighlight,

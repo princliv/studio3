@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/auth_user.dart';
 import 'cache_service.dart';
+import 'engagement_store.dart';
 import 'saved_content_store.dart';
 
 class AuthSession {
@@ -91,9 +92,11 @@ class AuthSession {
       // Monotonic: never let a server payload un-set a locally-completed
       // onboarding flag (see the matching guard in UserService).
       onboardingComplete:
-          current.onboardingComplete || (json['onboardingComplete'] as bool? ?? false),
+          current.onboardingComplete ||
+          (json['onboardingComplete'] as bool? ?? false),
       role: json['role'] as String? ?? current.role,
-      sellerEnabled: json['sellerEnabled'] as bool? ??
+      sellerEnabled:
+          json['sellerEnabled'] as bool? ??
           json['isSeller'] as bool? ??
           current.sellerEnabled,
       profilePhotoUrl:
@@ -134,6 +137,7 @@ class AuthSession {
     // account's cached feed/addresses/saved items.
     await CacheService.instance.clearAll();
     await SavedContentStore.instance.clearLocal();
+    EngagementStore.instance.clear();
     notifyListeners();
   }
 }

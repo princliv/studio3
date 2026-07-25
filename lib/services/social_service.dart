@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../models/blocked_user.dart';
 import '../models/comment_page.dart';
 import '../models/feed_item.dart';
@@ -5,6 +7,22 @@ import '../models/follow_request.dart';
 import '../models/follow_user_summary.dart';
 import 'api_client.dart';
 import 'auth_session.dart';
+import 'cache_service.dart';
+
+/// Result of like/unlike or save/unsave toggles (counts when the API returns them).
+class EngagementToggleResult {
+  const EngagementToggleResult({
+    this.liked,
+    this.saved,
+    this.likeCount,
+    this.saveCount,
+  });
+
+  final bool? liked;
+  final bool? saved;
+  final int? likeCount;
+  final int? saveCount;
+}
 
 /// Result of `POST`/`DELETE /api/users/:username/follow`. Private accounts
 /// return `requested: true` instead of following immediately.
@@ -105,8 +123,9 @@ class SocialService {
         .extractList(json)
         .map(FollowUserSummary.fromJson)
         .toList(growable: false);
-    final nextCursor =
-        data is Map<String, dynamic> ? data['nextCursor'] as String? : null;
+    final nextCursor = data is Map<String, dynamic>
+        ? data['nextCursor'] as String?
+        : null;
     return FollowUserPage(items: items, nextCursor: nextCursor);
   }
 
@@ -118,36 +137,73 @@ class SocialService {
     await _api.delete('/api/users/$username/block');
   }
 
-  Future<void> likePiece(String id) async {
-    await _api.post('/api/pieces/$id/like', auth: true);
+  Future<EngagementToggleResult> likePiece(String id) async {
+    final json = await _api.post('/api/pieces/$id/like', auth: true);
+    return _parseEngagementToggle(json, likedKey: 'liked');
   }
 
-  Future<void> unlikePiece(String id) async {
-    await _api.delete('/api/pieces/$id/like');
+  Future<EngagementToggleResult> unlikePiece(String id) async {
+    final json = await _api.delete('/api/pieces/$id/like');
+    return _parseEngagementToggle(json, likedKey: 'liked');
   }
 
-  Future<void> likePost(String id) async {
-    await _api.post('/api/posts/$id/like', auth: true);
+  Future<EngagementToggleResult> likePost(String id) async {
+    final json = await _api.post('/api/posts/$id/like', auth: true);
+    return _parseEngagementToggle(json, likedKey: 'liked');
   }
 
-  Future<void> unlikePost(String id) async {
-    await _api.delete('/api/posts/$id/like');
+  Future<EngagementToggleResult> unlikePost(String id) async {
+    final json = await _api.delete('/api/posts/$id/like');
+    return _parseEngagementToggle(json, likedKey: 'liked');
   }
 
-  Future<void> savePiece(String id) async {
-    await _api.post('/api/pieces/$id/save', auth: true);
+  Future<EngagementToggleResult> savePiece(String id) async {
+    final json = await _api.post('/api/pieces/$id/save', auth: true);
+    unawaited(_invalidateSavedLists(pieces: true));
+    return _parseEngagementToggle(json, savedKey: 'saved');
   }
 
-  Future<void> unsavePiece(String id) async {
-    await _api.delete('/api/pieces/$id/save');
+  Future<EngagementToggleResult> unsavePiece(String id) async {
+    final json = await _api.delete('/api/pieces/$id/save');
+    unawaited(_invalidateSavedLists(pieces: true));
+    return _parseEngagementToggle(json, savedKey: 'saved');
   }
 
-  Future<void> savePost(String id) async {
-    await _api.post('/api/posts/$id/save', auth: true);
+  Future<EngagementToggleResult> savePost(String id) async {
+    final json = await _api.post('/api/posts/$id/save', auth: true);
+    unawaited(_invalidateSavedLists(posts: true));
+    return _parseEngagementToggle(json, savedKey: 'saved');
   }
 
-  Future<void> unsavePost(String id) async {
-    await _api.delete('/api/posts/$id/save');
+  Future<EngagementToggleResult> unsavePost(String id) async {
+    final json = await _api.delete('/api/posts/$id/save');
+    unawaited(_invalidateSavedLists(posts: true));
+    return _parseEngagementToggle(json, savedKey: 'saved');
+  }
+
+  EngagementToggleResult _parseEngagementToggle(
+    Map<String, dynamic> json, {
+    String? likedKey,
+    String? savedKey,
+  }) {
+    final data = _api.extractData(json);
+    if (data is! Map<String, dynamic>) {
+      return const EngagementToggleResult();
+    }
+    return EngagementToggleResult(
+      liked: likedKey != null ? data[likedKey] as bool? : null,
+      saved: savedKey != null ? data[savedKey] as bool? : null,
+      likeCount: data['likeCount'] as int?,
+      saveCount: data['saveCount'] as int?,
+    );
+  }
+
+  Future<void> _invalidateSavedLists({
+    bool pieces = false,
+    bool posts = false,
+  }) async {
+    if (pieces) await CacheService.instance.invalidate('saved.pieces');
+    if (posts) await CacheService.instance.invalidate('saved.posts');
   }
 
   Future<List<Map<String, dynamic>>> listCollections() async {
@@ -165,10 +221,7 @@ class SocialService {
   }
 
   Future<void> renameCollection(String collectionId, String name) async {
-    await _api.patch(
-      '/api/collections/$collectionId',
-      body: {'name': name},
-    );
+    await _api.patch('/api/collections/$collectionId', body: {'name': name});
   }
 
   Future<void> deleteCollection(String collectionId) async {
@@ -197,7 +250,9 @@ class SocialService {
     required String targetType,
     required String targetId,
   }) async {
-    await _api.delete('/api/collections/$collectionId/items/$targetType/$targetId');
+    await _api.delete(
+      '/api/collections/$collectionId/items/$targetType/$targetId',
+    );
   }
 
   Future<CommentSummary> commentOnPiece(String id, String body) async {
@@ -273,8 +328,9 @@ class SocialService {
 
   CommentPage _parseCommentPage(Map<String, dynamic> json) {
     final data = _api.extractData(json);
-    final nextCursor =
-        data is Map<String, dynamic> ? data['nextCursor'] as String? : null;
+    final nextCursor = data is Map<String, dynamic>
+        ? data['nextCursor'] as String?
+        : null;
     final items = _api
         .extractList(json)
         .map(CommentSummary.fromJson)
