@@ -4,6 +4,7 @@ import '../data/post_material_options.dart';
 import '../models/listing_details.dart';
 import '../models/post_image_transform.dart';
 import '../services/api_exception.dart';
+import '../utils/crop_cover_math.dart' show CropAspectRatio;
 import '../services/media_service.dart';
 import '../services/piece_service.dart';
 import '../services/post_service.dart';
@@ -166,6 +167,8 @@ class PostPublishService {
       bytes: bytes,
       contentType: 'image/png',
     );
+    final mediaAspectRatio =
+        transform.aspectRatio == CropAspectRatio.ratio16x9 ? '16:9' : '3:4';
 
     if (isScene) {
       await _posts.create({
@@ -177,6 +180,7 @@ class PostPublishService {
           'linkedPieceId': draft.linkedPieceId,
         if (draft.location != null && draft.location!.isNotEmpty)
           'location': draft.location,
+        'mediaAspectRatio': mediaAspectRatio,
         'isProcess': draft.isProcess,
       });
       return;
@@ -203,6 +207,7 @@ class PostPublishService {
       if (draft.styleTags.isNotEmpty) 'styleTags': draft.styleTags,
       if (draft.location != null && draft.location!.isNotEmpty)
         'location': draft.location,
+      'mediaAspectRatio': mediaAspectRatio,
       'aiDisclosed': draft.aiDisclosed,
       if (draft.altText != null && draft.altText!.trim().isNotEmpty)
         'altText': draft.altText!.trim(),

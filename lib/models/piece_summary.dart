@@ -14,6 +14,7 @@ class PieceSummary {
     this.dimensions,
     this.shippingRegion,
     this.location,
+    this.mediaAspectRatio,
     this.yearCreated,
     this.framingMounting,
     this.provenance,
@@ -46,6 +47,7 @@ class PieceSummary {
   final String? dimensions;
   final String? shippingRegion;
   final String? location;
+  final String? mediaAspectRatio;
   final int? yearCreated;
   final String? framingMounting;
   final String? provenance;
@@ -85,6 +87,7 @@ class PieceSummary {
       dimensions: json['dimensions'] as String?,
       shippingRegion: json['shippingRegion'] as String?,
       location: json['location'] as String?,
+      mediaAspectRatio: json['mediaAspectRatio'] as String?,
       yearCreated: _intFrom(json['yearCreated']),
       framingMounting: json['framingMounting'] as String?,
       provenance: json['provenance'] as String?,
@@ -143,6 +146,7 @@ class PieceSummary {
         if (dimensions != null) 'dimensions': dimensions,
         if (shippingRegion != null) 'shippingRegion': shippingRegion,
         if (location != null) 'location': location,
+        if (mediaAspectRatio != null) 'mediaAspectRatio': mediaAspectRatio,
         if (yearCreated != null) 'yearCreated': yearCreated,
         if (framingMounting != null) 'framingMounting': framingMounting,
         if (provenance != null) 'provenance': provenance,

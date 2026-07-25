@@ -54,6 +54,10 @@ class FeedItem {
   String? get mediaType =>
       type == FeedItemType.piece ? piece?.mediaType : post?.mediaType;
 
+  String? get mediaAspectRatio => type == FeedItemType.piece
+      ? piece?.mediaAspectRatio
+      : post?.mediaAspectRatio;
+
   bool get isVideo {
     final t = mediaType?.toLowerCase();
     return t == 'video' || t == 'reel' || t == 'reels';

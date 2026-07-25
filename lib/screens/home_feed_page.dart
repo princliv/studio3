@@ -356,6 +356,22 @@ class _ApiFeedTileState extends State<_ApiFeedTile> {
   }
 
   void _resolveAspectRatio() {
+    final stored = widget.item.mediaAspectRatio;
+    if (stored != null) {
+      // Known synchronously from the baked-at-publish-time ratio — no
+      // decode round-trip, so the tile never renders at the wrong shape
+      // before snapping to the real one.
+      _aspectRatio = stored == '16:9'
+          ? ImageAspectRatioResolver.landscape16x9
+          : ImageAspectRatioResolver.portrait3x4;
+      return;
+    }
+
+    // Fallback for legacy content published before mediaAspectRatio existed
+    // (and for videos, which have no crop/transform step today).
+    if (widget.item.isVideo) {
+      _aspectRatio = ImageAspectRatioResolver.landscape16x9;
+    }
     final url = widget.item.mediaUrl;
     if (url == null) return;
     final cached = ImageAspectRatioResolver.cached(url);
