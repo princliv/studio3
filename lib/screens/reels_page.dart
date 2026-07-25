@@ -5,6 +5,7 @@ import '../models/feed_item.dart';
 import '../services/connectivity_service.dart';
 import '../services/feed_service.dart';
 import '../utils/scrolls_to_top_on_double_tap.dart';
+import '../utils/snappy_page_physics.dart';
 import '../widgets/feed_skeleton.dart';
 import '../widgets/reels/reel_player_page.dart';
 
@@ -162,7 +163,7 @@ class _ReelsPageState extends State<ReelsPage>
 
   @override
   Widget build(BuildContext context) {
-    final bottomPadding = MediaQuery.paddingOf(context).bottom + 72;
+    final bottomPadding = MediaQuery.paddingOf(context).bottom + 96;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -193,7 +194,7 @@ class _ReelsPageState extends State<ReelsPage>
                 child: PageView.builder(
                   controller: _pageController,
                   scrollDirection: Axis.vertical,
-                  physics: const PageScrollPhysics(
+                  physics: const SnappyPageScrollPhysics(
                     parent: AlwaysScrollableScrollPhysics(),
                   ),
                   itemCount: _items.length,

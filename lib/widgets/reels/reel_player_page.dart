@@ -29,6 +29,7 @@ class _ReelPlayerPageState extends State<ReelPlayerPage> {
   bool _failed = false;
   final _overlayKey = GlobalKey<ReelOverlayState>();
   bool _showHeart = false;
+  bool _muted = false;
 
   @override
   void initState() {
@@ -44,6 +45,11 @@ class _ReelPlayerPageState extends State<ReelPlayerPage> {
     Future<void>.delayed(const Duration(milliseconds: 700), () {
       if (mounted) setState(() => _showHeart = false);
     });
+  }
+
+  void _toggleMute() {
+    setState(() => _muted = !_muted);
+    _controller?.setVolume(_muted ? 0 : 1);
   }
 
   @override
@@ -90,7 +96,7 @@ class _ReelPlayerPageState extends State<ReelPlayerPage> {
     try {
       await controller.initialize();
       await controller.setLooping(true);
-      await controller.setVolume(1);
+      await controller.setVolume(_muted ? 0 : 1);
       if (!mounted) {
         await controller.dispose();
         return;
@@ -199,6 +205,8 @@ class _ReelPlayerPageState extends State<ReelPlayerPage> {
               key: _overlayKey,
               item: widget.item,
               bottomPadding: widget.bottomOverlayPadding,
+              muted: _muted,
+              onToggleMute: _toggleMute,
             ),
           ],
         ),

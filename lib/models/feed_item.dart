@@ -44,6 +44,10 @@ class FeedItem {
       ? piece!.authorAvatarUrl
       : post!.authorAvatarUrl;
 
+  bool get authorIsFollowing => type == FeedItemType.piece
+      ? piece!.authorIsFollowing
+      : post!.authorIsFollowing;
+
   bool get isForSale =>
       type == FeedItemType.piece ? (piece?.isForSale ?? false) : false;
 

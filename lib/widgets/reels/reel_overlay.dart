@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../models/feed_item.dart';
@@ -7,25 +6,40 @@ import '../../services/saved_content_store.dart';
 import '../../services/social_service.dart';
 import '../../utils/profile_navigation.dart';
 import '../collection_saved_toast.dart';
+import '../follow_button.dart';
+import '../piece_detail/detail_follow_state.dart';
 import '../profile_avatar.dart';
 import '../save_to_collection_sheet.dart';
+import 'reel_description_sheet.dart';
 import 'scene_video_comment_sheet.dart';
 
 class ReelOverlay extends StatefulWidget {
-  const ReelOverlay({super.key, required this.item, this.bottomPadding = 96});
+  const ReelOverlay({
+    super.key,
+    required this.item,
+    this.bottomPadding = 96,
+    required this.muted,
+    required this.onToggleMute,
+  });
 
   final FeedItem item;
   final double bottomPadding;
+  final bool muted;
+  final VoidCallback onToggleMute;
 
   @override
   State<ReelOverlay> createState() => ReelOverlayState();
 }
 
-class ReelOverlayState extends State<ReelOverlay> {
+class ReelOverlayState extends State<ReelOverlay>
+    with DetailFollowState<ReelOverlay> {
   late bool _liked;
   late bool _saved;
   late int _likeCount;
   int _commentCount = 0;
+
+  @override
+  String get followUsername => widget.item.authorUsername ?? '';
 
   @override
   void initState() {
@@ -38,6 +52,9 @@ class ReelOverlayState extends State<ReelOverlay> {
         : false;
     _likeCount = post?.likeCount ?? 0;
     _commentCount = 0;
+    followState = widget.item.authorIsFollowing
+        ? FollowState.following
+        : FollowState.none;
   }
 
   /// For double-tap-to-like on the video itself: only ever turns liking on,
@@ -83,6 +100,16 @@ class ReelOverlayState extends State<ReelOverlay> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('Comment posted')));
+  }
+
+  Future<void> _openDescription() {
+    return ReelDescriptionSheet.show(
+      context,
+      item: widget.item,
+      followState: followState,
+      onFollowToggle: toggleFollow,
+      onCommentPosted: () => setState(() => _commentCount += 1),
+    );
   }
 
   // Share hidden for now — see plan/task history to re-enable.
@@ -173,7 +200,10 @@ class ReelOverlayState extends State<ReelOverlay> {
                       behavior: authorUsername != null
                           ? HitTestBehavior.opaque
                           : HitTestBehavior.deferToChild,
-                      child: ProfileAvatar(url: null, size: 36),
+                      child: ProfileAvatar(
+                        url: widget.item.authorAvatarUrl,
+                        size: 36,
+                      ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -184,31 +214,61 @@ class ReelOverlayState extends State<ReelOverlay> {
                         behavior: authorUsername != null
                             ? HitTestBehavior.opaque
                             : HitTestBehavior.deferToChild,
-                        child: Text(
-                          authorName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              authorName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                            if (authorUsername != null &&
+                                authorUsername.isNotEmpty)
+                              Text(
+                                '@$authorUsername',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w400,
+                                  color: Colors.white.withValues(alpha: 0.7),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     ),
+                    if (authorUsername != null && authorUsername.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      FollowButton(
+                        state: followState,
+                        onPressed: toggleFollow,
+                        dense: true,
+                      ),
+                    ],
                   ],
                 ),
                 if (caption.trim().isNotEmpty) ...[
                   const SizedBox(height: 8),
-                  Text(
-                    caption,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w400,
-                      color: Colors.white.withValues(alpha: 0.92),
-                      height: 1.35,
+                  GestureDetector(
+                    onTap: _openDescription,
+                    behavior: HitTestBehavior.opaque,
+                    child: Text(
+                      caption,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w400,
+                        color: Colors.white.withValues(alpha: 0.92),
+                        height: 1.35,
+                      ),
                     ),
                   ),
                 ],
@@ -241,6 +301,11 @@ class ReelOverlayState extends State<ReelOverlay> {
               // ),
               const SizedBox(height: 18),
               _SaveActionButton(saved: _saved, onTap: _toggleSave),
+              const SizedBox(height: 18),
+              _MuteActionButton(
+                muted: widget.muted,
+                onTap: widget.onToggleMute,
+              ),
             ],
           ),
         ],
@@ -319,6 +384,26 @@ class _SaveActionButton extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _MuteActionButton extends StatelessWidget {
+  const _MuteActionButton({required this.muted, required this.onTap});
+
+  final bool muted;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Icon(
+        muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+        color: Colors.white,
+        size: 28,
       ),
     );
   }
