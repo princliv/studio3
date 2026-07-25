@@ -51,7 +51,7 @@ class MediaService {
       'jpg' || 'jpeg' => 'image/jpeg',
       'png' => 'image/png',
       'webp' => 'image/webp',
-      'mp4' || 'm4v' => 'video/mp4',
+      'mp4' || 'm4v' || 'mov' => 'video/mp4',
       _ => 'image/jpeg',
     };
   }

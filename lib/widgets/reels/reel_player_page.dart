@@ -1,3 +1,6 @@
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
@@ -49,6 +52,15 @@ class _ReelPlayerPageState extends State<ReelPlayerPage> {
     super.dispose();
   }
 
+  /// Android Impeller + texture-backed video often produces green macroblock
+  /// tearing on MediaTek/Mali devices. Platform views avoid that path.
+  static VideoViewType get _viewType {
+    if (kIsWeb) return VideoViewType.textureView;
+    return Platform.isAndroid
+        ? VideoViewType.platformView
+        : VideoViewType.textureView;
+  }
+
   Future<void> _initController() async {
     final url = widget.item.mediaUrl;
     if (url == null || url.isEmpty) {
@@ -60,7 +72,11 @@ class _ReelPlayerPageState extends State<ReelPlayerPage> {
       _initializing = true;
       _failed = false;
     });
-    final controller = VideoPlayerController.networkUrl(Uri.parse(url));
+    final controller = VideoPlayerController.networkUrl(
+      Uri.parse(url),
+      formatHint: VideoFormat.mp4,
+      viewType: _viewType,
+    );
     try {
       await controller.initialize();
       await controller.setLooping(true);
@@ -101,13 +117,36 @@ class _ReelPlayerPageState extends State<ReelPlayerPage> {
         fit: StackFit.expand,
         children: [
           if (_controller != null && _controller!.value.isInitialized)
-            FittedBox(
-              fit: BoxFit.cover,
-              child: SizedBox(
-                width: _controller!.value.size.width,
-                height: _controller!.value.size.height,
-                child: VideoPlayer(_controller!),
-              ),
+            // Explicit cover layout (not FittedBox scale) so Android platform
+            // views fill the frame correctly without texture-transform glitches.
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final size = _controller!.value.size;
+                final videoAspect =
+                    size.width == 0 ? 9 / 16 : size.width / size.height;
+                final frameAspect =
+                    constraints.maxWidth / constraints.maxHeight;
+                late final double width;
+                late final double height;
+                if (videoAspect > frameAspect) {
+                  height = constraints.maxHeight;
+                  width = height * videoAspect;
+                } else {
+                  width = constraints.maxWidth;
+                  height = width / videoAspect;
+                }
+                return SizedBox.expand(
+                  child: ClipRect(
+                    child: Center(
+                      child: SizedBox(
+                        width: width,
+                        height: height,
+                        child: VideoPlayer(_controller!),
+                      ),
+                    ),
+                  ),
+                );
+              },
             )
           else if (_failed)
             const Center(

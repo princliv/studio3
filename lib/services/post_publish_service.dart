@@ -130,6 +130,9 @@ class PostPublishService {
       final mediaUrl = await _media.uploadFile(
         purpose: purpose,
         file: File(draft.videoPath!),
+        // Always declare video — gallery temp paths may lack a .mp4 extension,
+        // and contentTypeForPath would otherwise fall back to image/jpeg.
+        contentType: 'video/mp4',
       );
       await _posts.create({
         'mediaUrl': mediaUrl,
