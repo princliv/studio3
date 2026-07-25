@@ -703,6 +703,7 @@ class _ProfilePageState extends State<ProfilePage>
                   sellerMode: sellerEnabled,
                   isOwnProfile: !showPublicActions,
                   followState: _followState,
+                  followBusy: _followBusy,
                   onFollow: showPublicActions && !_followBusy ? _onFollowTap : null,
                   onMessage: showPublicActions ? _onMessageTap : null,
                   onAvatarTap: () => _onAvatarTap(avatarUrl),

@@ -23,6 +23,7 @@ class ProfileHeader extends StatelessWidget {
     this.sellerMode = false,
     this.isOwnProfile = true,
     this.followState = FollowState.none,
+    this.followBusy = false,
     this.onFollow,
     this.onMessage,
     this.onAvatarTap,
@@ -44,6 +45,7 @@ class ProfileHeader extends StatelessWidget {
   final bool sellerMode;
   final bool isOwnProfile;
   final FollowState followState;
+  final bool followBusy;
   final VoidCallback? onFollow;
   final VoidCallback? onMessage;
   final VoidCallback? onAvatarTap;
@@ -218,6 +220,7 @@ class ProfileHeader extends StatelessWidget {
                     FollowButton(
                       state: followState,
                       onPressed: onFollow,
+                      busy: followBusy,
                     ),
                     const SizedBox(width: 10),
                     _MessageButton(onPressed: onMessage),

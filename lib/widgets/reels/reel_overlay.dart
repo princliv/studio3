@@ -176,6 +176,7 @@ class ReelOverlayState extends State<ReelOverlay>
       context,
       item: widget.item,
       followState: followState,
+      followBusy: followBusy,
       onFollowToggle: toggleFollow,
       onCommentPosted: () => setState(() => _commentCount += 1),
     );
@@ -337,6 +338,7 @@ class ReelOverlayState extends State<ReelOverlay>
                         state: followState,
                         onPressed: toggleFollow,
                         dense: true,
+                        busy: followBusy,
                       ),
                     ],
                   ],

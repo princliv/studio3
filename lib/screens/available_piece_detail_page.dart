@@ -229,6 +229,7 @@ class _AvailablePieceDetailPageState extends State<AvailablePieceDetailPage>
                     CollectArtistRow(
                       item: item,
                       followState: followState,
+                      followBusy: followBusy,
                       onFollowToggle: toggleFollow,
                     ),
                     // "Ask about this piece" (piece-anchored inquiries) deferred to v2 in favor

@@ -15,6 +15,7 @@ class ReelDescriptionSheet extends StatefulWidget {
     super.key,
     required this.item,
     required this.followState,
+    this.followBusy = false,
     required this.onFollowToggle,
     required this.onCommentPosted,
     required this.scrollController,
@@ -22,6 +23,7 @@ class ReelDescriptionSheet extends StatefulWidget {
 
   final FeedItem item;
   final FollowState followState;
+  final bool followBusy;
   final VoidCallback onFollowToggle;
   final VoidCallback onCommentPosted;
   final ScrollController scrollController;
@@ -30,6 +32,7 @@ class ReelDescriptionSheet extends StatefulWidget {
     BuildContext context, {
     required FeedItem item,
     required FollowState followState,
+    bool followBusy = false,
     required VoidCallback onFollowToggle,
     required VoidCallback onCommentPosted,
   }) {
@@ -48,6 +51,7 @@ class ReelDescriptionSheet extends StatefulWidget {
         builder: (context, scrollController) => ReelDescriptionSheet(
           item: item,
           followState: followState,
+          followBusy: followBusy,
           onFollowToggle: onFollowToggle,
           onCommentPosted: onCommentPosted,
           scrollController: scrollController,
@@ -169,6 +173,7 @@ class _ReelDescriptionSheetState extends State<ReelDescriptionSheet> {
                     state: widget.followState,
                     onPressed: widget.onFollowToggle,
                     dense: true,
+                    busy: widget.followBusy,
                   ),
               ],
             ),

@@ -12,11 +12,13 @@ class PieceArtistRow extends StatelessWidget {
     super.key,
     required this.item,
     required this.followState,
+    this.followBusy = false,
     required this.onFollowToggle,
   });
 
   final FeedPreviewItem item;
   final FollowState followState;
+  final bool followBusy;
   final VoidCallback onFollowToggle;
 
   @override
@@ -66,6 +68,7 @@ class PieceArtistRow extends StatelessWidget {
             state: followState,
             onPressed: onFollowToggle,
             dense: true,
+            busy: followBusy,
           ),
         ],
       ),

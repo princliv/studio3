@@ -15,6 +15,7 @@ class FollowButton extends StatelessWidget {
     required this.state,
     this.onPressed,
     this.dense = false,
+    this.busy = false,
   });
 
   final FollowState state;
@@ -24,6 +25,10 @@ class FollowButton extends StatelessWidget {
   /// as opposed to the larger standalone pill on the profile header.
   final bool dense;
 
+  /// Shows a spinner in place of the label and refuses taps — set while a
+  /// follow/unfollow request is in flight (e.g. `DetailFollowState.followBusy`).
+  final bool busy;
+
   @override
   Widget build(BuildContext context) {
     final outlined = state != FollowState.none;
@@ -32,11 +37,18 @@ class FollowButton extends StatelessWidget {
       FollowState.pending => 'Requested',
       FollowState.following => 'Following',
     };
+    final labelColor = outlined
+        ? HomeFeedTokens.textPrimary.withValues(
+            alpha: state == FollowState.pending ? 0.7 : 1,
+          )
+        : HomeFeedTokens.textInverse;
+    final spinnerSize = dense ? 14.0 : 16.0;
+
     return Material(
       color: outlined ? Colors.transparent : HomeFeedTokens.textPrimary,
       borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
       child: InkWell(
-        onTap: onPressed,
+        onTap: busy ? null : onPressed,
         borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
         child: DecoratedBox(
           decoration: outlined
@@ -56,18 +68,23 @@ class FollowButton extends StatelessWidget {
                 : const EdgeInsets.symmetric(vertical: 6, horizontal: 28),
             child: Center(
               widthFactor: 1,
-              child: Text(
-                label,
-                style: GoogleFonts.inter(
-                  fontSize: dense ? 12 : 15,
-                  fontWeight: dense ? FontWeight.w500 : FontWeight.w600,
-                  color: outlined
-                      ? HomeFeedTokens.textPrimary.withValues(
-                          alpha: state == FollowState.pending ? 0.7 : 1,
-                        )
-                      : HomeFeedTokens.textInverse,
-                ),
-              ),
+              child: busy
+                  ? SizedBox(
+                      width: spinnerSize,
+                      height: spinnerSize,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: labelColor,
+                      ),
+                    )
+                  : Text(
+                      label,
+                      style: GoogleFonts.inter(
+                        fontSize: dense ? 12 : 15,
+                        fontWeight: dense ? FontWeight.w500 : FontWeight.w600,
+                        color: labelColor,
+                      ),
+                    ),
             ),
           ),
         ),
