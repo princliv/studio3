@@ -26,12 +26,12 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Studio3 needs camera access so you can take a photo to post.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Studio3 uses your location to show shipping addresses and nearby sellers.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Studio3 needs access to your photo library so you can upload artwork photos and videos.</string>
-	<key>NSCameraUsageDescription</key>
-	<string>Studio3 needs camera access so you can take a photo to post.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -68,6 +68,9 @@
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 </dict>
 </plist>
