@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/feed_item.dart';
 import '../screens/reels_page.dart';
 import '../services/feed_service.dart';
+import '../services/reels_tab_service.dart';
 
 Future<void> openReels(
   BuildContext context, {
@@ -21,6 +22,9 @@ Future<void> openReels(
   }
 
   if (!context.mounted) return;
+  // If MainShell is mounted, switch to its own Reels tab in place (keeps the
+  // bottom nav bar visible) instead of covering it with a pushed route.
+  if (ReelsTabService.instance.tryOpen(reelsItems, index)) return;
   await Navigator.of(context).push<void>(
     MaterialPageRoute<void>(
       fullscreenDialog: true,

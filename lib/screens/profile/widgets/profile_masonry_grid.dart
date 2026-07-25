@@ -20,6 +20,8 @@ class ProfileContentGrid extends StatelessWidget {
     this.onPieceTap,
     this.onDeletePost,
     this.onDeletePiece,
+    this.onPublishPost,
+    this.onPublishPiece,
     this.showOwnerActions = false,
   });
 
@@ -30,6 +32,7 @@ class ProfileContentGrid extends StatelessWidget {
         bool forSale,
         String? price,
         bool isVideo,
+        bool isDraft,
         PostSummary? post,
         PieceSummary? piece,
       })> items;
@@ -37,12 +40,15 @@ class ProfileContentGrid extends StatelessWidget {
   final void Function(PieceSummary piece)? onPieceTap;
   final void Function(PostSummary post)? onDeletePost;
   final void Function(PieceSummary piece)? onDeletePiece;
+  final void Function(PostSummary post)? onPublishPost;
+  final void Function(PieceSummary piece)? onPublishPiece;
   final bool showOwnerActions;
 
   factory ProfileContentGrid.fromPieces(
     List<PieceSummary> pieces, {
     void Function(PieceSummary piece)? onPieceTap,
     void Function(PieceSummary piece)? onDeletePiece,
+    void Function(PieceSummary piece)? onPublishPiece,
     bool showOwnerActions = false,
     bool forSaleListing = false,
   }) {
@@ -54,6 +60,7 @@ class ProfileContentGrid extends StatelessWidget {
           bool forSale,
           String? price,
           bool isVideo,
+          bool isDraft,
           PostSummary? post,
           PieceSummary? piece,
         })>[];
@@ -65,6 +72,7 @@ class ProfileContentGrid extends StatelessWidget {
         forSale: forSaleListing || p.isForSale,
         price: p.priceDisplay,
         isVideo: false,
+        isDraft: p.status == 'draft',
         post: null,
         piece: p,
       ));
@@ -73,6 +81,7 @@ class ProfileContentGrid extends StatelessWidget {
       items: mapped,
       onPieceTap: onPieceTap,
       onDeletePiece: onDeletePiece,
+      onPublishPiece: onPublishPiece,
       showOwnerActions: showOwnerActions,
     );
   }
@@ -81,6 +90,7 @@ class ProfileContentGrid extends StatelessWidget {
     List<PostSummary> posts, {
     void Function(PostSummary post)? onPostTap,
     void Function(PostSummary post)? onDeletePost,
+    void Function(PostSummary post)? onPublishPost,
     bool showOwnerActions = false,
   }) {
     final heights = [292.0, 168.0, 174.0, 318.0, 182.0, 132.0, 302.0, 156.0];
@@ -91,6 +101,7 @@ class ProfileContentGrid extends StatelessWidget {
           bool forSale,
           String? price,
           bool isVideo,
+          bool isDraft,
           PostSummary? post,
           PieceSummary? piece,
         })>[];
@@ -105,6 +116,7 @@ class ProfileContentGrid extends StatelessWidget {
         forSale: false,
         price: null,
         isVideo: isVideo,
+        isDraft: p.status == 'draft',
         post: p,
         piece: null,
       ));
@@ -113,6 +125,7 @@ class ProfileContentGrid extends StatelessWidget {
       items: mapped,
       onPostTap: onPostTap,
       onDeletePost: onDeletePost,
+      onPublishPost: onPublishPost,
       showOwnerActions: showOwnerActions,
     );
   }
@@ -142,6 +155,7 @@ class ProfileContentGrid extends StatelessWidget {
           forSale: item.forSale,
           price: item.price,
           isVideo: item.isVideo,
+          isDraft: item.isDraft,
           onTap: item.post != null
               ? () => onPostTap?.call(item.post!)
               : item.piece != null
@@ -153,6 +167,13 @@ class ProfileContentGrid extends StatelessWidget {
                   ? () => onDeletePost?.call(item.post!)
                   : item.piece != null
                       ? () => onDeletePiece?.call(item.piece!)
+                      : null,
+          onPublish: !showOwnerActions || !item.isDraft
+              ? null
+              : item.post != null
+                  ? () => onPublishPost?.call(item.post!)
+                  : item.piece != null
+                      ? () => onPublishPiece?.call(item.piece!)
                       : null,
         );
       },
@@ -167,8 +188,10 @@ class _MasonryTile extends StatelessWidget {
     this.forSale = false,
     this.price,
     this.isVideo = false,
+    this.isDraft = false,
     this.onTap,
     this.onDelete,
+    this.onPublish,
   });
 
   final String? url;
@@ -176,12 +199,17 @@ class _MasonryTile extends StatelessWidget {
   final bool forSale;
   final String? price;
   final bool isVideo;
+  final bool isDraft;
   final VoidCallback? onTap;
   final VoidCallback? onDelete;
+  final VoidCallback? onPublish;
+
+  bool get _hasActions => onDelete != null || onPublish != null;
 
   void _showActions(BuildContext context) {
+    if (!_hasActions) return;
+    final publish = onPublish;
     final delete = onDelete;
-    if (delete == null) return;
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xFF1A1A1A),
@@ -189,16 +217,34 @@ class _MasonryTile extends StatelessWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (sheetContext) => SafeArea(
-        child: ListTile(
-          leading: const Icon(Icons.delete_outline, color: Color(0xFFE05252)),
-          title: const Text(
-            'Delete',
-            style: TextStyle(color: Color(0xFFE05252), fontWeight: FontWeight.w600),
-          ),
-          onTap: () {
-            Navigator.pop(sheetContext);
-            delete();
-          },
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (publish != null)
+              ListTile(
+                leading: const Icon(Icons.publish_outlined, color: Colors.white),
+                title: const Text(
+                  'Publish',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                ),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  publish();
+                },
+              ),
+            if (delete != null)
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Color(0xFFE05252)),
+                title: const Text(
+                  'Delete',
+                  style: TextStyle(color: Color(0xFFE05252), fontWeight: FontWeight.w600),
+                ),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  delete();
+                },
+              ),
+          ],
         ),
       ),
     );
@@ -208,7 +254,7 @@ class _MasonryTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      onLongPress: onDelete != null ? () => _showActions(context) : null,
+      onLongPress: _hasActions ? () => _showActions(context) : null,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
         child: SizedBox(
@@ -273,7 +319,30 @@ class _MasonryTile extends StatelessWidget {
                     ),
                   ),
                 ),
-              if (onDelete != null)
+              if (isDraft)
+                Positioned(
+                  top: 6,
+                  left: 6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.65),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text(
+                      'Draft',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              if (_hasActions)
                 Positioned(
                   top: 6,
                   right: 6,

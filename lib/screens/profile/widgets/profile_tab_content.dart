@@ -30,6 +30,8 @@ class ProfileTabContent extends StatelessWidget {
     this.isOwnProfile = false,
     this.onDeletePiece,
     this.onDeleteScene,
+    this.onPublishPiece,
+    this.onPublishScene,
     this.sceneFilter = 'all',
     this.onSceneFilterChanged,
   });
@@ -45,6 +47,8 @@ class ProfileTabContent extends StatelessWidget {
   final bool isOwnProfile;
   final void Function(PieceSummary piece)? onDeletePiece;
   final void Function(PostSummary post)? onDeleteScene;
+  final void Function(PieceSummary piece)? onPublishPiece;
+  final void Function(PostSummary post)? onPublishScene;
   final String sceneFilter;
   final ValueChanged<String>? onSceneFilterChanged;
 
@@ -86,6 +90,7 @@ class ProfileTabContent extends StatelessWidget {
           pieces,
           onPieceTap: (piece) => openProfilePiece(context, piece),
           onDeletePiece: onDeletePiece,
+          onPublishPiece: onPublishPiece,
           showOwnerActions: isOwnProfile,
         );
       }
@@ -100,6 +105,7 @@ class ProfileTabContent extends StatelessWidget {
               visibleScenes,
               onPostTap: (post) => openProfileScene(context, visibleScenes, post),
               onDeletePost: onDeleteScene,
+              onPublishPost: onPublishScene,
               showOwnerActions: isOwnProfile,
             )
           : SliverToBoxAdapter(

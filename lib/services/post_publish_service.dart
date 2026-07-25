@@ -36,6 +36,7 @@ class PostDraft {
     this.linkedPieceId,
     this.isProcess = false,
     this.isForSale = false,
+    this.status = 'live',
   });
 
   final String postType;
@@ -60,6 +61,11 @@ class PostDraft {
   final bool isProcess;
   final bool isForSale;
 
+  /// `'live'` (default) or `'draft'` — a draft is created immediately but
+  /// hidden from public feeds until later published (see profile grid's
+  /// "Publish" action).
+  final String status;
+
   bool get isVideo => mediaKind == 'video';
 
   PostDraft copyWith({
@@ -83,6 +89,7 @@ class PostDraft {
     String? linkedPieceId,
     bool? isProcess,
     bool? isForSale,
+    String? status,
   }) {
     return PostDraft(
       postType: postType ?? this.postType,
@@ -105,6 +112,7 @@ class PostDraft {
       linkedPieceId: linkedPieceId ?? this.linkedPieceId,
       isProcess: isProcess ?? this.isProcess,
       isForSale: isForSale ?? this.isForSale,
+      status: status ?? this.status,
     );
   }
 }
@@ -153,6 +161,7 @@ class PostPublishService {
           'location': draft.location,
         if (thumbnailUrl != null) 'thumbnailUrl': thumbnailUrl,
         'isProcess': draft.isProcess,
+        'status': draft.status,
       });
       return;
     }
@@ -193,6 +202,7 @@ class PostPublishService {
           'location': draft.location,
         'mediaAspectRatio': mediaAspectRatio,
         'isProcess': draft.isProcess,
+        'status': draft.status,
       });
       return;
     }
@@ -219,6 +229,7 @@ class PostPublishService {
       if (draft.location != null && draft.location!.isNotEmpty)
         'location': draft.location,
       'mediaAspectRatio': mediaAspectRatio,
+      'status': draft.status,
       'aiDisclosed': draft.aiDisclosed,
       if (draft.altText != null && draft.altText!.trim().isNotEmpty)
         'altText': draft.altText!.trim(),

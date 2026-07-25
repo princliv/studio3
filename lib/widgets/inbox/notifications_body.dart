@@ -158,7 +158,7 @@ class NotificationsBodyState extends State<NotificationsBody> {
       return OfflineState(onRetry: () => _load(refresh: true));
     }
     if (_loading && _items.isEmpty) {
-      return const ListRowSkeleton();
+      return const FlatListRowSkeleton();
     }
 
     if (_items.isEmpty) {

@@ -380,7 +380,7 @@ class _ChatsBodyState extends State<ChatsBody> {
 
   Widget _buildConnectionsSearchBody() {
     if (_connectionsLoading && _connections == null) {
-      return const ListRowSkeleton();
+      return const FlatListRowSkeleton();
     }
     final results = _filteredConnections;
     if (results.isEmpty) {
@@ -447,7 +447,7 @@ class _ChatsBodyState extends State<ChatsBody> {
 
   Widget _buildAllBody() {
     if (_loading) {
-      return const ListRowSkeleton();
+      return const FlatListRowSkeleton();
     }
     if (_conversations.isEmpty) {
       return Center(
@@ -546,7 +546,7 @@ class _ChatsBodyState extends State<ChatsBody> {
 
   Widget _buildRequestsBody() {
     if (_requestsLoading) {
-      return const ListRowSkeleton();
+      return const FlatListRowSkeleton();
     }
     if (_requests.isEmpty) {
       return Center(

@@ -95,7 +95,7 @@ class FollowRequestsBodyState extends State<FollowRequestsBody> {
       return OfflineState(onRetry: _load);
     }
     if (_loading && _requests.isEmpty) {
-      return const ListRowSkeleton();
+      return const FlatListRowSkeleton();
     }
     if (_requests.isEmpty) {
       return Center(

@@ -20,6 +20,7 @@ class PostSummary {
     this.authorAvatarUrl,
     this.authorIsFollowing = false,
     this.linkedPiece,
+    this.status,
   });
 
   final String id;
@@ -40,6 +41,7 @@ class PostSummary {
   final String? authorAvatarUrl;
   final bool authorIsFollowing;
   final PieceSummary? linkedPiece;
+  final String? status;
 
   factory PostSummary.fromJson(Map<String, dynamic> json) {
     final author = json['author'] as Map<String, dynamic>?;
@@ -78,6 +80,7 @@ class PostSummary {
       linkedPiece: pieceJson is Map<String, dynamic>
           ? PieceSummary.fromJson(pieceJson)
           : null,
+      status: json['status'] as String?,
     );
   }
 
@@ -107,6 +110,7 @@ class PostSummary {
     if (authorAvatarUrl != null) 'authorAvatarUrl': authorAvatarUrl,
     'authorIsFollowing': authorIsFollowing,
     if (linkedPiece != null) 'piece': linkedPiece!.toJson(),
+    if (status != null) 'status': status,
   };
 
   bool get isVideo {

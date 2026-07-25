@@ -67,6 +67,7 @@ class _PostCreatePageState extends State<PostCreatePage> {
   bool _isProcess = false;
   bool _publishing = false;
   bool _listForSale = false;
+  bool _reviewMode = false;
   PostLocationOption? _selectedLocation;
   String? _selectedMediumId;
   final Set<String> _selectedStyleIds = {};
@@ -338,16 +339,34 @@ class _PostCreatePageState extends State<PostCreatePage> {
     }
   }
 
-  void _onCreate() {
+  bool _validate() {
     if (_isPiece && _listForSale) {
       final form = _listingFormKey.currentState;
       if (form == null || !form.isPriceValid) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Enter a valid price to list for sale')),
         );
-        return;
+        return false;
       }
     }
+    return true;
+  }
+
+  void _onSave() {
+    if (!_validate()) return;
+    _publish(_buildDraft().copyWith(status: 'draft'));
+  }
+
+  void _onNext() {
+    if (!_validate()) return;
+    setState(() => _reviewMode = true);
+  }
+
+  void _onBackToEdit() {
+    setState(() => _reviewMode = false);
+  }
+
+  void _onCreate() {
     _publish(_buildDraft());
   }
 
@@ -356,7 +375,12 @@ class _PostCreatePageState extends State<PostCreatePage> {
     final topInset = MediaQuery.paddingOf(context).top;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
 
-    return Scaffold(
+    return PopScope(
+      canPop: !_reviewMode,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _onBackToEdit();
+      },
+      child: Scaffold(
       backgroundColor: Colors.black,
       body: Column(
         children: [
@@ -368,7 +392,51 @@ class _PostCreatePageState extends State<PostCreatePage> {
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.only(bottom: 16),
-              child: Column(
+              child: _reviewMode ? _buildSummary() : _buildEditableForm(),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(16, 8, 16, bottomInset + 16),
+            child: Row(
+              children: [
+                CreateFlowBottomButton(
+                  label: _reviewMode ? 'Back' : 'Save',
+                  backgroundColor: _neutral700,
+                  textColor: HomeFeedTokens.textInverse,
+                  width: 68,
+                  onTap: _publishing
+                      ? null
+                      : (_reviewMode ? _onBackToEdit : _onSave),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: CreateFlowBottomButton(
+                    label: _reviewMode ? 'Publish' : 'Next',
+                    backgroundColor: _neutral300,
+                    textColor: HomeFeedTokens.textPrimary,
+                    onTap: _publishing
+                        ? null
+                        : (_reviewMode ? _onCreate : _onNext),
+                    child: _publishing
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : null,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      ),
+    );
+  }
+
+  Widget _buildEditableForm() {
+    return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 13),
@@ -505,37 +573,113 @@ class _PostCreatePageState extends State<PostCreatePage> {
                     ),
                   ],
                 ],
+    );
+  }
+
+  /// Read-only recap of everything entered so far — reuses the same values
+  /// as [_buildEditableForm] but as plain text (no fields, no chevrons, no
+  /// toggles, no edit affordance on the preview image), so this reads as a
+  /// summary to confirm rather than a second copy of the editable form.
+  Widget _buildSummary() {
+    ListingDetails? listingDetails;
+    if (_isPiece && _listForSale) {
+      listingDetails = _listingFormKey.currentState?.buildListingDetails();
+    }
+    final materialsLabel = _selectedMaterials.isEmpty
+        ? null
+        : _selectedMaterials.map((m) => m.name).join(', ');
+    final title = _nameController.text.trim();
+    final description = _descriptionController.text.trim();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 13),
+        Center(
+          child: widget.mediaKind == 'video'
+              ? _VideoPreviewCard(thumbnailBytes: widget.videoThumbnailBytes)
+              : _PreviewCard(
+                  imagePath: widget.imagePaths[widget.previewImageIndex],
+                  transform: widget.transforms[widget.previewImageIndex],
+                ),
+        ),
+        const SizedBox(height: 24),
+        if (title.isNotEmpty) _summaryRow('Name', title),
+        if (description.isNotEmpty) _summaryRow('Description', description),
+        const Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: createFlowHorizontalInset,
+            vertical: 8,
+          ),
+          child: CreateFlowDivider(),
+        ),
+        if (_selectedLocation != null)
+          _summaryRow('Location', _selectedLocation!.name),
+        if (_mediumTrailing != null) _summaryRow('Medium', _mediumTrailing!),
+        if (_styleTrailing != null) _summaryRow('Style', _styleTrailing!),
+        if (materialsLabel != null) _summaryRow('Materials', materialsLabel),
+        if (_isPiece) ...[
+          if (_seriesLabel != null) _summaryRow('Series', _seriesLabel!),
+        ] else ...[
+          if (_linkedPieceLabel != null)
+            _summaryRow('Link to piece', _linkedPieceLabel!),
+          if (_isProcess) _summaryRow('Process / work-in-progress', 'Yes'),
+        ],
+        if (_aiToolsUsed) _summaryRow('AI tools used', 'Yes'),
+        if (_isPiece && _listForSale) ...[
+          _summaryRow('List for sale', 'Yes'),
+          if (listingDetails?.priceUsd != null)
+            _summaryRow(
+              'Price',
+              '\$${listingDetails!.priceUsd!.toStringAsFixed(2)}',
+            ),
+          if (listingDetails?.dimensionsString != null)
+            _summaryRow('Dimensions', listingDetails!.dimensionsString!),
+          if (listingDetails?.framingMounting?.trim().isNotEmpty == true)
+            _summaryRow(
+              'Framing/mounting',
+              listingDetails!.framingMounting!.trim(),
+            ),
+          if (listingDetails?.provenance?.trim().isNotEmpty == true)
+            _summaryRow('Provenance', listingDetails!.provenance!.trim()),
+          if (listingDetails?.yearCreated != null)
+            _summaryRow('Year created', '${listingDetails!.yearCreated}'),
+          if (listingDetails?.handlingNotes?.trim().isNotEmpty == true)
+            _summaryRow(
+              'Handling notes',
+              listingDetails!.handlingNotes!.trim(),
+            ),
+        ],
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
+  Widget _summaryRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 110,
+            child: Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF8C8880),
               ),
             ),
           ),
-          Padding(
-            padding: EdgeInsets.fromLTRB(16, 8, 16, bottomInset + 16),
-            child: Row(
-              children: [
-                CreateFlowBottomButton(
-                  label: 'Save',
-                  backgroundColor: _neutral700,
-                  textColor: HomeFeedTokens.textInverse,
-                  width: 68,
-                  onTap: _publishing ? null : _onCreate,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: CreateFlowBottomButton(
-                    label: 'Publish',
-                    backgroundColor: _neutral300,
-                    textColor: HomeFeedTokens.textPrimary,
-                    onTap: _publishing ? null : _onCreate,
-                    child: _publishing
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : null,
-                  ),
-                ),
-              ],
+          Expanded(
+            child: Text(
+              value,
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+                color: HomeFeedTokens.textInverse,
+              ),
             ),
           ),
         ],

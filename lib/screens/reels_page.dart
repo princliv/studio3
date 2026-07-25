@@ -2,8 +2,10 @@ import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
 import '../models/feed_item.dart';
+import '../models/feed_page.dart';
 import '../services/connectivity_service.dart';
 import '../services/feed_service.dart';
+import '../services/reels_tab_service.dart';
 import '../utils/scrolls_to_top_on_double_tap.dart';
 import '../utils/snappy_page_physics.dart';
 import '../widgets/feed_skeleton.dart';
@@ -19,6 +21,7 @@ class ReelsPage extends StatefulWidget {
     this.initialIndex = 0,
     this.initialItems,
     this.activeListenable,
+    this.jumpRequests,
   });
 
   final int initialIndex;
@@ -33,6 +36,13 @@ class ReelsPage extends StatefulWidget {
   /// active. Playback still pauses independently while another route is
   /// pushed on top (see [_routePaused]).
   final ValueListenable<bool>? activeListenable;
+
+  /// Fires when a "open this video" call site (see
+  /// `lib/utils/reels_route.dart`/`ReelsTabService`) wants this already-live
+  /// tab to jump to a specific video without being rebuilt — `initialIndex`/
+  /// `initialItems` are only read once in [State.initState], so they can't
+  /// do this on their own for a tab that's already mounted.
+  final ValueListenable<ReelsJumpRequest?>? jumpRequests;
 
   @override
   State<ReelsPage> createState() => _ReelsPageState();
@@ -57,6 +67,7 @@ class _ReelsPageState extends State<ReelsPage>
     _currentIndex = widget.initialIndex;
     _isActive = widget.activeListenable?.value ?? true;
     widget.activeListenable?.addListener(_onActiveChanged);
+    widget.jumpRequests?.addListener(_onJumpRequest);
     _pageController = PageController(initialPage: widget.initialIndex);
     ConnectivityService.instance.addReconnectHook(_onReconnected);
     _loadItems();
@@ -65,6 +76,22 @@ class _ReelsPageState extends State<ReelsPage>
   void _onActiveChanged() {
     if (!mounted) return;
     setState(() => _isActive = widget.activeListenable!.value);
+  }
+
+  void _onJumpRequest() {
+    final request = widget.jumpRequests?.value;
+    if (request == null || !mounted) return;
+    final index = request.items.isEmpty
+        ? 0
+        : request.index.clamp(0, request.items.length - 1);
+    setState(() {
+      _items = List<FeedItem>.from(request.items);
+      _currentIndex = index;
+      _loading = false;
+    });
+    if (_pageController.hasClients) {
+      _pageController.jumpToPage(index);
+    }
   }
 
   Future<void> _onReconnected() => _loadItems(refresh: true);
@@ -89,6 +116,7 @@ class _ReelsPageState extends State<ReelsPage>
   void dispose() {
     routeObserver.unsubscribe(this);
     widget.activeListenable?.removeListener(_onActiveChanged);
+    widget.jumpRequests?.removeListener(_onJumpRequest);
     _pageController.dispose();
     ConnectivityService.instance.removeReconnectHook(_onReconnected);
     super.dispose();
@@ -114,6 +142,7 @@ class _ReelsPageState extends State<ReelsPage>
           : await FeedService.instance.getExploreCached(
               videoOnly: true,
               forceRefresh: refresh,
+              onBackgroundUpdate: _onBackgroundUpdate,
             );
       if (!mounted) return;
       setState(() {
@@ -134,6 +163,19 @@ class _ReelsPageState extends State<ReelsPage>
         _loadingMore = false;
       });
     }
+  }
+
+  /// Applies a page fetched silently in the background (see
+  /// [CacheService.fetchWithCache]'s `onBackgroundUpdate`) — mirrors
+  /// `HomeFeedStore._mergeBackgroundPage`'s replace-from-page-1 convention,
+  /// so a stale cached page (e.g. opened before new videos were published)
+  /// self-heals without requiring a manual pull-to-refresh.
+  void _onBackgroundUpdate(FeedPage page) {
+    if (!mounted) return;
+    setState(() {
+      _items = page.items;
+      _nextCursor = page.nextCursor;
+    });
   }
 
   void _maybeLoadMore(int index) {

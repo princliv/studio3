@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../models/feed_item.dart';
+import '../feed_skeleton.dart';
 import 'reel_overlay.dart';
 
 class ReelPlayerPage extends StatefulWidget {
@@ -108,7 +109,8 @@ class _ReelPlayerPageState extends State<ReelPlayerPage> {
       if (widget.isActive) {
         await controller.play();
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('ReelPlayerPage: failed to initialize $url — $e');
       await controller.dispose();
       if (!mounted) return;
       setState(() {
@@ -177,12 +179,7 @@ class _ReelPlayerPageState extends State<ReelPlayerPage> {
                 ),
               )
             else
-              const Center(
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2,
-                ),
-              ),
+              const ReelSkeleton(),
             IgnorePointer(
               child: Center(
                 child: AnimatedOpacity(

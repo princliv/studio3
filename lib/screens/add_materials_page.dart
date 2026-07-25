@@ -234,54 +234,18 @@ class _AddMaterialsBanner extends StatelessWidget {
 class _MaterialRow extends StatelessWidget {
   const _MaterialRow({required this.material});
 
-  static const _textSecondary = Color(0xFF8C8880);
-
   final PostMaterialOption material;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.asset(
-            material.imagePath,
-            width: 40,
-            height: 40,
-            fit: BoxFit.cover,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 2),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  material.name,
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                    color: HomeFeedTokens.textInverse,
-                    height: 1.25,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  material.price,
-                  style: GoogleFonts.inter(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w400,
-                    color: _textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+    return Text(
+      material.name,
+      style: GoogleFonts.inter(
+        fontSize: 13,
+        fontWeight: FontWeight.w400,
+        color: HomeFeedTokens.textInverse,
+        height: 1.25,
+      ),
     );
   }
 }

@@ -42,13 +42,7 @@ class _PickMaterialsPageState extends State<PickMaterialsPage> {
   List<PostMaterialOption> _filter(List<PostMaterialOption> source) {
     if (_query.isEmpty) return source;
     final q = _query.toLowerCase();
-    return source
-        .where(
-          (m) =>
-              m.name.toLowerCase().contains(q) ||
-              m.price.toLowerCase().contains(q),
-        )
-        .toList();
+    return source.where((m) => m.name.toLowerCase().contains(q)).toList();
   }
 
   void _toggleMaterial(PostMaterialOption material) {
@@ -62,12 +56,30 @@ class _PickMaterialsPageState extends State<PickMaterialsPage> {
     });
   }
 
+  List<Widget> _buildCategorySection(
+    String category,
+    List<PostMaterialOption> items,
+  ) {
+    if (items.isEmpty) return const [];
+    return [
+      _SectionHeader(title: category),
+      const SizedBox(height: 8),
+      ...items.map(
+        (material) => _MaterialPickerTile(
+          material: material,
+          selected: _selected.any((m) => m.id == material.id),
+          onTap: () => _toggleMaterial(material),
+        ),
+      ),
+      const SizedBox(height: 20),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final topInset = MediaQuery.paddingOf(context).top;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
-    final recent = _filter(PostMaterialOptions.recentlyUsed);
-    final suggested = _filter(PostMaterialOptions.suggested);
+    final byCategory = PostMaterialOptions.byCategory;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -147,29 +159,11 @@ class _PickMaterialsPageState extends State<PickMaterialsPage> {
             child: ListView(
               padding: EdgeInsets.fromLTRB(10, 8, 10, bottomInset + 16),
               children: [
-                if (recent.isNotEmpty) ...[
-                  _SectionHeader(title: 'Recently used'),
-                  const SizedBox(height: 8),
-                  ...recent.map(
-                    (material) => _MaterialPickerTile(
-                      material: material,
-                      selected: _selected.any((m) => m.id == material.id),
-                      onTap: () => _toggleMaterial(material),
-                    ),
+                for (final category in PostMaterialOptions.categories)
+                  ..._buildCategorySection(
+                    category,
+                    _filter(byCategory[category] ?? const []),
                   ),
-                ],
-                if (suggested.isNotEmpty) ...[
-                  const SizedBox(height: 20),
-                  _SectionHeader(title: 'Suggested materials'),
-                  const SizedBox(height: 8),
-                  ...suggested.map(
-                    (material) => _MaterialPickerTile(
-                      material: material,
-                      selected: _selected.any((m) => m.id == material.id),
-                      onTap: () => _toggleMaterial(material),
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
@@ -209,54 +203,21 @@ class _SectionHeader extends StatelessWidget {
 class _MaterialRow extends StatelessWidget {
   const _MaterialRow({required this.material});
 
-  static const _textSecondary = Color(0xFF8C8880);
-
   final PostMaterialOption material;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.asset(
-            material.imagePath,
-            width: 40,
-            height: 40,
-            fit: BoxFit.cover,
-          ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Text(
+        material.name,
+        style: GoogleFonts.inter(
+          fontSize: 13,
+          fontWeight: FontWeight.w400,
+          color: HomeFeedTokens.textInverse,
+          height: 1.25,
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 2),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  material.name,
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                    color: HomeFeedTokens.textInverse,
-                    height: 1.25,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  material.price,
-                  style: GoogleFonts.inter(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w400,
-                    color: _textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

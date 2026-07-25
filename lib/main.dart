@@ -12,6 +12,7 @@ import 'services/chat_socket_service.dart';
 import 'services/deep_link_service.dart';
 import 'services/device_service.dart';
 import 'services/permission_service.dart';
+import 'services/reels_tab_service.dart';
 import 'services/saved_content_store.dart';
 import 'services/user_service.dart';
 import 'utils/app_routes.dart';
@@ -43,6 +44,7 @@ import 'screens/notification_preferences_page.dart';
 import 'screens/blocked_users_page.dart';
 import 'screens/privacy_settings_page.dart';
 import 'models/auth_user.dart';
+import 'models/feed_item.dart';
 import 'theme/home_feed_tokens.dart';
 import 'utils/scrolls_to_top_on_double_tap.dart';
 import 'utils/snappy_page_physics.dart';
@@ -273,6 +275,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   late final ValueNotifier<bool> _reelsActive =
       ValueNotifier(_selectedNavIndex.value == BottomNavIndex.reels);
   final ValueNotifier<bool> _showProfile = ValueNotifier(false);
+  final ValueNotifier<ReelsJumpRequest?> _reelsJumpRequest = ValueNotifier(
+    null,
+  );
 
   late final PageController _pageController = PageController(
     initialPage: _kHomePage,
@@ -297,7 +302,11 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   late final List<Widget> _pages = [
     HomePage(key: _homeKey, store: _homeFeedStore),
     ExplorePage(key: _exploreKey),
-    ReelsPage(key: _reelsKey, activeListenable: _reelsActive),
+    ReelsPage(
+      key: _reelsKey,
+      activeListenable: _reelsActive,
+      jumpRequests: _reelsJumpRequest,
+    ),
     SavedPage(key: _savedKey),
   ];
 
@@ -307,6 +316,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     AuthSession.instance.addListener(_onSessionChanged);
     _selectedNavIndex.addListener(_onNavIndexChanged);
+    ReelsTabService.instance.register(_openReelsTab);
     _loadProfilePhoto();
   }
 
@@ -315,12 +325,24 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     AuthSession.instance.removeListener(_onSessionChanged);
     _selectedNavIndex.removeListener(_onNavIndexChanged);
+    ReelsTabService.instance.unregister();
     _selectedNavIndex.dispose();
     _reelsActive.dispose();
     _showProfile.dispose();
+    _reelsJumpRequest.dispose();
     _pageController.dispose();
     _homeFeedStore.dispose();
     super.dispose();
+  }
+
+  /// Bridges "open this video" call sites (see `lib/utils/reels_route.dart`)
+  /// to this shell's own Reels tab, so a video opens by switching tabs in
+  /// place — keeping the bottom nav bar visible — instead of covering it
+  /// with a full-screen pushed route.
+  void _openReelsTab(List<FeedItem> items, int index) {
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    _reelsJumpRequest.value = ReelsJumpRequest(items: items, index: index);
+    _onNavTap(BottomNavIndex.reels);
   }
 
   @override

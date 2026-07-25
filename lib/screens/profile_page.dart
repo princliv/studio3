@@ -495,6 +495,42 @@ class _ProfilePageState extends State<ProfilePage>
     }
   }
 
+  Future<void> _publishPiece(PieceSummary piece) async {
+    try {
+      final updated = await PieceService.instance.update(piece.id, {
+        'status': 'live',
+      });
+      if (!mounted) return;
+      setState(() {
+        final index = _pieces.indexWhere((p) => p.id == piece.id);
+        if (index != -1) _pieces = List.of(_pieces)..[index] = updated;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to publish piece: $e')));
+    }
+  }
+
+  Future<void> _publishScene(PostSummary post) async {
+    try {
+      final updated = await PostService.instance.update(post.id, {
+        'status': 'live',
+      });
+      if (!mounted) return;
+      setState(() {
+        final index = _scenes.indexWhere((p) => p.id == post.id);
+        if (index != -1) _scenes = List.of(_scenes)..[index] = updated;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to publish scene: $e')));
+    }
+  }
+
   void _showProfileActionsSheet(UserProfile? profile) {
     if (profile == null) return;
     showModalBottomSheet<void>(
@@ -715,6 +751,8 @@ class _ProfilePageState extends State<ProfilePage>
                     isOwnProfile: isOwnProfile && !widget.viewerMode,
                     onDeletePiece: _deletePiece,
                     onDeleteScene: _deleteScene,
+                    onPublishPiece: _publishPiece,
+                    onPublishScene: _publishScene,
                     sceneFilter: _sceneFilter,
                     onSceneFilterChanged: _onSceneFilterChanged,
                   ),

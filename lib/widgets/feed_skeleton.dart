@@ -373,6 +373,73 @@ class ListRowSkeleton extends StatelessWidget {
   }
 }
 
+/// Placeholder rows for card-list screens (Notifications / Requests / Chats),
+/// styled to match [SettingsListSkeleton]'s flat look — a leading avatar
+/// circle plus two text-bar "lines" sitting directly on the page background,
+/// with no solid card block behind each row (unlike [ListRowSkeleton], which
+/// mimics the real [GlassCard] row's opaque background).
+class FlatListRowSkeleton extends StatelessWidget {
+  const FlatListRowSkeleton({super.key, this.itemCount = 6});
+
+  final int itemCount;
+
+  @override
+  Widget build(BuildContext context) {
+    const fill = HomeFeedTokens.skeletonBase;
+
+    Widget row() {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+        child: Row(
+          children: [
+            DecoratedBox(
+              decoration: const BoxDecoration(color: fill, shape: BoxShape.circle),
+              child: const SizedBox(width: 44, height: 44),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 140,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: fill,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 90,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: fill,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return _shimmer(
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(
+          children: [for (var i = 0; i < itemCount; i++) row()],
+        ),
+      ),
+      baseColor: fill,
+      highlightColor: HomeFeedTokens.skeletonHighlight,
+    );
+  }
+}
+
 /// Placeholder for Profile Settings' first load — section-header bars
 /// followed by [SettingsTile]-shaped rows (icon circle + text bar +
 /// trailing blob), so the page reads as "loading settings" instead of a
