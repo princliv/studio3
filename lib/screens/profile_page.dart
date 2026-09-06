@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models/piece_summary.dart';
 import '../models/post_summary.dart';
 import '../models/user_profile.dart';
 import '../services/auth_session.dart';
+import '../services/main_nav_service.dart';
 import '../services/piece_service.dart';
 import '../services/post_service.dart';
 import '../services/series_service.dart';
@@ -14,11 +16,11 @@ import 'conversation_thread_page.dart';
 import 'follow_list_page.dart';
 import '../widgets/delete_confirmation_dialog.dart';
 import '../widgets/profile_avatar_preview_sheet.dart';
-import '../widgets/profile_cover_image.dart';
 import 'profile/models/profile_series_data.dart';
 import 'profile/profile_constants.dart';
 import '../widgets/follow_button.dart';
 import 'profile/widgets/profile_header.dart';
+import 'profile/widgets/profile_hero.dart';
 import 'profile/widgets/profile_locked_placeholder.dart';
 import 'profile/widgets/profile_tab_content.dart';
 import 'profile/widgets/profile_tabs.dart';
@@ -55,7 +57,7 @@ class _ProfilePageState extends State<ProfilePage>
   bool _scenesLoaded = false;
   bool _listedPiecesLoaded = false;
   bool _seriesLoaded = false;
-  String _collectSegment = 'available';
+  String _collectSegment = 'all';
   String _sceneFilter = 'all';
   bool _followBusy = false;
   int _profileLoadAttempts = 0;
@@ -190,6 +192,9 @@ class _ProfilePageState extends State<ProfilePage>
         _lastKnownSeller = profile.sellerEnabled;
         if (!profile.sellerEnabled && _tab == 'collect') _tab = 'pieces';
       });
+      if (profile.sellerEnabled && !profile.isLocked) {
+        _prefetchListedPieces(profile);
+      }
       // Locked (private, not-yet-approved) profiles never fetch tab content
       // — the backend gates those endpoints the same way, so there's
       // nothing to show and no point firing the requests.
@@ -318,10 +323,20 @@ class _ProfilePageState extends State<ProfilePage>
     );
   }
 
+  Future<void> _prefetchListedPieces(UserProfile profile) async {
+    try {
+      final listed = await _loadListedPieces(profile);
+      if (!mounted) return;
+      setState(() {
+        _listedPieces = listed;
+        _listedPiecesLoaded = true;
+      });
+    } catch (_) {}
+  }
+
   void _onTabChanged(String tab) {
     setState(() {
       _tab = tab;
-      if (tab == 'collect') _collectSegment = 'available';
     });
     _loadActiveTab();
   }
@@ -345,7 +360,8 @@ class _ProfilePageState extends State<ProfilePage>
   Future<void> _toggleFollow() async {
     final profile = _profile;
     if (profile == null || _followBusy) return;
-    final wasFollowingOrPending = profile.isFollowing || profile.followRequestPending;
+    final wasFollowingOrPending =
+        profile.isFollowing || profile.followRequestPending;
     setState(() => _followBusy = true);
     try {
       if (wasFollowingOrPending) {
@@ -356,8 +372,9 @@ class _ProfilePageState extends State<ProfilePage>
           _profile = profile.copyWith(
             isFollowing: false,
             followRequestPending: false,
-            followersCount:
-                profile.isFollowing ? profile.followersCount - 1 : null,
+            followersCount: profile.isFollowing
+                ? profile.followersCount - 1
+                : null,
           );
         });
       } else {
@@ -367,15 +384,17 @@ class _ProfilePageState extends State<ProfilePage>
           _profile = profile.copyWith(
             isFollowing: result.following,
             followRequestPending: result.requested,
-            followersCount: result.following ? profile.followersCount + 1 : null,
+            followersCount: result.following
+                ? profile.followersCount + 1
+                : null,
           );
         });
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Something went wrong: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Something went wrong: $e')));
     } finally {
       if (mounted) setState(() => _followBusy = false);
     }
@@ -394,7 +413,8 @@ class _ProfilePageState extends State<ProfilePage>
   }
 
   void _onTapFollowStat(FollowListTab tab) {
-    final username = _profile?.username ??
+    final username =
+        _profile?.username ??
         widget.username ??
         AuthSession.instance.user?.username;
     if (username == null || username.isEmpty) return;
@@ -456,16 +476,17 @@ class _ProfilePageState extends State<ProfilePage>
       if (!mounted) return;
       setState(() {
         if (pieceIndex != -1) {
-          _pieces = List.of(_pieces)..insert(pieceIndex.clamp(0, _pieces.length), piece);
+          _pieces = List.of(_pieces)
+            ..insert(pieceIndex.clamp(0, _pieces.length), piece);
         }
         if (listedIndex != -1) {
           _listedPieces = List.of(_listedPieces)
             ..insert(listedIndex.clamp(0, _listedPieces.length), piece);
         }
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to delete piece: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to delete piece: $e')));
     }
   }
 
@@ -486,12 +507,13 @@ class _ProfilePageState extends State<ProfilePage>
       if (!mounted) return;
       setState(() {
         if (index != -1) {
-          _scenes = List.of(_scenes)..insert(index.clamp(0, _scenes.length), post);
+          _scenes = List.of(_scenes)
+            ..insert(index.clamp(0, _scenes.length), post);
         }
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to delete scene: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to delete scene: $e')));
     }
   }
 
@@ -545,7 +567,10 @@ class _ProfilePageState extends State<ProfilePage>
           children: [
             const SizedBox(height: 8),
             ListTile(
-              leading: const Icon(Icons.block_outlined, color: Color(0xFFE05252)),
+              leading: const Icon(
+                Icons.block_outlined,
+                color: Color(0xFFE05252),
+              ),
               title: Text(
                 'Block ${profile.handle}',
                 style: const TextStyle(
@@ -580,7 +605,10 @@ class _ProfilePageState extends State<ProfilePage>
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Block', style: TextStyle(color: Color(0xFFE05252))),
+            child: const Text(
+              'Block',
+              style: TextStyle(color: Color(0xFFE05252)),
+            ),
           ),
         ],
       ),
@@ -592,26 +620,31 @@ class _ProfilePageState extends State<ProfilePage>
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to block user: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to block user: $e')));
+    }
+  }
+
+  void _onBackToHome() {
+    if (MainNavService.instance.goHome()) return;
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
     }
   }
 
   void _showViewerModePreviewSnackBar() {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('This is a preview of your public profile'),
-      ),
+      const SnackBar(content: Text('This is a preview of your public profile')),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-    final heroH = (width * 0.68).clamp(260.0, 340.0);
     final safeBottom = MediaQuery.paddingOf(context).bottom;
-    final bottomPad = (_isPushedRoute ? safeBottom + 24 : safeBottom + 100) +
+    final bottomPad =
+        (_isPushedRoute ? safeBottom + 24 : safeBottom + 100) +
         (widget.viewerMode ? 56 : 0);
     final profile = _profile;
     final sessionUser = AuthSession.instance.user;
@@ -620,20 +653,27 @@ class _ProfilePageState extends State<ProfilePage>
     // Only borrow the viewer's own session data while `_profile` is still
     // loading for their own profile — otherwise viewing another artist's
     // profile flashes the viewer's own name/handle/seller state first.
-    final sellerEnabled = profile?.sellerEnabled ??
+    final sellerEnabled =
+        profile?.sellerEnabled ??
         (isOwnProfile ? AuthSession.instance.sellerEnabled : false);
 
-    final name = profile?.name ?? (isOwnProfile ? sessionUser?.name : null) ?? '';
-    final handle = profile?.handle ??
+    final name =
+        profile?.name ?? (isOwnProfile ? sessionUser?.name : null) ?? '';
+    final handle =
+        profile?.handle ??
         (isOwnProfile && sessionUser != null ? '@${sessionUser.username}' : '');
     final coverUrl = profile?.coverPhotoUrl;
     final avatarUrl = profile?.profilePhotoUrl;
 
-    return Scaffold(
-      backgroundColor: HomeFeedTokens.background,
-      body: SafeArea(
-        bottom: false,
-        child: Stack(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+      ),
+      child: Scaffold(
+        backgroundColor: kProfilePageBackground,
+        body: Stack(
           children: [
             RefreshIndicator(
               onRefresh: _loadProfile,
@@ -641,124 +681,110 @@ class _ProfilePageState extends State<ProfilePage>
                 controller: _scrollController,
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
-              SliverToBoxAdapter(
-                child: Stack(
-                  children: [
-                    ProfileCoverImage(
-                      url: coverUrl,
-                      height: heroH,
+                  SliverToBoxAdapter(
+                    child: ProfileHero(
                       width: width,
-                      showDefaultWhenEmpty: profile != null,
-                    ),
-                    if (_isPushedRoute)
-                      Positioned(
-                        top: 8,
-                        left: 12,
-                        child: _ProfileBackButton(
-                          onPressed: () => Navigator.pop(context),
-                        ),
-                      ),
-                    if (isOwnProfile && _isTabContext)
-                      Positioned(
-                        top: 8,
-                        right: 12,
-                        child: _ProfileSettingsButton(
-                          onPressed: () async {
-                            await Navigator.pushNamed(
-                              context,
-                              '/profile-settings',
-                            );
-                            if (mounted) {
-                              _resetTabCache();
-                              await _loadProfileShell(silent: true);
-                              await _loadActiveTab(force: true);
+                      coverUrl: coverUrl,
+                      avatarUrl: avatarUrl,
+                      showDefaultCover: profile != null,
+                      onBack: _onBackToHome,
+                      onMore: isOwnProfile && _isTabContext
+                          ? () async {
+                              await Navigator.pushNamed(
+                                context,
+                                '/profile-settings',
+                              );
+                              if (mounted) {
+                                _resetTabCache();
+                                await _loadProfileShell(silent: true);
+                                await _loadActiveTab(force: true);
+                              }
                             }
-                          },
-                        ),
+                          : (!isOwnProfile &&
+                                !widget.viewerMode &&
+                                _isPushedRoute)
+                          ? () => _showProfileActionsSheet(profile)
+                          : null,
+                      onAvatarTap: () => _onAvatarTap(avatarUrl),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: ProfileHeader(
+                      name: name,
+                      handle: handle,
+                      followingCount: profile?.followingCount ?? 0,
+                      followersCount: profile?.followersCount ?? 0,
+                      bio: profile?.bio ?? '',
+                      piecesCount: profile?.piecesCount ?? _pieces.length,
+                      scenesCount: _scenes.length,
+                      savesCount: profile?.savesCount,
+                      availableCount: _listedPieces
+                          .where((p) => p.isForSale && p.status != 'sold')
+                          .length,
+                      collectedCount: profile?.collectedCount,
+                      rating: profile?.rating,
+                      sellerMode: sellerEnabled,
+                      isOwnProfile: !showPublicActions,
+                      followState: _followState,
+                      followBusy: _followBusy,
+                      onFollow: showPublicActions && !_followBusy
+                          ? _onFollowTap
+                          : null,
+                      onMessage: showPublicActions ? _onMessageTap : null,
+                      onTapFollowing: () =>
+                          _onTapFollowStat(FollowListTab.following),
+                      onTapFollowers: () =>
+                          _onTapFollowStat(FollowListTab.followers),
+                    ),
+                  ),
+                  if (profile != null && profile.isLocked && !isOwnProfile)
+                    SliverPadding(
+                      padding: EdgeInsets.fromLTRB(
+                        kProfileHorizontalPad,
+                        0,
+                        kProfileHorizontalPad,
+                        bottomPad,
                       ),
-                    if (!isOwnProfile && !widget.viewerMode && _isPushedRoute)
-                      Positioned(
-                        top: 8,
-                        right: 12,
-                        child: _ProfileOverflowButton(
-                          onPressed: () => _showProfileActionsSheet(profile),
-                        ),
+                      sliver: const SliverToBoxAdapter(
+                        child: ProfileLockedPlaceholder(),
                       ),
+                    )
+                  else ...[
+                    SliverToBoxAdapter(
+                      child: ProfileTabs(
+                        currentTab: _tab,
+                        showCollect: sellerEnabled,
+                        collectSegment: _collectSegment,
+                        onCollectSegmentChanged: _onCollectSegmentChanged,
+                        onTabChanged: _onTabChanged,
+                      ),
+                    ),
+                    SliverPadding(
+                      padding: EdgeInsets.fromLTRB(
+                        kProfileHorizontalPad,
+                        kProfileGridTopGap,
+                        kProfileHorizontalPad,
+                        bottomPad,
+                      ),
+                      sliver: ProfileTabContent(
+                        currentTab: _tab,
+                        seriesItems: _series,
+                        pieces: _pieces,
+                        scenes: _scenes,
+                        listedPieces: _listedPieces,
+                        collectSegment: _collectSegment,
+                        sellerMode: sellerEnabled,
+                        loading: _tabContentLoading,
+                        isOwnProfile: isOwnProfile && !widget.viewerMode,
+                        onDeletePiece: _deletePiece,
+                        onDeleteScene: _deleteScene,
+                        onPublishPiece: _publishPiece,
+                        onPublishScene: _publishScene,
+                        sceneFilter: _sceneFilter,
+                        onSceneFilterChanged: _onSceneFilterChanged,
+                      ),
+                    ),
                   ],
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: ProfileHeader(
-                  name: name,
-                  handle: handle,
-                  followingCount: profile?.followingCount ?? 0,
-                  followersCount: profile?.followersCount ?? 0,
-                  bioLine1: profile?.location ?? '',
-                  bioLine2: profile?.bio ?? '',
-                  avatarUrl: avatarUrl,
-                  piecesCount: profile?.piecesCount ?? _pieces.length,
-                  collectedCount: profile?.collectedCount,
-                  savesCount: profile?.savesCount,
-                  salesCount: profile?.collectedCount,
-                  sellerMode: sellerEnabled,
-                  isOwnProfile: !showPublicActions,
-                  followState: _followState,
-                  followBusy: _followBusy,
-                  onFollow: showPublicActions && !_followBusy ? _onFollowTap : null,
-                  onMessage: showPublicActions ? _onMessageTap : null,
-                  onAvatarTap: () => _onAvatarTap(avatarUrl),
-                  onTapFollowing: () => _onTapFollowStat(FollowListTab.following),
-                  onTapFollowers: () => _onTapFollowStat(FollowListTab.followers),
-                ),
-              ),
-              if (profile != null && profile.isLocked && !isOwnProfile)
-                SliverPadding(
-                  padding: EdgeInsets.fromLTRB(
-                    kProfileHorizontalPad,
-                    0,
-                    kProfileHorizontalPad,
-                    bottomPad,
-                  ),
-                  sliver: const SliverToBoxAdapter(
-                    child: ProfileLockedPlaceholder(),
-                  ),
-                )
-              else ...[
-                SliverToBoxAdapter(
-                  child: ProfileTabs(
-                    currentTab: _tab,
-                    showCollect: sellerEnabled,
-                    collectSegment: _collectSegment,
-                    onCollectSegmentChanged: _onCollectSegmentChanged,
-                    onTabChanged: _onTabChanged,
-                  ),
-                ),
-                SliverPadding(
-                  padding: EdgeInsets.fromLTRB(
-                    kProfileHorizontalPad,
-                    0,
-                    kProfileHorizontalPad,
-                    bottomPad,
-                  ),
-                  sliver: ProfileTabContent(
-                    currentTab: _tab,
-                    seriesItems: _series,
-                    pieces: _pieces,
-                    scenes: _scenes,
-                    listedPieces: _listedPieces,
-                    collectSegment: _collectSegment,
-                    sellerMode: sellerEnabled,
-                    loading: _tabContentLoading,
-                    isOwnProfile: isOwnProfile && !widget.viewerMode,
-                    onDeletePiece: _deletePiece,
-                    onDeleteScene: _deleteScene,
-                    onPublishPiece: _publishPiece,
-                    onPublishScene: _publishScene,
-                    sceneFilter: _sceneFilter,
-                    onSceneFilterChanged: _onSceneFilterChanged,
-                  ),
-                ),
-              ],
                 ],
               ),
             ),
@@ -771,75 +797,6 @@ class _ProfilePageState extends State<ProfilePage>
                 ),
               ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ProfileSettingsButton extends StatelessWidget {
-  const _ProfileSettingsButton({required this.onPressed});
-
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.black.withValues(alpha: 0.35),
-      shape: const CircleBorder(),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onPressed,
-        child: const SizedBox(
-          width: 40,
-          height: 40,
-          child: Icon(Icons.menu_rounded, color: Colors.white, size: 22),
-        ),
-      ),
-    );
-  }
-}
-
-class _ProfileOverflowButton extends StatelessWidget {
-  const _ProfileOverflowButton({required this.onPressed});
-
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.black.withValues(alpha: 0.35),
-      shape: const CircleBorder(),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onPressed,
-        child: const SizedBox(
-          width: 40,
-          height: 40,
-          child: Icon(Icons.more_vert_rounded, color: Colors.white, size: 22),
-        ),
-      ),
-    );
-  }
-}
-
-class _ProfileBackButton extends StatelessWidget {
-  const _ProfileBackButton({required this.onPressed});
-
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.black.withValues(alpha: 0.35),
-      shape: const CircleBorder(),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onPressed,
-        child: const SizedBox(
-          width: 40,
-          height: 40,
-          child: Icon(Icons.arrow_back_rounded, color: Colors.white, size: 22),
         ),
       ),
     );

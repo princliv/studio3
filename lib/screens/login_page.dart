@@ -4,7 +4,6 @@ import '../utils/app_routes.dart';
 import '../services/auth_service.dart';
 import '../services/auth_session.dart';
 import '../utils/auth_validators.dart';
-import '../widgets/studio_loading.dart';
 import '../widgets/auth_ui.dart';
 
 class LoginPage extends StatefulWidget {
@@ -52,6 +51,7 @@ class _LoginPageState extends State<LoginPage> {
       _passwordController.text.isNotEmpty;
 
   Future<void> _signIn() async {
+    if (_loading) return;
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() => _submitted = true);
     if (!_canSubmit) return;
@@ -80,13 +80,11 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    return StudioLoadingGate(
-      loading: _loading,
-      dark: true,
-      loginExperience: true,
-      child: AuthScaffold(
-        compact: true,
-        child: AuthFormBody(
+    return AuthScaffold(
+      compact: true,
+      child: AuthFormBody(
+        child: AbsorbPointer(
+          absorbing: _loading,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -125,6 +123,7 @@ class _LoginPageState extends State<LoginPage> {
               AuthPrimaryButton(
                 label: 'Login',
                 enabled: _canSubmit,
+                loading: _loading,
                 onPressed: _signIn,
               ),
               const SizedBox(height: 24),

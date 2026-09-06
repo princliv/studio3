@@ -47,3 +47,7 @@ app.*.map.json
 # Environment / docs
 .env
 docs/
+
+# Local tooling / caches (must not be committed — they blow past Cursor CAPI limits)
+.mcp.json
+**/node_modules/

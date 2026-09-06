@@ -6,7 +6,6 @@ import '../../../models/feed_item.dart';
 import '../../../models/feed_preview_item.dart';
 import '../../../models/piece_summary.dart';
 import '../../../models/post_summary.dart';
-import '../../../theme/home_feed_tokens.dart';
 import '../../../utils/explore_detail_route.dart';
 import '../../../utils/slide_up_page_route.dart';
 import '../../available_piece_detail_page.dart';
@@ -26,16 +25,18 @@ class ProfileContentGrid extends StatelessWidget {
   });
 
   final List<
-      ({
-        String? url,
-        double height,
-        bool forSale,
-        String? price,
-        bool isVideo,
-        bool isDraft,
-        PostSummary? post,
-        PieceSummary? piece,
-      })> items;
+    ({
+      String? url,
+      double ratio,
+      bool forSale,
+      String? price,
+      bool isVideo,
+      bool isDraft,
+      PostSummary? post,
+      PieceSummary? piece,
+    })
+  >
+  items;
   final void Function(PostSummary post)? onPostTap;
   final void Function(PieceSummary piece)? onPieceTap;
   final void Function(PostSummary post)? onDeletePost;
@@ -52,23 +53,25 @@ class ProfileContentGrid extends StatelessWidget {
     bool showOwnerActions = false,
     bool forSaleListing = false,
   }) {
-    final heights = [292.0, 168.0, 174.0, 318.0, 182.0, 132.0, 302.0, 156.0];
-    final mapped = <
-        ({
-          String? url,
-          double height,
-          bool forSale,
-          String? price,
-          bool isVideo,
-          bool isDraft,
-          PostSummary? post,
-          PieceSummary? piece,
-        })>[];
+    final mapped =
+        <
+          ({
+            String? url,
+            double ratio,
+            bool forSale,
+            String? price,
+            bool isVideo,
+            bool isDraft,
+            PostSummary? post,
+            PieceSummary? piece,
+          })
+        >[];
     for (var i = 0; i < pieces.length; i++) {
       final p = pieces[i];
       mapped.add((
         url: p.mediaUrl,
-        height: heights[i % heights.length],
+        ratio:
+            kProfileMasonryHeightRatios[i % kProfileMasonryHeightRatios.length],
         forSale: forSaleListing || p.isForSale,
         price: p.priceDisplay,
         isVideo: false,
@@ -93,18 +96,19 @@ class ProfileContentGrid extends StatelessWidget {
     void Function(PostSummary post)? onPublishPost,
     bool showOwnerActions = false,
   }) {
-    final heights = [292.0, 168.0, 174.0, 318.0, 182.0, 132.0, 302.0, 156.0];
-    final mapped = <
-        ({
-          String? url,
-          double height,
-          bool forSale,
-          String? price,
-          bool isVideo,
-          bool isDraft,
-          PostSummary? post,
-          PieceSummary? piece,
-        })>[];
+    final mapped =
+        <
+          ({
+            String? url,
+            double ratio,
+            bool forSale,
+            String? price,
+            bool isVideo,
+            bool isDraft,
+            PostSummary? post,
+            PieceSummary? piece,
+          })
+        >[];
     for (var i = 0; i < posts.length; i++) {
       final p = posts[i];
       final mediaType = p.mediaType?.toLowerCase();
@@ -112,7 +116,8 @@ class ProfileContentGrid extends StatelessWidget {
           mediaType == 'video' || mediaType == 'reel' || mediaType == 'reels';
       mapped.add((
         url: p.mediaUrl,
-        height: heights[i % heights.length],
+        ratio:
+            kProfileMasonryHeightRatios[i % kProfileMasonryHeightRatios.length],
         forSale: false,
         price: null,
         isVideo: isVideo,
@@ -149,9 +154,14 @@ class ProfileContentGrid extends StatelessWidget {
       childCount: items.length,
       itemBuilder: (context, index) {
         final item = items[index];
+        final colW =
+            (MediaQuery.sizeOf(context).width -
+                kProfileHorizontalPad * 2 -
+                kProfileGutter) /
+            2;
         return _MasonryTile(
           url: item.url,
-          height: item.height,
+          height: colW * item.ratio,
           forSale: item.forSale,
           price: item.price,
           isVideo: item.isVideo,
@@ -159,22 +169,22 @@ class ProfileContentGrid extends StatelessWidget {
           onTap: item.post != null
               ? () => onPostTap?.call(item.post!)
               : item.piece != null
-                  ? () => onPieceTap?.call(item.piece!)
-                  : null,
+              ? () => onPieceTap?.call(item.piece!)
+              : null,
           onDelete: !showOwnerActions
               ? null
               : item.post != null
-                  ? () => onDeletePost?.call(item.post!)
-                  : item.piece != null
-                      ? () => onDeletePiece?.call(item.piece!)
-                      : null,
+              ? () => onDeletePost?.call(item.post!)
+              : item.piece != null
+              ? () => onDeletePiece?.call(item.piece!)
+              : null,
           onPublish: !showOwnerActions || !item.isDraft
               ? null
               : item.post != null
-                  ? () => onPublishPost?.call(item.post!)
-                  : item.piece != null
-                      ? () => onPublishPiece?.call(item.piece!)
-                      : null,
+              ? () => onPublishPost?.call(item.post!)
+              : item.piece != null
+              ? () => onPublishPiece?.call(item.piece!)
+              : null,
         );
       },
     );
@@ -222,10 +232,16 @@ class _MasonryTile extends StatelessWidget {
           children: [
             if (publish != null)
               ListTile(
-                leading: const Icon(Icons.publish_outlined, color: Colors.white),
+                leading: const Icon(
+                  Icons.publish_outlined,
+                  color: Colors.white,
+                ),
                 title: const Text(
                   'Publish',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 onTap: () {
                   Navigator.pop(sheetContext);
@@ -234,10 +250,16 @@ class _MasonryTile extends StatelessWidget {
               ),
             if (delete != null)
               ListTile(
-                leading: const Icon(Icons.delete_outline, color: Color(0xFFE05252)),
+                leading: const Icon(
+                  Icons.delete_outline,
+                  color: Color(0xFFE05252),
+                ),
                 title: const Text(
                   'Delete',
-                  style: TextStyle(color: Color(0xFFE05252), fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    color: Color(0xFFE05252),
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 onTap: () {
                   Navigator.pop(sheetContext);
@@ -256,7 +278,7 @@ class _MasonryTile extends StatelessWidget {
       onTap: onTap,
       onLongPress: _hasActions ? () => _showActions(context) : null,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(HomeFeedTokens.cardRadius),
+        borderRadius: BorderRadius.circular(kProfileCardRadius),
         child: SizedBox(
           height: height,
           width: double.infinity,
@@ -267,13 +289,16 @@ class _MasonryTile extends StatelessWidget {
                 CachedNetworkImage(
                   imageUrl: url!,
                   fit: BoxFit.cover,
-                  memCacheWidth: ((MediaQuery.sizeOf(context).width / 2) *
-                          MediaQuery.devicePixelRatioOf(context))
-                      .round(),
+                  memCacheWidth:
+                      ((MediaQuery.sizeOf(context).width / 2) *
+                              MediaQuery.devicePixelRatioOf(context))
+                          .round(),
                   errorWidget: (context, error, stackTrace) => ColoredBox(
                     color: Colors.grey.shade300,
-                    child: Icon(Icons.broken_image_outlined,
-                        color: Colors.grey.shade500),
+                    child: Icon(
+                      Icons.broken_image_outlined,
+                      color: Colors.grey.shade500,
+                    ),
                   ),
                 )
               else
@@ -303,8 +328,10 @@ class _MasonryTile extends StatelessWidget {
                   left: 8,
                   bottom: 8,
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.65),
                       borderRadius: BorderRadius.circular(6),
@@ -387,7 +414,5 @@ void openProfilePiece(BuildContext context, PieceSummary piece) {
   final page = preview.isAvailable
       ? AvailablePieceDetailPage(item: preview)
       : PieceDetailPage(item: preview);
-  Navigator.of(context).push<void>(
-    SlideUpPageRoute<void>(page: page),
-  );
+  Navigator.of(context).push<void>(SlideUpPageRoute<void>(page: page));
 }

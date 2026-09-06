@@ -35,8 +35,9 @@ class ProfileSellerToggle extends StatelessWidget {
             AnimatedAlign(
               duration: const Duration(milliseconds: 200),
               curve: Curves.easeOut,
-              alignment:
-                  sellerEnabled ? Alignment.centerRight : Alignment.centerLeft,
+              alignment: sellerEnabled
+                  ? Alignment.centerRight
+                  : Alignment.centerLeft,
               child: FractionallySizedBox(
                 widthFactor: 0.5,
                 child: Container(
@@ -90,11 +91,7 @@ class ProfileSellerToggle extends StatelessWidget {
 }
 
 class _Segment extends StatelessWidget {
-  const _Segment({
-    required this.label,
-    required this.selected,
-    this.onTap,
-  });
+  const _Segment({required this.label, required this.selected, this.onTap});
 
   final String label;
   final bool selected;

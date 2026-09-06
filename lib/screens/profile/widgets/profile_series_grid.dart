@@ -1,6 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../theme/home_feed_tokens.dart';
 import '../models/profile_series_data.dart';
 import '../profile_constants.dart';
@@ -31,9 +30,8 @@ class ProfileSeriesGrid extends StatelessWidget {
           child: Text(
             'Series with more than one piece will appear here.',
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              fontWeight: FontWeight.w400,
+            style: kProfileGeist(
+              fontSize: 13,
               color: kProfileTextMuted,
               height: 1.45,
             ),
@@ -105,12 +103,7 @@ class _SeriesGridCard extends StatelessWidget {
                   applyHeightToFirstAscent: false,
                   applyHeightToLastDescent: false,
                 ),
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: HomeFeedTokens.textPrimary,
-                  height: 1.0,
-                ),
+                style: kProfileGeist(fontSize: 13, fontWeight: FontWeight.w500),
               ),
             ),
           ],
@@ -121,10 +114,7 @@ class _SeriesGridCard extends StatelessWidget {
 }
 
 class _StackedSeriesCovers extends StatelessWidget {
-  const _StackedSeriesCovers({
-    required this.data,
-    required this.maxWidth,
-  });
+  const _StackedSeriesCovers({required this.data, required this.maxWidth});
 
   final ProfileSeriesData data;
   final double maxWidth;
@@ -189,10 +179,7 @@ class _StackedSeriesCovers extends StatelessWidget {
     return SizedBox(
       width: w,
       height: stackHeight,
-      child: Stack(
-        clipBehavior: Clip.hardEdge,
-        children: cards,
-      ),
+      child: Stack(clipBehavior: Clip.hardEdge, children: cards),
     );
   }
 }
@@ -253,8 +240,10 @@ class _SeriesCoverPlaceholder extends StatelessWidget {
   Widget build(BuildContext context) {
     return ColoredBox(
       color: Colors.grey.shade300,
-      child: Icon(Icons.image_not_supported_outlined,
-          color: Colors.grey.shade500),
+      child: Icon(
+        Icons.image_not_supported_outlined,
+        color: Colors.grey.shade500,
+      ),
     );
   }
 }
