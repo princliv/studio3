@@ -241,6 +241,18 @@ class PostPublishService {
           'dimensions': draft.listingDetails!.dimensionsString,
         if (draft.listingDetails?.location != null)
           'shippingRegion': draft.listingDetails!.location,
+        // Courier-facing shipping attributes — the API rejects a for-sale
+        // listing without these, since ops can't book a shipment without them.
+        if (draft.listingDetails?.weightKg != null)
+          'weightKg': draft.listingDetails!.weightKg,
+        if (draft.listingDetails?.packageLengthCm != null)
+          'packageLengthCm': draft.listingDetails!.packageLengthCm,
+        if (draft.listingDetails?.packageWidthCm != null)
+          'packageWidthCm': draft.listingDetails!.packageWidthCm,
+        if (draft.listingDetails?.packageHeightCm != null)
+          'packageHeightCm': draft.listingDetails!.packageHeightCm,
+        if (draft.listingDetails?.declaredValueCents != null)
+          'declaredValueCents': draft.listingDetails!.declaredValueCents,
       },
     };
 

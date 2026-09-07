@@ -6,6 +6,7 @@ import '../services/api_exception.dart';
 import '../services/piece_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/home_feed_tokens.dart';
+import '../utils/payout_setup.dart';
 import '../widgets/choose_location_sheet.dart';
 import '../widgets/studio_loading.dart';
 
@@ -31,10 +32,17 @@ class _EditPiecePageState extends State<EditPiecePage> {
   late final TextEditingController _materials;
   late final TextEditingController _styleTags;
   late final TextEditingController _altText;
+  late final TextEditingController _weightKg;
+  late final TextEditingController _packageLength;
+  late final TextEditingController _packageWidth;
+  late final TextEditingController _packageHeight;
+  late final TextEditingController _declaredValueUsd;
 
   bool _isForSale = false;
   bool _aiDisclosed = false;
   String? _shippingRegion;
+  String _packageUnit = 'in';
+  static const _cmPerInch = 2.54;
   late String _status;
   bool _saving = false;
   String? _error;
@@ -59,6 +67,15 @@ class _EditPiecePageState extends State<EditPiecePage> {
     _materials = TextEditingController(text: p.materials.join(', '));
     _styleTags = TextEditingController(text: p.styleTags.join(', '));
     _altText = TextEditingController(text: p.altText);
+    _weightKg = TextEditingController(text: _fmtNum(p.weightKg));
+    _packageLength = TextEditingController(text: _fmtNum(_fromCm(p.packageLengthCm)));
+    _packageWidth = TextEditingController(text: _fmtNum(_fromCm(p.packageWidthCm)));
+    _packageHeight = TextEditingController(text: _fmtNum(_fromCm(p.packageHeightCm)));
+    _declaredValueUsd = TextEditingController(
+      text: p.declaredValueCents != null
+          ? (p.declaredValueCents! / 100).toStringAsFixed(2)
+          : '',
+    );
     _isForSale = p.isForSale;
     _aiDisclosed = p.aiDisclosed;
     _shippingRegion = p.shippingRegion;
@@ -79,7 +96,57 @@ class _EditPiecePageState extends State<EditPiecePage> {
     _materials.dispose();
     _styleTags.dispose();
     _altText.dispose();
+    _weightKg.dispose();
+    _packageLength.dispose();
+    _packageWidth.dispose();
+    _packageHeight.dispose();
+    _declaredValueUsd.dispose();
     super.dispose();
+  }
+
+  String _fmtNum(double? value) {
+    if (value == null) return '';
+    return value.toStringAsFixed(value.truncateToDouble() == value ? 0 : 2);
+  }
+
+  double? _fromCm(double? cm) {
+    if (cm == null) return null;
+    return _packageUnit == 'cm' ? cm : cm / _cmPerInch;
+  }
+
+  double? _toCm(String raw) {
+    final value = double.tryParse(raw.trim());
+    if (value == null) return null;
+    return _packageUnit == 'cm' ? value : value * _cmPerInch;
+  }
+
+  void _setPackageUnit(String unit) {
+    if (unit == _packageUnit) return;
+    double? convert(String raw) {
+      final value = double.tryParse(raw.trim());
+      if (value == null) return null;
+      return unit == 'cm' ? value * _cmPerInch : value / _cmPerInch;
+    }
+
+    void rewrite(TextEditingController controller) {
+      final converted = convert(controller.text);
+      controller.text = _fmtNum(converted);
+    }
+
+    rewrite(_packageLength);
+    rewrite(_packageWidth);
+    rewrite(_packageHeight);
+    setState(() => _packageUnit = unit);
+  }
+
+  Future<void> _onListForSaleChanged(bool value) async {
+    if (!value) {
+      setState(() => _isForSale = false);
+      return;
+    }
+    final allowed = await ensureCanListForSale(context);
+    if (!mounted) return;
+    if (allowed) setState(() => _isForSale = true);
   }
 
   bool get _statusIsEditable => _editableStatuses.contains(widget.piece.status ?? 'live');
@@ -130,6 +197,18 @@ class _EditPiecePageState extends State<EditPiecePage> {
         if (_priceUsd.text.trim().isNotEmpty)
           'priceCents': ((double.tryParse(_priceUsd.text.trim()) ?? 0) * 100).round(),
         if (_shippingRegion != null) 'shippingRegion': _shippingRegion,
+        if (_weightKg.text.trim().isNotEmpty)
+          'weightKg': double.tryParse(_weightKg.text.trim()),
+        if (_packageLength.text.trim().isNotEmpty)
+          'packageLengthCm': _toCm(_packageLength.text),
+        if (_packageWidth.text.trim().isNotEmpty)
+          'packageWidthCm': _toCm(_packageWidth.text),
+        if (_packageHeight.text.trim().isNotEmpty)
+          'packageHeightCm': _toCm(_packageHeight.text),
+        if (_declaredValueUsd.text.trim().isNotEmpty)
+          'declaredValueCents':
+              ((double.tryParse(_declaredValueUsd.text.trim()) ?? 0) * 100)
+                  .round(),
       },
       if (_statusIsEditable) 'status': _status,
     };
@@ -139,6 +218,11 @@ class _EditPiecePageState extends State<EditPiecePage> {
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
+      if (e is ApiException && isPayoutSetupRequiredMessage(e.message)) {
+        setState(() => _saving = false);
+        await openPayoutSetup(context);
+        return;
+      }
       setState(() {
         _error = e is ApiException ? e.message : 'Could not save changes';
         _saving = false;
@@ -211,7 +295,7 @@ class _EditPiecePageState extends State<EditPiecePage> {
               contentPadding: EdgeInsets.zero,
               title: const Text('List for sale'),
               value: _isForSale,
-              onChanged: (v) => setState(() => _isForSale = v),
+              onChanged: _onListForSaleChanged,
             ),
             if (_isForSale) ...[
               const SizedBox(height: 8),
@@ -221,6 +305,53 @@ class _EditPiecePageState extends State<EditPiecePage> {
                 onPressed: _openShippingRegionPicker,
                 child: Text(_shippingRegion ?? 'Set shipping region'),
               ),
+              const SizedBox(height: 16),
+              Text(
+                'Shipping details',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: HomeFeedTokens.textPrimary.withValues(alpha: 0.6),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Measure the packed crate or box, not the artwork.',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: HomeFeedTokens.textPrimary.withValues(alpha: 0.45),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _Field(label: 'Packed weight (kg)', controller: _weightKg),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(child: _Field(label: 'L', controller: _packageLength)),
+                  const SizedBox(width: 8),
+                  Expanded(child: _Field(label: 'W', controller: _packageWidth)),
+                  const SizedBox(width: 8),
+                  Expanded(child: _Field(label: 'H', controller: _packageHeight)),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  _UnitChip(
+                    label: 'in',
+                    selected: _packageUnit == 'in',
+                    onTap: () => _setPackageUnit('in'),
+                  ),
+                  const SizedBox(width: 8),
+                  _UnitChip(
+                    label: 'cm',
+                    selected: _packageUnit == 'cm',
+                    onTap: () => _setPackageUnit('cm'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _Field(label: 'Declared value (USD)', controller: _declaredValueUsd),
             ],
             const SizedBox(height: 16),
             if (_statusIsEditable) ...[
@@ -254,6 +385,44 @@ class _EditPiecePageState extends State<EditPiecePage> {
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _UnitChip extends StatelessWidget {
+  const _UnitChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected
+              ? HomeFeedTokens.neutral800
+              : HomeFeedTokens.textPrimary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(100),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: selected
+                ? HomeFeedTokens.textInverse
+                : HomeFeedTokens.textPrimary,
+          ),
         ),
       ),
     );

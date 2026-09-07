@@ -5,11 +5,12 @@ import 'package:flutter/material.dart';
 
 import '../models/feed_preview_item.dart';
 import '../utils/explore_detail_route.dart';
+import 'auth_session.dart';
 import 'piece_service.dart';
 
-/// Resolves incoming `https://<host>/piece/:id` links (Android App Links /
-/// iOS Universal Links — see AndroidManifest.xml's intent-filter and
-/// ios/Runner/Runner.entitlements) into the piece detail screen.
+/// Resolves incoming `https://<host>/piece/:id` links and Stripe Connect
+/// return/refresh (`/connect/return`, `/connect/refresh`) via Android App
+/// Links / iOS Universal Links.
 ///
 /// The host is a placeholder domain until a real production domain is
 /// wired up end-to-end (see lib/config/app_link_config.dart) — until then
@@ -42,10 +43,22 @@ class DeepLinkService {
 
   void _handle(BuildContext context, Uri uri) {
     final segments = uri.pathSegments;
+    if (segments.length >= 2 && segments[0] == 'connect') {
+      final action = segments[1];
+      if (action == 'return' || action == 'refresh') {
+        _openPayoutSetup(context);
+        return;
+      }
+    }
     if (segments.length < 2 || segments[0] != 'piece') return;
     final id = segments[1];
     if (id.isEmpty) return;
     _openPiece(context, id);
+  }
+
+  void _openPayoutSetup(BuildContext context) {
+    if (!AuthSession.instance.sellerEnabled) return;
+    Navigator.pushNamed(context, '/payout-setup');
   }
 
   Future<void> _openPiece(BuildContext context, String id) async {

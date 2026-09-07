@@ -23,7 +23,7 @@ import '../widgets/create_flow/listing_details_form.dart';
 import '../widgets/create_flow/series_picker_sheet.dart';
 import '../widgets/post_create_option_sheet.dart';
 import '../widgets/post_crop_preview.dart';
-import '../widgets/seller_mode_required_dialog.dart';
+import '../utils/payout_setup.dart';
 import '../widgets/uploading_dialog.dart';
 import 'add_materials_page.dart';
 
@@ -83,23 +83,14 @@ class _PostCreatePageState extends State<PostCreatePage> {
   @override
   void initState() {
     super.initState();
-    _listForSale = _isPiece && AuthSession.instance.sellerEnabled;
-    AuthSession.instance.addListener(_onSessionChanged);
+    _listForSale = false;
   }
 
   @override
   void dispose() {
-    AuthSession.instance.removeListener(_onSessionChanged);
     _nameController.dispose();
     _descriptionController.dispose();
     super.dispose();
-  }
-
-  void _onSessionChanged() {
-    if (!mounted) return;
-    if (_isPiece && AuthSession.instance.sellerEnabled && !_listForSale) {
-      setState(() => _listForSale = true);
-    }
   }
 
   Future<void> _onListForSaleChanged(bool value) async {
@@ -111,20 +102,9 @@ class _PostCreatePageState extends State<PostCreatePage> {
       return;
     }
 
-    if (AuthSession.instance.sellerEnabled) {
-      setState(() => _listForSale = true);
-      return;
-    }
-
-    final switchToSeller = await showSellerModeRequiredDialog(context);
+    final allowed = await ensureCanListForSale(context);
     if (!mounted) return;
-    if (switchToSeller == true) {
-      await Navigator.pushNamed(context, '/profile-settings');
-      if (!mounted) return;
-      if (AuthSession.instance.sellerEnabled) {
-        setState(() => _listForSale = true);
-      }
-    }
+    if (allowed) setState(() => _listForSale = true);
   }
 
   void _openLocationPicker() {
@@ -331,6 +311,10 @@ class _PostCreatePageState extends State<PostCreatePage> {
       if (!mounted) return;
       hideUploadingDialog(context);
       final message = e is ApiException ? e.message : e.toString();
+      if (e is ApiException && isPayoutSetupRequiredMessage(e.message)) {
+        await openPayoutSetup(context);
+        return;
+      }
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(message)));

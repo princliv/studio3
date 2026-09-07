@@ -34,8 +34,14 @@ class ListingDetailsFormState extends State<ListingDetailsForm> {
   final _provenanceController = TextEditingController();
   final _yearController = TextEditingController();
   final _handlingController = TextEditingController();
+  final _weightController = TextEditingController();
+  final _packageLengthController = TextEditingController();
+  final _packageWidthController = TextEditingController();
+  final _packageHeightController = TextEditingController();
+  final _declaredValueController = TextEditingController();
 
   String _dimensionUnit = 'in';
+  String _packageUnit = 'in';
   bool _nonStandardFormat = false;
   String? _location;
 
@@ -65,6 +71,11 @@ class ListingDetailsFormState extends State<ListingDetailsForm> {
     _provenanceController.dispose();
     _yearController.dispose();
     _handlingController.dispose();
+    _weightController.dispose();
+    _packageLengthController.dispose();
+    _packageWidthController.dispose();
+    _packageHeightController.dispose();
+    _declaredValueController.dispose();
     super.dispose();
   }
 
@@ -78,8 +89,14 @@ class ListingDetailsFormState extends State<ListingDetailsForm> {
     _provenanceController.clear();
     _yearController.clear();
     _handlingController.clear();
+    _weightController.clear();
+    _packageLengthController.clear();
+    _packageWidthController.clear();
+    _packageHeightController.clear();
+    _declaredValueController.clear();
     setState(() {
       _dimensionUnit = 'in';
+      _packageUnit = 'in';
       _nonStandardFormat = false;
       _location = null;
     });
@@ -99,7 +116,26 @@ class ListingDetailsFormState extends State<ListingDetailsForm> {
       provenance: _provenanceController.text,
       yearCreated: int.tryParse(_yearController.text.trim()),
       handlingNotes: _handlingController.text,
+      weightKg: double.tryParse(_weightController.text.trim()),
+      packageLength: double.tryParse(_packageLengthController.text.trim()),
+      packageWidth: double.tryParse(_packageWidthController.text.trim()),
+      packageHeight: double.tryParse(_packageHeightController.text.trim()),
+      packageUnit: _packageUnit,
+      declaredValueUsd: double.tryParse(_declaredValueController.text.trim()),
     );
+  }
+
+  /// The backend rejects a for-sale listing without these, so the create flow
+  /// checks them before publish rather than surfacing a server error.
+  bool get areShippingFieldsValid {
+    final values = [
+      double.tryParse(_weightController.text.trim()),
+      double.tryParse(_packageLengthController.text.trim()),
+      double.tryParse(_packageWidthController.text.trim()),
+      double.tryParse(_packageHeightController.text.trim()),
+      double.tryParse(_declaredValueController.text.trim()),
+    ];
+    return values.every((v) => v != null && v > 0);
   }
 
   void _openLocationPicker() {
@@ -246,6 +282,129 @@ class ListingDetailsFormState extends State<ListingDetailsForm> {
                 minLines: 2,
               ),
             ),
+          const SizedBox(height: 10),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: createFlowHorizontalInset),
+            child: CreateFlowDivider(),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Shipping details',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: HomeFeedTokens.textInverse,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Measure the packed crate or box, not the artwork — couriers '
+                  'quote on what actually ships.',
+                  style: GoogleFonts.inter(fontSize: 11, color: _textSecondary),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            child: CreateFlowTextField(
+              controller: _weightController,
+              hint: 'Packed weight (kg)',
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: CreateFlowTextField(
+                    controller: _packageLengthController,
+                    hint: 'L',
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Text(
+                    '×',
+                    style: GoogleFonts.inter(fontSize: 14, color: _textSecondary),
+                  ),
+                ),
+                Expanded(
+                  child: CreateFlowTextField(
+                    controller: _packageWidthController,
+                    hint: 'W',
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Text(
+                    '×',
+                    style: GoogleFonts.inter(fontSize: 14, color: _textSecondary),
+                  ),
+                ),
+                Expanded(
+                  child: CreateFlowTextField(
+                    controller: _packageHeightController,
+                    hint: 'H',
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Container(
+              height: 38,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: BoxDecoration(
+                color: _neutral700,
+                borderRadius: BorderRadius.circular(100),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _UnitChip(
+                    label: 'in',
+                    selected: _packageUnit == 'in',
+                    onTap: () => setState(() => _packageUnit = 'in'),
+                  ),
+                  _UnitChip(
+                    label: 'cm',
+                    selected: _packageUnit == 'cm',
+                    onTap: () => setState(() => _packageUnit = 'cm'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            child: CreateFlowTextField(
+              controller: _declaredValueController,
+              hint: 'Declared value',
+              prefixText: '\$ ',
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 6, 16, 0),
+            child: Text(
+              'Used for customs and insurance if the work is damaged in transit.',
+              style: GoogleFonts.inter(fontSize: 11, color: _textSecondary),
+            ),
+          ),
         ],
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: createFlowHorizontalInset),

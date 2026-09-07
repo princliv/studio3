@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'services/auth_session.dart';
@@ -44,6 +45,7 @@ import 'screens/change_email_page.dart';
 import 'screens/notification_preferences_page.dart';
 import 'screens/blocked_users_page.dart';
 import 'screens/privacy_settings_page.dart';
+import 'screens/payout_setup_page.dart';
 import 'models/auth_user.dart';
 import 'models/feed_item.dart';
 import 'theme/home_feed_tokens.dart';
@@ -53,6 +55,15 @@ import 'utils/snappy_page_physics.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env');
+
+  // Publishable key only — it is safe to ship, and it is what lets the Stripe
+  // SDK talk to Stripe directly so card data never reaches our backend. Absent
+  // key just means checkout is unavailable, not a crash on launch.
+  final stripeKey = dotenv.env['STRIPE_PUBLISHABLE_KEY']?.trim() ?? '';
+  if (stripeKey.isNotEmpty) {
+    Stripe.publishableKey = stripeKey;
+    await Stripe.instance.applySettings();
+  }
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
   ]);
@@ -128,6 +139,7 @@ class Studio3App extends StatelessWidget {
           );
         },
         '/profile-settings': (context) => const ProfileSettingsPage(),
+        '/payout-setup': (context) => const PayoutSetupPage(),
         '/manage-series': (context) => const ManageSeriesPage(),
         '/edit-profile': (context) => const EditProfilePage(),
         '/addresses': (context) => const AddressListPage(),

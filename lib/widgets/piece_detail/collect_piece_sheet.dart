@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../models/collect_checkout.dart';
@@ -100,41 +101,17 @@ class _CollectPieceSheetState extends State<CollectPieceSheet> {
         shippingMethod: shipping.method.id,
       );
 
-      // Real Stripe PaymentIntent flow is not wired yet. Debug/profile may
-      // use the server's auto-pay confirm; release builds skip confirm unless
-      // explicitly enabled via --dart-define=ALLOW_DEV_CHECKOUT=true.
-      const allowDevCheckout = bool.fromEnvironment(
-        'ALLOW_DEV_CHECKOUT',
-        defaultValue: false,
-      );
-      final canConfirm = kDebugMode || allowDevCheckout;
+      final paid = await _payForOrder(order.id);
+      if (!paid) return;
 
-      if (!canConfirm) {
-        if (!mounted) return;
-        setState(() => _collecting = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Payments are not live yet. Checkout confirm is disabled in this build.',
-            ),
-          ),
-        );
-        return;
-      }
-
-      final confirmed = await OrderService.instance.confirm(order.id);
+      final confirmed = await OrderService.instance.getOrder(order.id);
       if (!mounted) return;
       Navigator.pop(context);
       await CollectOrderConfirmationSheet.show(context, order: confirmed);
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _collecting = false);
-      final message = e.statusCode == 501
-          ? 'Card payments are not set up yet (Stripe pending).'
-          : e.message;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     } catch (_) {
       if (!mounted) return;
       setState(() => _collecting = false);
@@ -142,6 +119,70 @@ class _CollectPieceSheetState extends State<CollectPieceSheet> {
         const SnackBar(content: Text('Could not complete checkout. Please try again.')),
       );
     }
+  }
+
+  /// Takes payment for [orderId] and waits for it to actually clear.
+  ///
+  /// Returns false (having already shown a message and reset state) if the
+  /// collector cancels or payment doesn't go through.
+  Future<bool> _payForOrder(String orderId) async {
+    // No publishable key configured — fall back to the server's dev auto-pay so
+    // the flow stays testable, but never in a release build.
+    if (Stripe.publishableKey.isEmpty) {
+      const allowDevCheckout =
+          bool.fromEnvironment('ALLOW_DEV_CHECKOUT', defaultValue: false);
+      if (!(kDebugMode || allowDevCheckout)) {
+        if (!mounted) return false;
+        setState(() => _collecting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Payments are not available in this build.')),
+        );
+        return false;
+      }
+      await OrderService.instance.confirm(orderId);
+      return true;
+    }
+
+    final intent = await OrderService.instance.createPaymentIntent(orderId);
+    await Stripe.instance.initPaymentSheet(
+      paymentSheetParameters: SetupPaymentSheetParameters(
+        paymentIntentClientSecret: intent.clientSecret,
+        merchantDisplayName: 'Studiothree',
+        style: ThemeMode.light,
+      ),
+    );
+
+    try {
+      await Stripe.instance.presentPaymentSheet();
+    } on StripeException catch (e) {
+      if (!mounted) return false;
+      setState(() => _collecting = false);
+      // Cancelling isn't an error worth shouting about.
+      if (e.error.code != FailureCode.Canceled) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.error.localizedMessage ?? 'Payment was not completed.')),
+        );
+      }
+      return false;
+    }
+
+    // The sheet succeeding isn't proof the order is paid: a Stripe webhook is
+    // what actually marks it, so wait for that rather than assuming.
+    final paid = await OrderService.instance.waitForPayment(orderId);
+    if (!paid) {
+      if (!mounted) return false;
+      setState(() => _collecting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Payment went through but we're still confirming it. "
+            "Check your orders in a moment.",
+          ),
+        ),
+      );
+      return false;
+    }
+    return true;
   }
 
   @override

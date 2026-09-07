@@ -13,6 +13,11 @@ class PieceSummary {
     this.priceCents,
     this.dimensions,
     this.shippingRegion,
+    this.weightKg,
+    this.packageLengthCm,
+    this.packageWidthCm,
+    this.packageHeightCm,
+    this.declaredValueCents,
     this.location,
     this.mediaAspectRatio,
     this.yearCreated,
@@ -46,6 +51,11 @@ class PieceSummary {
   final int? priceCents;
   final String? dimensions;
   final String? shippingRegion;
+  final double? weightKg;
+  final double? packageLengthCm;
+  final double? packageWidthCm;
+  final double? packageHeightCm;
+  final int? declaredValueCents;
   final String? location;
   final String? mediaAspectRatio;
   final int? yearCreated;
@@ -86,6 +96,11 @@ class PieceSummary {
       priceCents: json['priceCents'] as int?,
       dimensions: json['dimensions'] as String?,
       shippingRegion: json['shippingRegion'] as String?,
+      weightKg: _doubleFrom(json['weightKg']),
+      packageLengthCm: _doubleFrom(json['packageLengthCm']),
+      packageWidthCm: _doubleFrom(json['packageWidthCm']),
+      packageHeightCm: _doubleFrom(json['packageHeightCm']),
+      declaredValueCents: _intFrom(json['declaredValueCents']),
       location: json['location'] as String?,
       mediaAspectRatio: json['mediaAspectRatio'] as String?,
       yearCreated: _intFrom(json['yearCreated']),
@@ -133,6 +148,12 @@ class PieceSummary {
     return null;
   }
 
+  static double? _doubleFrom(dynamic value) {
+    if (value is double) return value;
+    if (value is num) return value.toDouble();
+    return null;
+  }
+
   Map<String, dynamic> toJson() => {
         'type': 'piece',
         'id': id,
@@ -145,6 +166,11 @@ class PieceSummary {
         if (priceCents != null) 'priceCents': priceCents,
         if (dimensions != null) 'dimensions': dimensions,
         if (shippingRegion != null) 'shippingRegion': shippingRegion,
+        if (weightKg != null) 'weightKg': weightKg,
+        if (packageLengthCm != null) 'packageLengthCm': packageLengthCm,
+        if (packageWidthCm != null) 'packageWidthCm': packageWidthCm,
+        if (packageHeightCm != null) 'packageHeightCm': packageHeightCm,
+        if (declaredValueCents != null) 'declaredValueCents': declaredValueCents,
         if (location != null) 'location': location,
         if (mediaAspectRatio != null) 'mediaAspectRatio': mediaAspectRatio,
         if (yearCreated != null) 'yearCreated': yearCreated,

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../services/auth_service.dart';
 import '../services/auth_session.dart';
 import '../services/device_service.dart';
 import '../models/user_profile.dart';
+import '../services/api_exception.dart';
+import '../services/payout_service.dart';
 import '../services/user_service.dart';
 import '../theme/home_feed_tokens.dart';
 import '../utils/profile_navigation.dart';
@@ -28,6 +31,7 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
   bool _togglingSeller = false;
   String? _profileLocation;
   SellerAnalytics? _analytics;
+  PayoutStatus? _payoutStatus;
 
   @override
   void initState() {
@@ -49,7 +53,10 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
         _profileLocation = profile.location;
         _loadingSeller = false;
       });
-      if (status.enabled) _loadAnalytics();
+      if (status.enabled) {
+        _loadAnalytics();
+        _loadPayoutStatus();
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -113,7 +120,48 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
       _togglingSeller = false;
       if (result != null) _sellerEnabled = result;
     });
-    if (result == true) _loadAnalytics();
+    if (result == true) {
+      _loadAnalytics();
+      _loadPayoutStatus();
+    } else if (result == false) {
+      setState(() => _payoutStatus = null);
+    }
+  }
+
+  Future<void> _loadPayoutStatus() async {
+    if (!_sellerEnabled) return;
+    try {
+      final status = await PayoutService.instance.getStatus();
+      if (!mounted) return;
+      setState(() => _payoutStatus = status);
+    } catch (_) {
+      // Seller mode still works if Connect status fails to load.
+    }
+  }
+
+  Future<void> _openPayoutDashboard() async {
+    try {
+      final url = await PayoutService.instance.dashboardUrl();
+      final launched = await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open the browser.')),
+        );
+      }
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open payouts.')),
+      );
+    }
   }
 
   @override
@@ -153,6 +201,30 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
               onChanged: _onSellerToggle,
             ),
             if (_sellerEnabled) ...[
+              if (_payoutStatus == null || _payoutStatus!.needsAction)
+                SettingsTile(
+                  icon: Icons.account_balance_wallet_outlined,
+                  label: 'Payout setup',
+                  trailing: Text(
+                    'Required',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFFC47B2B),
+                    ),
+                  ),
+                  onTap: () async {
+                    await Navigator.pushNamed(context, '/payout-setup');
+                    if (!mounted) return;
+                    _loadPayoutStatus();
+                  },
+                )
+              else
+                SettingsTile(
+                  icon: Icons.account_balance_outlined,
+                  label: 'Payouts',
+                  onTap: _openPayoutDashboard,
+                ),
               SettingsTile(
                 icon: Icons.bar_chart_rounded,
                 label: 'Seller analytics',
