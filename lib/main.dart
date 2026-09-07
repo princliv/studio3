@@ -12,6 +12,7 @@ import 'services/chat_socket_service.dart';
 import 'services/deep_link_service.dart';
 import 'services/device_service.dart';
 import 'services/permission_service.dart';
+import 'services/main_nav_service.dart';
 import 'services/reels_tab_service.dart';
 import 'services/saved_content_store.dart';
 import 'services/user_service.dart';
@@ -317,6 +318,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     AuthSession.instance.addListener(_onSessionChanged);
     _selectedNavIndex.addListener(_onNavIndexChanged);
     ReelsTabService.instance.register(_openReelsTab);
+    MainNavService.instance.register(goHome: _goHome);
     _loadProfilePhoto();
   }
 
@@ -326,6 +328,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     AuthSession.instance.removeListener(_onSessionChanged);
     _selectedNavIndex.removeListener(_onNavIndexChanged);
     ReelsTabService.instance.unregister();
+    MainNavService.instance.unregister();
     _selectedNavIndex.dispose();
     _reelsActive.dispose();
     _showProfile.dispose();
@@ -343,6 +346,11 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     Navigator.of(context).popUntil((route) => route.isFirst);
     _reelsJumpRequest.value = ReelsJumpRequest(items: items, index: index);
     _onNavTap(BottomNavIndex.reels);
+  }
+
+  void _goHome() {
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    _onNavTap(BottomNavIndex.home);
   }
 
   @override

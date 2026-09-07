@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:google_fonts/google_fonts.dart';
-
 import '../../../models/piece_summary.dart';
 import '../../../models/post_summary.dart';
 import '../../../widgets/feed_skeleton.dart';
@@ -24,7 +22,7 @@ class ProfileTabContent extends StatelessWidget {
     this.pieces = const [],
     this.scenes = const [],
     this.listedPieces = const [],
-    this.collectSegment = 'available',
+    this.collectSegment = 'all',
     this.sellerMode = false,
     this.loading = false,
     this.isOwnProfile = false,
@@ -64,12 +62,12 @@ class ProfileTabContent extends StatelessWidget {
         (currentTab == 'pieces'
             ? pieces.isEmpty
             : currentTab == 'scenes'
-                ? scenes.isEmpty
-                : currentTab == 'collect'
-                    ? listedPieces.isEmpty
-                    : currentTab == 'series'
-                        ? seriesItems.isEmpty
-                        : true)) {
+            ? scenes.isEmpty
+            : currentTab == 'collect'
+            ? listedPieces.isEmpty
+            : currentTab == 'series'
+            ? seriesItems.isEmpty
+            : true)) {
       return const SliverToBoxAdapter(
         child: Padding(
           padding: EdgeInsets.symmetric(vertical: 8),
@@ -94,23 +92,29 @@ class ProfileTabContent extends StatelessWidget {
           showOwnerActions: isOwnProfile,
         );
       }
-      return const SliverToBoxAdapter(child: _EmptyState(label: 'No pieces yet'));
+      return const SliverToBoxAdapter(
+        child: _EmptyState(label: 'No pieces yet'),
+      );
     }
 
     if (currentTab == 'scenes') {
-      final visibleScenes =
-          sceneFilter == 'videos' ? scenes.where(_isVideoPost).toList() : scenes;
+      final visibleScenes = sceneFilter == 'videos'
+          ? scenes.where(_isVideoPost).toList()
+          : scenes;
       final Widget gridSliver = visibleScenes.isNotEmpty
           ? ProfileContentGrid.fromPosts(
               visibleScenes,
-              onPostTap: (post) => openProfileScene(context, visibleScenes, post),
+              onPostTap: (post) =>
+                  openProfileScene(context, visibleScenes, post),
               onDeletePost: onDeleteScene,
               onPublishPost: onPublishScene,
               showOwnerActions: isOwnProfile,
             )
           : SliverToBoxAdapter(
               child: _EmptyState(
-                label: sceneFilter == 'videos' ? 'No videos yet' : 'No scenes yet',
+                label: sceneFilter == 'videos'
+                    ? 'No videos yet'
+                    : 'No scenes yet',
               ),
             );
       if (scenes.isEmpty) return gridSliver;
@@ -148,22 +152,25 @@ class ProfileTabContent extends StatelessWidget {
         );
       }
 
-      if (collectSegment == 'sold') {
-        return const SliverToBoxAdapter(
-          child: _EmptyState(label: 'No sold pieces yet'),
-        );
-      }
+      final visible = switch (collectSegment) {
+        'sold' => listedPieces.where((p) => p.status == 'sold').toList(),
+        'available' =>
+          listedPieces.where((p) => p.isForSale && p.status != 'sold').toList(),
+        _ => listedPieces,
+      };
 
-      final available = listedPieces.where((p) => p.isForSale).toList();
-      if (available.isEmpty) {
-        return const SliverToBoxAdapter(
-          child: _EmptyState(label: 'No pieces listed for sale yet'),
-        );
+      if (visible.isEmpty) {
+        final label = switch (collectSegment) {
+          'sold' => 'No sold pieces yet',
+          'available' => 'No pieces listed for sale yet',
+          _ => 'No collect pieces yet',
+        };
+        return SliverToBoxAdapter(child: _EmptyState(label: label));
       }
 
       return ProfileContentGrid.fromPieces(
-        available,
-        forSaleListing: true,
+        visible,
+        forSaleListing: collectSegment != 'sold',
         onPieceTap: (piece) => openProfilePiece(context, piece),
       );
     }
@@ -185,11 +192,7 @@ class _EmptyState extends StatelessWidget {
         child: Text(
           label,
           textAlign: TextAlign.center,
-          style: GoogleFonts.inter(
-            fontSize: 14,
-            fontWeight: FontWeight.w400,
-            color: kProfileTextMuted,
-          ),
+          style: kProfileGeist(fontSize: 13, color: kProfileTextMuted),
         ),
       ),
     );

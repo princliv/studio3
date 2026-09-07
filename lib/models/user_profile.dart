@@ -22,6 +22,7 @@ class UserProfile {
     this.piecesCount = 0,
     this.collectedCount = 0,
     this.savesCount = 0,
+    this.rating,
     this.isFollowing = false,
     this.followRequestPending = false,
     this.tastePreferences,
@@ -56,6 +57,7 @@ class UserProfile {
   final int piecesCount;
   final int collectedCount;
   final int savesCount;
+  final double? rating;
   final bool isFollowing;
   final bool followRequestPending;
   final Map<String, dynamic>? tastePreferences;
@@ -80,7 +82,8 @@ class UserProfile {
     // viewer can't see yet (no counts, no bio) — detect it by the absence
     // of any count field alongside a present profileVisibility, rather than
     // trusting a single flag the backend doesn't explicitly send.
-    final isLocked = json['profileVisibility'] != null &&
+    final isLocked =
+        json['profileVisibility'] != null &&
         json['followersCount'] == null &&
         json['followers'] == null &&
         json['piecesCount'] == null &&
@@ -99,15 +102,15 @@ class UserProfile {
       coverPhotoUrl: json['coverPhotoUrl'] as String?,
       role: json['role'] as String?,
       onboardingComplete: json['onboardingComplete'] as bool? ?? false,
-      sellerEnabled: json['sellerEnabled'] as bool? ??
-          json['isSeller'] as bool? ??
-          false,
+      sellerEnabled:
+          json['sellerEnabled'] as bool? ?? json['isSeller'] as bool? ?? false,
       canChangeUsername: json['canChangeUsername'] as bool? ?? true,
       followingCount: _intFrom(json['followingCount'] ?? json['following']),
       followersCount: _intFrom(json['followersCount'] ?? json['followers']),
       piecesCount: _intFrom(json['piecesCount'] ?? json['pieces']),
       collectedCount: _intFrom(json['collectedCount'] ?? json['collected']),
       savesCount: _intFrom(json['savesCount'] ?? json['saves']),
+      rating: _doubleFrom(json['rating'] ?? json['sellerRating']),
       isFollowing: json['isFollowing'] as bool? ?? false,
       followRequestPending: json['followRequestPending'] as bool? ?? false,
       tastePreferences: json['tastePreferences'] as Map<String, dynamic>?,
@@ -120,9 +123,11 @@ class UserProfile {
       bannerAutoRule: json['bannerAutoRule'] as String? ?? 'none',
       messagePermission: json['messagePermission'] as String? ?? 'everyone',
       profileVisibility: json['profileVisibility'] as String? ?? 'public',
-      notificationPreferences: json['notificationPreferences'] is Map<String, dynamic>
+      notificationPreferences:
+          json['notificationPreferences'] is Map<String, dynamic>
           ? NotificationPreferences.fromJson(
-              json['notificationPreferences'] as Map<String, dynamic>)
+              json['notificationPreferences'] as Map<String, dynamic>,
+            )
           : null,
       isLocked: isLocked,
     );
@@ -154,6 +159,7 @@ class UserProfile {
       piecesCount: piecesCount,
       collectedCount: collectedCount,
       savesCount: savesCount,
+      rating: rating,
       isFollowing: isFollowing ?? this.isFollowing,
       followRequestPending: followRequestPending ?? this.followRequestPending,
       tastePreferences: tastePreferences,
@@ -173,6 +179,12 @@ class UserProfile {
     if (value is int) return value;
     if (value is num) return value.toInt();
     return 0;
+  }
+
+  static double? _doubleFrom(dynamic value) {
+    if (value is double) return value;
+    if (value is num) return value.toDouble();
+    return null;
   }
 
   static List<PieceSummary> _parseSavedPieces(Map<String, dynamic> json) {
@@ -252,7 +264,9 @@ class NotificationPreferences {
       push: {
         ..._defaultPush,
         if (pushJson != null)
-          ...pushJson.map((key, value) => MapEntry(key, value as bool? ?? true)),
+          ...pushJson.map(
+            (key, value) => MapEntry(key, value as bool? ?? true),
+          ),
       },
       dailyDigestEnabled: digestJson?['enabled'] as bool? ?? false,
       dailyDigestTime: digestJson?['time'] as String? ?? '09:00',
@@ -273,21 +287,20 @@ class NotificationPreferences {
 }
 
 class SellerStatus {
-  const SellerStatus({
-    required this.enabled,
-    this.location,
-  });
+  const SellerStatus({required this.enabled, this.location});
 
   final bool enabled;
   final String? location;
 
   factory SellerStatus.fromJson(Map<String, dynamic> json) {
     return SellerStatus(
-      enabled: json['enabled'] as bool? ??
+      enabled:
+          json['enabled'] as bool? ??
           json['sellerEnabled'] as bool? ??
           json['isSeller'] as bool? ??
           false,
-      location: json['location'] as String? ?? json['sellerLocation'] as String?,
+      location:
+          json['location'] as String? ?? json['sellerLocation'] as String?,
     );
   }
 }

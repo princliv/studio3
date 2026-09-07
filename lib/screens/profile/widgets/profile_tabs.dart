@@ -1,7 +1,5 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../theme/home_feed_tokens.dart';
 import '../profile_constants.dart';
@@ -12,7 +10,7 @@ class ProfileTabs extends StatefulWidget {
     required this.currentTab,
     required this.onTabChanged,
     this.showCollect = false,
-    this.collectSegment = 'available',
+    this.collectSegment = 'all',
     this.onCollectSegmentChanged,
   });
 
@@ -29,6 +27,7 @@ class ProfileTabs extends StatefulWidget {
 class _ProfileTabsState extends State<ProfileTabs> {
   final _collectTabKey = GlobalKey();
   final _tabsBarKey = GlobalKey();
+  bool _collectMenuOpen = false;
 
   Future<void> _openCollectFilterMenu() async {
     final collectBox =
@@ -37,8 +36,8 @@ class _ProfileTabsState extends State<ProfileTabs> {
     if (collectBox == null || barBox == null || !mounted) return;
 
     final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
-    final collectCenter = collectBox.localToGlobal(
-      collectBox.size.center(Offset.zero),
+    final collectRight = collectBox.localToGlobal(
+      collectBox.size.topRight(Offset.zero),
       ancestor: overlay,
     );
     final barBottom = barBox.localToGlobal(
@@ -46,14 +45,18 @@ class _ProfileTabsState extends State<ProfileTabs> {
       ancestor: overlay,
     );
 
+    setState(() => _collectMenuOpen = true);
+    widget.onTabChanged('collect');
     final selected = await showCollectFilterMenu(
       context: context,
-      anchorCenterX: collectCenter.dx,
-      top: barBottom.dy + 6,
+      right: collectRight.dx,
+      top: barBottom.dy + 9,
       currentSegment: widget.collectSegment,
     );
+    if (!mounted) return;
+    setState(() => _collectMenuOpen = false);
 
-    if (selected != null && mounted) {
+    if (selected != null) {
       widget.onTabChanged('collect');
       widget.onCollectSegmentChanged?.call(selected);
     }
@@ -63,32 +66,40 @@ class _ProfileTabsState extends State<ProfileTabs> {
   Widget build(BuildContext context) {
     final tabs = <({String id, String label})>[
       (id: 'pieces', label: 'Pieces'),
-      (id: 'series', label: 'Series'),
       (id: 'scenes', label: 'Scenes'),
+      (id: 'series', label: 'Series'),
       if (widget.showCollect) (id: 'collect', label: 'Collect'),
     ];
 
-    return Column(
+    return ColoredBox(
       key: _tabsBarKey,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        ColoredBox(
-          color: HomeFeedTokens.background,
-          child: Padding(
+      color: kProfilePageBackground,
+      child: Stack(
+        children: [
+          Padding(
             padding: const EdgeInsets.fromLTRB(
               kProfileHorizontalPad,
-              4,
+              24,
               kProfileHorizontalPad,
               0,
             ),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 for (final tab in tabs)
                   if (tab.id == 'collect')
                     _CollectTabItem(
                       key: _collectTabKey,
                       active: widget.currentTab == tab.id,
-                      onTabTap: () => widget.onTabChanged(tab.id),
+                      menuOpen: _collectMenuOpen,
+                      onTabTap: () {
+                        if (widget.currentTab == 'collect') {
+                          _openCollectFilterMenu();
+                        } else {
+                          widget.onTabChanged(tab.id);
+                        }
+                      },
                       onFilterTap: _openCollectFilterMenu,
                     )
                   else
@@ -100,47 +111,40 @@ class _ProfileTabsState extends State<ProfileTabs> {
               ],
             ),
           ),
-        ),
-        ColoredBox(
-          color: HomeFeedTokens.background,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              kProfileHorizontalPad,
-              0,
-              kProfileHorizontalPad,
-              4,
-            ),
-            child: Divider(
-              height: 1,
-              thickness: 1,
-              color: HomeFeedTokens.textPrimary.withValues(alpha: 0.12),
+          const Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: ColoredBox(
+              color: kProfileTabRule,
+              child: SizedBox(height: 0.5),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
-/// Glass filter menu shown below the tab bar, not over the Collect label.
+/// Figma 2652:2859 — Collect filter list under the Collect tab.
 Future<String?> showCollectFilterMenu({
   required BuildContext context,
-  required double anchorCenterX,
+  required double right,
   required double top,
   required String currentSegment,
 }) {
-  const menuWidth = 148.0;
+  const menuWidth = 112.0;
 
   return showGeneralDialog<String>(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'Collect filter',
     barrierColor: Colors.transparent,
-    transitionDuration: const Duration(milliseconds: 160),
+    transitionDuration: const Duration(milliseconds: 140),
     pageBuilder: (context, animation, secondaryAnimation) {
       final screenWidth = MediaQuery.sizeOf(context).width;
-      var left = anchorCenterX - menuWidth / 2;
-      left = left.clamp(12.0, screenWidth - menuWidth - 12.0);
+      var left = right - menuWidth;
+      left = left.clamp(10.0, screenWidth - menuWidth - 10.0);
 
       return Stack(
         children: [
@@ -153,15 +157,9 @@ Future<String?> showCollectFilterMenu({
                 parent: animation,
                 curve: Curves.easeOut,
               ),
-              child: ScaleTransition(
-                scale: Tween<double>(begin: 0.96, end: 1).animate(
-                  CurvedAnimation(parent: animation, curve: Curves.easeOut),
-                ),
-                alignment: Alignment.topCenter,
-                child: _CollectFilterGlassMenu(
-                  currentSegment: currentSegment,
-                  onSelected: (value) => Navigator.pop(context, value),
-                ),
+              child: _CollectFilterMenu(
+                currentSegment: currentSegment,
+                onSelected: (value) => Navigator.pop(context, value),
               ),
             ),
           ),
@@ -171,8 +169,8 @@ Future<String?> showCollectFilterMenu({
   );
 }
 
-class _CollectFilterGlassMenu extends StatelessWidget {
-  const _CollectFilterGlassMenu({
+class _CollectFilterMenu extends StatelessWidget {
+  const _CollectFilterMenu({
     required this.currentSegment,
     required this.onSelected,
   });
@@ -180,39 +178,36 @@ class _CollectFilterGlassMenu extends StatelessWidget {
   final String currentSegment;
   final ValueChanged<String> onSelected;
 
+  static const _options = [
+    (id: 'all', label: 'All'),
+    (id: 'available', label: 'Available'),
+    (id: 'sold', label: 'Sold'),
+  ];
+
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.72),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.14),
+    return Material(
+      color: Colors.transparent,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(4),
+        child: ColoredBox(
+          color: kProfileCollectMenuFill,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var i = 0; i < _options.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 8),
+                  _CollectFilterOption(
+                    label: _options[i].label,
+                    selected: currentSegment == _options[i].id,
+                    onTap: () => onSelected(_options[i].id),
+                  ),
+                ],
+              ],
             ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _CollectFilterOption(
-                label: 'Available',
-                selected: currentSegment == 'available',
-                onTap: () => onSelected('available'),
-              ),
-              Divider(
-                height: 1,
-                thickness: 1,
-                color: Colors.white.withValues(alpha: 0.1),
-              ),
-              _CollectFilterOption(
-                label: 'Sold',
-                selected: currentSegment == 'sold',
-                onTap: () => onSelected('sold'),
-              ),
-            ],
           ),
         ),
       ),
@@ -231,34 +226,42 @@ class _CollectFilterOption extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
+  static const _dotAsset = 'assets/profile/icon_collect_dot_on.svg';
+
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  label,
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                    color: Colors.white.withValues(alpha: selected ? 1 : 0.88),
-                  ),
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: 80,
+        height: 20,
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.clip,
+                textHeightBehavior: const TextHeightBehavior(
+                  applyHeightToFirstAscent: false,
+                  applyHeightToLastDescent: false,
+                ),
+                style: kProfileGeist(
+                  fontSize: 12,
+                  height: 1,
+                  color: selected
+                      ? HomeFeedTokens.textInverse
+                      : kProfileTextDisabled,
                 ),
               ),
-              if (selected)
-                Icon(
-                  Icons.check_rounded,
-                  size: 16,
-                  color: Colors.white.withValues(alpha: 0.9),
-                ),
-            ],
-          ),
+            ),
+            if (selected)
+              Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: SvgPicture.asset(_dotAsset, width: 4, height: 4),
+              ),
+          ],
         ),
       ),
     );
@@ -278,43 +281,45 @@ class _TabItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 6),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
-                  fontSize: 15,
-                  fontWeight: active ? FontWeight.w600 : FontWeight.w500,
-                  height: 1.1,
-                  color:
-                      active ? HomeFeedTokens.textPrimary : kProfileTextMuted,
-                ),
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Text(
+              label,
+              style: kProfileGeist(
+                fontSize: 13,
+                fontWeight: active ? FontWeight.w500 : FontWeight.w400,
+                color: active
+                    ? HomeFeedTokens.textPrimary
+                    : HomeFeedTokens.textSecondary,
               ),
-              const SizedBox(height: 6),
-              Center(
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  curve: Curves.easeOut,
-                  height: 2,
-                  width: _indicatorWidth(label, active),
-                  decoration: BoxDecoration(
-                    color: active
-                        ? HomeFeedTokens.textPrimary
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(1),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: -0.5,
+            child: Center(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOut,
+                height: 2,
+                width: _indicatorWidth(label, active),
+                decoration: BoxDecoration(
+                  color: active
+                      ? HomeFeedTokens.textPrimary
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -324,11 +329,7 @@ class _TabItem extends StatelessWidget {
     final painter = TextPainter(
       text: TextSpan(
         text: label,
-        style: GoogleFonts.inter(
-          fontSize: 15,
-          fontWeight: FontWeight.w600,
-          height: 1.1,
-        ),
+        style: kProfileGeist(fontSize: 13, fontWeight: FontWeight.w500),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
@@ -340,88 +341,95 @@ class _CollectTabItem extends StatelessWidget {
   const _CollectTabItem({
     super.key,
     required this.active,
+    required this.menuOpen,
     required this.onTabTap,
     required this.onFilterTap,
   });
 
   final bool active;
+  final bool menuOpen;
   final VoidCallback onTabTap;
   final VoidCallback onFilterTap;
 
+  static const _chevronAsset = 'assets/profile/icon_collect_chevron.svg';
+
   @override
   Widget build(BuildContext context) {
-    final labelColor =
-        active ? HomeFeedTokens.textPrimary : kProfileTextMuted;
+    final labelColor = active
+        ? HomeFeedTokens.textPrimary
+        : HomeFeedTokens.textSecondary;
 
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                InkWell(
-                  onTap: onTabTap,
-                  child: Text(
-                    'Collect',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.inter(
-                      fontSize: 15,
-                      fontWeight: active ? FontWeight.w600 : FontWeight.w500,
-                      height: 1.1,
-                      color: labelColor,
-                    ),
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              GestureDetector(
+                onTap: onTabTap,
+                behavior: HitTestBehavior.opaque,
+                child: Text(
+                  'Collect',
+                  style: kProfileGeist(
+                    fontSize: 13,
+                    fontWeight: active ? FontWeight.w500 : FontWeight.w400,
+                    color: labelColor,
                   ),
-                ),
-                GestureDetector(
-                  onTap: onFilterTap,
-                  behavior: HitTestBehavior.opaque,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(0, 2, 4, 2),
-                    child: Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      size: 16,
-                      color: labelColor,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Center(
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                curve: Curves.easeOut,
-                height: 2,
-                width: _collectIndicatorWidth(active),
-                decoration: BoxDecoration(
-                  color: active
-                      ? HomeFeedTokens.textPrimary
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(1),
                 ),
               ),
-            ),
-          ],
+              GestureDetector(
+                onTap: onFilterTap,
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 4, 0, 4),
+                  child: AnimatedRotation(
+                    duration: const Duration(milliseconds: 160),
+                    turns: menuOpen ? 0.5 : 0,
+                    child: SvgPicture.asset(
+                      _chevronAsset,
+                      width: 8,
+                      height: 4,
+                      colorFilter: ColorFilter.mode(
+                        labelColor,
+                        BlendMode.srcIn,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: -0.5,
+          child: Center(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              height: 2,
+              width: _collectIndicatorWidth(active),
+              decoration: BoxDecoration(
+                color: active ? HomeFeedTokens.textPrimary : Colors.transparent,
+                borderRadius: BorderRadius.circular(6),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
   double _collectIndicatorWidth(bool active) {
     if (!active) return 0;
-    const chevronWidth = 20.0;
+    const chevronWidth = 12.0;
     final painter = TextPainter(
       text: TextSpan(
         text: 'Collect',
-        style: GoogleFonts.inter(
-          fontSize: 15,
-          fontWeight: FontWeight.w600,
-          height: 1.1,
-        ),
+        style: kProfileGeist(fontSize: 13, fontWeight: FontWeight.w500),
       ),
       textDirection: TextDirection.ltr,
     )..layout();

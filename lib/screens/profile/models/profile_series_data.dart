@@ -17,8 +17,8 @@ class ProfileSeriesData {
     required this.pieceCount,
     List<int>? imageSeeds,
     List<String>? previewUrls,
-  })  : imageSeeds = imageSeeds ?? const [],
-        previewUrls = previewUrls ?? const [];
+  }) : imageSeeds = imageSeeds ?? const [],
+       previewUrls = previewUrls ?? const [];
 
   final String? id;
   final String name;
