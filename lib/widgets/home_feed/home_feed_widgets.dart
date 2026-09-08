@@ -11,26 +11,26 @@ import '../../services/notification_service.dart';
 import '../../services/social_service.dart';
 import '../../theme/home_feed_tokens.dart';
 import '../../utils/profile_navigation.dart';
-import '../studio_logo.dart';
 
 class FeedHomeHeader extends StatelessWidget {
   const FeedHomeHeader({
     super.key,
     required this.filter,
     required this.onFilterChanged,
-    required this.onAddTap,
-    this.hasAvailableItems = false,
+    required this.onSavedTap,
   });
 
-  final FeedAvailabilityFilter filter;
-  final ValueChanged<FeedAvailabilityFilter> onFilterChanged;
-  final VoidCallback onAddTap;
-
-  /// Shows a small green dot beside "Available" when there's at least one
-  /// item currently available to purchase.
-  final bool hasAvailableItems;
+  final HomeFeedContentFilter filter;
+  final ValueChanged<HomeFeedContentFilter> onFilterChanged;
+  final VoidCallback onSavedTap;
 
   static const _headerHeight = 52.0;
+
+  String get _filterLabel => switch (filter) {
+        HomeFeedContentFilter.all => 'All',
+        HomeFeedContentFilter.piece => 'Piece',
+        HomeFeedContentFilter.scene => 'Scene',
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -39,59 +39,48 @@ class FeedHomeHeader extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          Positioned(
-            left: 16,
-            top: 0,
-            bottom: 0,
-            child: Center(
-              child: Image.asset(
-                StudioLogoPaths.iconBlack,
-                width: 29,
-                height: 27,
-                fit: BoxFit.contain,
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 16),
+              child: _FeedTypeDropdown(
+                label: _filterLabel,
+                selected: filter,
+                onSelected: onFilterChanged,
               ),
             ),
           ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _UnderlinedFilterTab(
-                label: 'All',
-                active: filter == FeedAvailabilityFilter.all,
-                onTap: () => onFilterChanged(FeedAvailabilityFilter.all),
-              ),
-              const SizedBox(width: 24),
-              _UnderlinedFilterTab(
-                label: 'Available',
-                active: filter == FeedAvailabilityFilter.available,
-                onTap: () =>
-                    onFilterChanged(FeedAvailabilityFilter.available),
-                showDot: hasAvailableItems,
-              ),
-            ],
+          Text(
+            'studio 3',
+            style: GoogleFonts.inter(
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+              color: Colors.black,
+              height: 1,
+            ),
           ),
-          Positioned(
-            right: 12,
-            top: 0,
-            bottom: 0,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                GestureDetector(
-                  onTap: onAddTap,
-                  behavior: HitTestBehavior.opaque,
-                  child: Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: SvgPicture.asset(
-                      NavAssets.plusIcon,
-                      width: 16,
-                      height: 16,
+          Align(
+            alignment: Alignment.centerRight,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GestureDetector(
+                    onTap: onSavedTap,
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.all(6),
+                      child: SvgPicture.asset(
+                        NavAssets.bookmarkIcon,
+                        width: 18,
+                        height: 20,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 4),
-                const _InboxMenuButton(),
-              ],
+                  const _InboxMenuButton(),
+                ],
+              ),
             ),
           ),
         ],
@@ -100,56 +89,62 @@ class FeedHomeHeader extends StatelessWidget {
   }
 }
 
-/// Home header's "All"/"Available" tab — a gap between the label (plus an
-/// optional trailing "available" dot) and its active-state underline,
-/// matching the Inbox page's tab treatment, instead of a text-decoration
-/// underline flush against the label.
-class _UnderlinedFilterTab extends StatelessWidget {
-  const _UnderlinedFilterTab({
+class _FeedTypeDropdown extends StatelessWidget {
+  const _FeedTypeDropdown({
     required this.label,
-    required this.active,
-    required this.onTap,
-    this.showDot = false,
+    required this.selected,
+    required this.onSelected,
   });
 
   final String label;
-  final bool active;
-  final VoidCallback onTap;
-  final bool showDot;
+  final HomeFeedContentFilter selected;
+  final ValueChanged<HomeFeedContentFilter> onSelected;
 
   @override
   Widget build(BuildContext context) {
-    return IntrinsicWidth(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              FeedFilterTab(
-                label: label,
-                active: active,
-                onTap: onTap,
-                underline: false,
+    return PopupMenuButton<HomeFeedContentFilter>(
+      padding: EdgeInsets.zero,
+      tooltip: 'Filter feed',
+      offset: const Offset(0, 36),
+      color: HomeFeedTokens.background,
+      onSelected: onSelected,
+      itemBuilder: (context) => [
+        for (final option in HomeFeedContentFilter.values)
+          PopupMenuItem(
+            value: option,
+            child: Text(
+              switch (option) {
+                HomeFeedContentFilter.all => 'All',
+                HomeFeedContentFilter.piece => 'Piece',
+                HomeFeedContentFilter.scene => 'Scene',
+              },
+              style: GoogleFonts.inter(
+                fontSize: 16,
+                fontWeight: option == selected
+                    ? FontWeight.w600
+                    : FontWeight.w400,
+                color: HomeFeedTokens.textPrimary,
               ),
-              if (showDot) ...[
-                const SizedBox(width: 6),
-                Container(
-                  width: HomeFeedTokens.dotSize,
-                  height: HomeFeedTokens.dotSize,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.green.shade500,
-                  ),
-                ),
-              ],
-            ],
+            ),
           ),
-          const SizedBox(height: 6),
-          Container(
-            height: 1.5,
-            color: active ? HomeFeedTokens.textPrimary : Colors.transparent,
+      ],
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: HomeFeedTokens.textPrimary,
+              height: 1.1,
+            ),
+          ),
+          const SizedBox(width: 4),
+          SvgPicture.asset(
+            NavAssets.chevronDown,
+            width: 8,
+            height: 4,
           ),
         ],
       ),
@@ -232,10 +227,10 @@ class _InboxMenuButtonState extends State<_InboxMenuButton> {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              Icon(
-                Icons.inbox_outlined,
-                size: 20,
-                color: HomeFeedTokens.textPrimary,
+              SvgPicture.asset(
+                NavAssets.bellIcon,
+                width: 20,
+                height: 20,
               ),
               if (_badgeCount > 0)
                 Positioned(
@@ -428,7 +423,7 @@ class FeedCardArtistStrip extends StatelessWidget {
         authorUsername != null && authorUsername!.trim().isNotEmpty;
 
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         GestureDetector(
           onTap: canNavigate ? () => _onAvatarTap(context) : null,
@@ -440,7 +435,7 @@ class FeedCardArtistStrip extends StatelessWidget {
             size: HomeFeedTokens.avatarSize,
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 10),
         Expanded(
           child: GestureDetector(
             onTap: canNavigate ? () => _onAvatarTap(context) : null,
@@ -467,8 +462,8 @@ class FeedCardArtistStrip extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.inter(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w300,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w400,
                       color: HomeFeedTokens.textInverse.withValues(alpha: 0.6),
                     ),
                   ),
@@ -489,12 +484,16 @@ class FeedApiCardOverlay extends StatelessWidget {
     required this.name,
     this.medium,
     this.authorUsername,
+    this.showAvailable = false,
+    this.showCollected = false,
   });
 
   final String? avatarUrl;
   final String name;
   final String? medium;
   final String? authorUsername;
+  final bool showAvailable;
+  final bool showCollected;
 
   @override
   Widget build(BuildContext context) {
@@ -503,17 +502,70 @@ class FeedApiCardOverlay extends StatelessWidget {
       children: [
         const FeedCardBottomScrim(),
         Positioned(
-          left: 8,
-          right: 8,
-          bottom: 8,
-          child: FeedCardArtistStrip(
-            avatarUrl: avatarUrl,
-            name: name,
-            medium: medium,
-            authorUsername: authorUsername,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: 56,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: FeedCardArtistStrip(
+                    avatarUrl: avatarUrl,
+                    name: name,
+                    medium: medium,
+                    authorUsername: authorUsername,
+                  ),
+                ),
+                if (showAvailable)
+                  const _StatusPill(label: 'Available')
+                else if (showCollected)
+                  const _StatusPill(label: 'Collected'),
+              ],
+            ),
           ),
         ),
       ],
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0x99231F1B),
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Color(0xFF3DDC84),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              fontWeight: FontWeight.w400,
+              color: HomeFeedTokens.textInverse,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -575,7 +627,7 @@ class FeedCardBottomScrim extends StatelessWidget {
       left: 0,
       right: 0,
       bottom: 0,
-      height: 88,
+      height: 56,
       child: DecoratedBox(
         decoration: BoxDecoration(
           gradient: LinearGradient(

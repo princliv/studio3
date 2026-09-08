@@ -45,6 +45,7 @@ dependencies:
   photo_manager: ^3.6.0
   shared_preferences: ^2.3.3
   video_player: ^2.9.2
+  visibility_detector: ^0.4.0+2
   cached_network_image: ^3.4.1
   geolocator: ^14.0.3
   firebase_core: ^4.12.1

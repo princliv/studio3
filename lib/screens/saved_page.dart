@@ -256,9 +256,18 @@ class _SavedPageState extends State<SavedPage>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+              padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
               child: Row(
                 children: [
+                  if (Navigator.of(context).canPop())
+                    IconButton(
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        size: 18,
+                        color: HomeFeedTokens.textPrimary,
+                      ),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
                   Expanded(
                     child: Text(
                       'Saved',

@@ -3,11 +3,12 @@ import 'package:flutter/material.dart';
 
 import '../models/feed_item.dart';
 import '../models/feed_page.dart';
-import '../models/feed_preview_item.dart' show FeedAvailabilityFilter;
+import '../models/feed_preview_item.dart' show HomeFeedContentFilter;
 import '../theme/home_feed_tokens.dart';
 import '../utils/explore_detail_route.dart';
 import '../utils/image_aspect_ratio_resolver.dart';
 import '../widgets/feed_skeleton.dart';
+import '../widgets/home_feed/feed_inline_video.dart';
 import '../widgets/home_feed/home_feed_widgets.dart';
 import '../widgets/offline_state.dart';
 import '../services/connectivity_service.dart';
@@ -15,8 +16,8 @@ import '../services/feed_service.dart';
 import '../utils/scrolls_to_top_on_double_tap.dart';
 import 'reels_page.dart' show routeObserver;
 
-/// Owns the "For You" feed's data/pagination — shared by both the "All" and
-/// "Available" tabs of [HomePage] so they read from one fetch instead of
+/// Owns the "For You" feed's data/pagination — shared by the All / Piece /
+/// Scene filters of [HomePage] so they read from one fetch instead of
 /// each maintaining their own.
 class HomeFeedStore extends ChangeNotifier {
   final List<FeedItem> apiItems = [];
@@ -27,13 +28,20 @@ class HomeFeedStore extends ChangeNotifier {
 
   bool _initialized = false;
 
-  List<FeedItem> get availableItems =>
-      apiItems.where((item) => item.isForSale).toList();
-
-  /// The "All" tab never shows video scenes — those live in Explore/Reels
-  /// only.
-  List<FeedItem> get feedItems =>
-      apiItems.where((item) => !item.isVideo).toList();
+  List<FeedItem> itemsFor(HomeFeedContentFilter filter) {
+    switch (filter) {
+      case HomeFeedContentFilter.piece:
+        return apiItems
+            .where((item) => item.type == FeedItemType.piece)
+            .toList();
+      case HomeFeedContentFilter.scene:
+        return apiItems
+            .where((item) => item.type == FeedItemType.post)
+            .toList();
+      case HomeFeedContentFilter.all:
+        return List<FeedItem>.from(apiItems);
+    }
+  }
 
   /// Paints instantly from whatever's already cached (if anything) instead
   /// of starting from an empty spinner, then kicks off a fetch to silently
@@ -130,10 +138,8 @@ class HomeFeedStore extends ChangeNotifier {
 }
 
 /// The Home ("For You") page — a single page with one header and one
-/// `Scaffold`, whose "All"/"Available" tabs switch by *tapping* only (no
-/// swipe): both are just two views over the same [HomeFeedStore], toggled
-/// with local state, rather than separate pages in the shell's outer
-/// Home/Discover/Reels/Saved swipe sequence (`MainShell`, `lib/main.dart`).
+/// `Scaffold`, whose All / Piece / Scene filter switches by tapping the
+/// header dropdown (no swipe). Both views read the same [HomeFeedStore].
 class HomePage extends StatefulWidget {
   const HomePage({super.key, required this.store});
 
@@ -148,7 +154,7 @@ class _HomePageState extends State<HomePage>
   static const double _loadMoreThreshold = 200;
 
   final ScrollController _scrollController = ScrollController();
-  bool _showAvailable = false;
+  HomeFeedContentFilter _contentFilter = HomeFeedContentFilter.all;
 
   @override
   void initState() {
@@ -196,13 +202,12 @@ class _HomePageState extends State<HomePage>
     openExploreDetail(context, item);
   }
 
-  /// Tapping "All"/"Available" only ever swaps which items this single page
-  /// shows — no swipe/PageView is involved. Also snaps back to the top of
-  /// the list, matching how switching tabs behaves elsewhere in the app.
-  void _onFilterTap(FeedAvailabilityFilter filter) {
-    final showAvailable = filter == FeedAvailabilityFilter.available;
-    if (showAvailable == _showAvailable) return;
-    setState(() => _showAvailable = showAvailable);
+  /// Tapping All / Piece / Scene only ever swaps which items this single
+  /// page shows — no swipe/PageView is involved. Also snaps back to the
+  /// top of the list, matching how switching tabs behaves elsewhere.
+  void _onFilterTap(HomeFeedContentFilter filter) {
+    if (filter == _contentFilter) return;
+    setState(() => _contentFilter = filter);
     if (_scrollController.hasClients) {
       _scrollController.jumpTo(0);
     }
@@ -224,10 +229,12 @@ class _HomePageState extends State<HomePage>
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.paddingOf(context).bottom + 100;
     final store = widget.store;
-    final items = _showAvailable ? store.availableItems : store.feedItems;
-    final filter = _showAvailable
-        ? FeedAvailabilityFilter.available
-        : FeedAvailabilityFilter.all;
+    final items = store.itemsFor(_contentFilter);
+    final emptyMessage = switch (_contentFilter) {
+      HomeFeedContentFilter.piece => 'No pieces yet',
+      HomeFeedContentFilter.scene => 'No scenes yet',
+      HomeFeedContentFilter.all => 'No feed items yet',
+    };
 
     return Scaffold(
       backgroundColor: HomeFeedTokens.background,
@@ -239,19 +246,16 @@ class _HomePageState extends State<HomePage>
             Padding(
               padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
               child: FeedHomeHeader(
-                filter: filter,
+                filter: _contentFilter,
                 onFilterChanged: _onFilterTap,
-                onAddTap: () => Navigator.pushNamed(context, '/post'),
-                hasAvailableItems: store.availableItems.isNotEmpty,
+                onSavedTap: () => Navigator.pushNamed(context, '/saved'),
               ),
             ),
             Expanded(
               child: _buildFeed(
                 bottomInset,
                 items: items,
-                emptyMessage: _showAvailable
-                    ? 'No available pieces yet'
-                    : 'No feed items yet',
+                emptyMessage: emptyMessage,
               ),
             ),
           ],
@@ -403,7 +407,9 @@ class _ApiFeedTileState extends State<_ApiFeedTile> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              if (url != null)
+              if (item.isVideo)
+                FeedInlineVideoTile(item: item)
+              else if (url != null)
                 CachedNetworkImage(
                   imageUrl: url,
                   fit: BoxFit.cover,
@@ -416,12 +422,13 @@ class _ApiFeedTileState extends State<_ApiFeedTile> {
                 )
               else
                 ColoredBox(color: Colors.grey.shade300),
-              if (item.type == FeedItemType.piece)
-                FeedApiCardOverlay(
+              FeedApiCardOverlay(
                   avatarUrl: item.authorAvatarUrl,
                   name: item.authorName ?? 'Artist',
-                  medium: item.piece?.medium,
+                  medium: item.title,
                   authorUsername: item.authorUsername,
+                  showAvailable: item.isForSale,
+                  showCollected: item.isCollected,
                 ),
             ],
           ),

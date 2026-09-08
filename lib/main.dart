@@ -31,6 +31,7 @@ import 'screens/home_feed_page.dart';
 import 'screens/explore_page.dart';
 import 'screens/reels_page.dart';
 import 'screens/saved_page.dart';
+import 'screens/event_page.dart';
 import 'screens/profile_page.dart';
 import 'screens/post_page.dart';
 import 'screens/inbox_page.dart';
@@ -92,7 +93,7 @@ Future<void> main() async {
 /// each weight is used in a session (e.g. Home's header right after login),
 /// Flutter briefly paints a fallback system font whose slightly different
 /// metrics can trip a `RenderFlex` overflow in tightly-fitted layouts (see
-/// `_UnderlinedFilterTab` in `widgets/home_feed/home_feed_widgets.dart`).
+/// `_FeedTypeDropdown` in `widgets/home_feed/home_feed_widgets.dart`).
 /// Bounded by a timeout so a genuinely offline first launch can't hang
 /// startup — it just falls back to the system font for that session.
 Future<void> _preloadInterFont() async {
@@ -161,6 +162,7 @@ class Studio3App extends StatelessWidget {
           );
         },
         '/post': (context) => const PostPage(),
+        '/saved': (context) => const SavedPage(),
         // Inquiries deferred to v2 — legacy /chat route redirects to Conversations inbox.
         '/chat': (context) => const InboxPage(initialTab: InboxTab.chats),
         '/inbox': (context) {
@@ -261,17 +263,13 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
-  // Page indices for the single swipeable Home/Discover/Reels/Saved
-  // sequence. Home is one page (its "All"/"Available" tabs switch by
-  // tapping only, entirely within that page — see `HomePage`), so a
-  // left/right swipe flows continuously between these 4 top-level
-  // sections. Profile is deliberately NOT one of these pages — it's shown
-  // as a tap-only overlay (see `_showProfile`) so it can never be swiped
-  // into or out of.
+  // Page indices for the swipeable Home / Explore / Event sequence.
+  // Post opens as a pushed route; Profile is a tap-only overlay so it
+  // can never be swiped into. Reels stay as an overlay opened from
+  // video content, not a bottom-nav tab.
   static const _kHomePage = 0;
   static const _kDiscoverPage = 1;
-  static const _kReelsPage = 2;
-  static const _kSavedPage = 3;
+  static const _kEventPage = 2;
 
   // How long after a nav-icon tap a second tap on the same (already active)
   // icon still counts as a double-tap → scroll-to-top-and-refresh.
@@ -285,9 +283,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   // auth-session change via the shared setState scope).
   final ValueNotifier<int> _selectedNavIndex =
       ValueNotifier(BottomNavIndex.home);
-  late final ValueNotifier<bool> _reelsActive =
-      ValueNotifier(_selectedNavIndex.value == BottomNavIndex.reels);
+  late final ValueNotifier<bool> _reelsActive = ValueNotifier(false);
   final ValueNotifier<bool> _showProfile = ValueNotifier(false);
+  final ValueNotifier<bool> _showReels = ValueNotifier(false);
   final ValueNotifier<ReelsJumpRequest?> _reelsJumpRequest = ValueNotifier(
     null,
   );
@@ -307,7 +305,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   final GlobalKey<State<StatefulWidget>> _homeKey = GlobalKey();
   final GlobalKey<State<StatefulWidget>> _exploreKey = GlobalKey();
   final GlobalKey<State<StatefulWidget>> _reelsKey = GlobalKey();
-  final GlobalKey<State<StatefulWidget>> _savedKey = GlobalKey();
+  final GlobalKey<State<StatefulWidget>> _eventKey = GlobalKey();
   final GlobalKey<State<StatefulWidget>> _profileKey = GlobalKey();
 
   // Built once — every page widget is `const` where possible so this list
@@ -315,12 +313,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   late final List<Widget> _pages = [
     HomePage(key: _homeKey, store: _homeFeedStore),
     ExplorePage(key: _exploreKey),
-    ReelsPage(
-      key: _reelsKey,
-      activeListenable: _reelsActive,
-      jumpRequests: _reelsJumpRequest,
-    ),
-    SavedPage(key: _savedKey),
+    EventPage(key: _eventKey),
   ];
 
   @override
@@ -344,6 +337,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     _selectedNavIndex.dispose();
     _reelsActive.dispose();
     _showProfile.dispose();
+    _showReels.dispose();
     _reelsJumpRequest.dispose();
     _pageController.dispose();
     _homeFeedStore.dispose();
@@ -357,7 +351,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   void _openReelsTab(List<FeedItem> items, int index) {
     Navigator.of(context).popUntil((route) => route.isFirst);
     _reelsJumpRequest.value = ReelsJumpRequest(items: items, index: index);
-    _onNavTap(BottomNavIndex.reels);
+    _showProfile.value = false;
+    _showReels.value = true;
+    _reelsActive.value = true;
   }
 
   void _goHome() {
@@ -374,7 +370,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   }
 
   void _onNavIndexChanged() {
-    _reelsActive.value = _selectedNavIndex.value == BottomNavIndex.reels;
+    if (!_showReels.value) {
+      _reelsActive.value = false;
+    }
   }
 
   void _onSessionChanged() {
@@ -401,17 +399,17 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
         return BottomNavIndex.home;
       case _kDiscoverPage:
         return BottomNavIndex.discover;
-      case _kReelsPage:
-        return BottomNavIndex.reels;
-      case _kSavedPage:
+      case _kEventPage:
       default:
-        return BottomNavIndex.bookmark;
+        return BottomNavIndex.event;
     }
   }
 
   void _onPageChanged(int page) {
     // Covers swipe-to-switch too, not just bottom-nav taps (see _onNavTap).
     FocusManager.instance.primaryFocus?.unfocus();
+    _showReels.value = false;
+    _reelsActive.value = false;
     _currentPage = page;
     final navIndex = _navIndexForPage(page);
     _selectedNavIndex.value = navIndex;
@@ -442,6 +440,14 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       return;
     }
 
+    if (navIndex == BottomNavIndex.post) {
+      Navigator.pushNamed(context, '/post');
+      return;
+    }
+
+    _showReels.value = false;
+    _reelsActive.value = false;
+
     if (navIndex == BottomNavIndex.profile) {
       _showProfile.value = true;
       _selectedNavIndex.value = BottomNavIndex.profile;
@@ -453,8 +459,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     final targetPage = switch (navIndex) {
       BottomNavIndex.home => _kHomePage,
       BottomNavIndex.discover => _kDiscoverPage,
-      BottomNavIndex.reels => _kReelsPage,
-      BottomNavIndex.bookmark => _kSavedPage,
+      BottomNavIndex.event => _kEventPage,
       _ => _currentPage,
     };
     _selectedNavIndex.value = navIndex;
@@ -472,8 +477,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     final key = switch (navIndex) {
       BottomNavIndex.home => _homeKey,
       BottomNavIndex.discover => _exploreKey,
-      BottomNavIndex.reels => _reelsKey,
-      BottomNavIndex.bookmark => _savedKey,
+      BottomNavIndex.event => _eventKey,
       BottomNavIndex.profile => _profileKey,
       _ => null,
     };
@@ -497,6 +501,20 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           // Offstage (not a conditional widget swap) so ProfilePage stays
           // mounted the whole session — its own data/scroll state survives
           // being hidden, same as it did as an IndexedStack child before.
+          Positioned.fill(
+            child: ValueListenableBuilder<bool>(
+              valueListenable: _showReels,
+              builder: (context, show, child) => Offstage(
+                offstage: !show,
+                child: child,
+              ),
+              child: ReelsPage(
+                key: _reelsKey,
+                activeListenable: _reelsActive,
+                jumpRequests: _reelsJumpRequest,
+              ),
+            ),
+          ),
           Positioned.fill(
             child: ValueListenableBuilder<bool>(
               valueListenable: _showProfile,

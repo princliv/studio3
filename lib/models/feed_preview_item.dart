@@ -7,6 +7,9 @@ enum FeedAspectRatio { portrait3x4, landscape16x9 }
 
 enum FeedAvailabilityFilter { all, available }
 
+/// Home feed type filter (All / Piece / Scene).
+enum HomeFeedContentFilter { all, piece, scene }
+
 class RelatedScene {
   const RelatedScene({
     this.id,
