@@ -111,16 +111,13 @@ class ProfileContentGrid extends StatelessWidget {
         >[];
     for (var i = 0; i < posts.length; i++) {
       final p = posts[i];
-      final mediaType = p.mediaType?.toLowerCase();
-      final isVideo =
-          mediaType == 'video' || mediaType == 'reel' || mediaType == 'reels';
       mapped.add((
         url: p.mediaUrl,
         ratio:
             kProfileMasonryHeightRatios[i % kProfileMasonryHeightRatios.length],
         forSale: false,
         price: null,
-        isVideo: isVideo,
+        isVideo: p.isVideo,
         isDraft: p.status == 'draft',
         post: p,
         piece: null,

@@ -9,11 +9,6 @@ import 'profile_masonry_grid.dart';
 import 'profile_series_grid.dart';
 import '../models/profile_series_data.dart';
 
-bool _isVideoPost(PostSummary p) {
-  final m = p.mediaType?.toLowerCase();
-  return m == 'video' || m == 'reel' || m == 'reels';
-}
-
 class ProfileTabContent extends StatelessWidget {
   const ProfileTabContent({
     super.key,
@@ -99,7 +94,7 @@ class ProfileTabContent extends StatelessWidget {
 
     if (currentTab == 'scenes') {
       final visibleScenes = sceneFilter == 'videos'
-          ? scenes.where(_isVideoPost).toList()
+          ? scenes.where((p) => p.isVideo).toList()
           : scenes;
       final Widget gridSliver = visibleScenes.isNotEmpty
           ? ProfileContentGrid.fromPosts(

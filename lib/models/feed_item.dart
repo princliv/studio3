@@ -1,3 +1,4 @@
+import '../utils/media_type_utils.dart';
 import 'piece_summary.dart';
 import 'post_summary.dart';
 
@@ -68,10 +69,7 @@ class FeedItem {
   String? get thumbnailUrl =>
       type == FeedItemType.piece ? null : post?.thumbnailUrl;
 
-  bool get isVideo {
-    final t = mediaType?.toLowerCase();
-    return t == 'video' || t == 'reel' || t == 'reels';
-  }
+  bool get isVideo => isVideoMediaType(mediaType, mediaUrl);
 
   Map<String, dynamic> toJson() =>
       type == FeedItemType.piece ? piece!.toJson() : post!.toJson();
