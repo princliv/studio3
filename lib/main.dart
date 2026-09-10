@@ -22,6 +22,7 @@ import 'utils/app_state_store.dart';
 import 'utils/profile_navigation.dart';
 import 'theme/app_theme.dart';
 import 'widgets/bottom_nav.dart' show BottomNav, BottomNavIndex;
+import 'widgets/post_share_type_sheet.dart';
 import 'screens/login_page.dart';
 import 'screens/signup_page.dart';
 import 'screens/forgot_password_page.dart';
@@ -161,7 +162,10 @@ class Studio3App extends StatelessWidget {
             viewerMode: args.viewerMode,
           );
         },
-        '/post': (context) => const PostPage(),
+        '/post': (context) {
+          final type = ModalRoute.of(context)?.settings.arguments as String?;
+          return PostPage(postType: type == 'scene' ? 'scene' : 'piece');
+        },
         '/saved': (context) => const SavedPage(),
         // Inquiries deferred to v2 — legacy /chat route redirects to Conversations inbox.
         '/chat': (context) => const InboxPage(initialTab: InboxTab.chats),
@@ -441,7 +445,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     }
 
     if (navIndex == BottomNavIndex.post) {
-      Navigator.pushNamed(context, '/post');
+      PostShareTypeSheet.showAndOpenPost(context);
       return;
     }
 

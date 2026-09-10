@@ -18,7 +18,9 @@ enum _PostFlowStep { gallery, edit, videoEdit, details }
 
 /// Single-route posting flow: gallery → edit → details (Figma 1609:1975).
 class PostPage extends StatefulWidget {
-  const PostPage({super.key});
+  const PostPage({super.key, this.postType = 'piece'});
+
+  final String postType;
 
   @override
   State<PostPage> createState() => _PostPageState();
@@ -26,11 +28,11 @@ class PostPage extends StatefulWidget {
 
 class _PostPageState extends State<PostPage> {
   static const _bannerHeight = 64.0;
-  static const _bottomControlsOffset = 42.0;
-  static const _maxSelection = 10;
+  static const _maxPieceSelection = 5;
+  static const _maxSceneSelection = 10;
 
   _PostFlowStep _step = _PostFlowStep.gallery;
-  String _postType = 'piece';
+  late final String _postType = widget.postType;
   List<AssetEntity> _pickedAssets = [];
   List<String>? _pickedImagePaths;
   String? _pickedVideoPath;
@@ -49,17 +51,6 @@ class _PostPageState extends State<PostPage> {
   }
 
   void _exitFlow() => Navigator.pop(context);
-
-  void _onPostTypeChanged(String type) {
-    if (type == _postType) return;
-    setState(() {
-      _postType = type;
-      _pickedAssets = [];
-      _pickedImagePaths = null;
-      _pickedVideoPath = null;
-      _pickedVideoThumbnailBytes = null;
-    });
-  }
 
   Future<void> _goToEdit() async {
     if (_pickedAssets.isEmpty) return;
@@ -169,7 +160,6 @@ class _PostPageState extends State<PostPage> {
 
   Widget _buildGallery() {
     final topInset = MediaQuery.paddingOf(context).top;
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
     final hasSelection = _pickedAssets.isNotEmpty || _pickedVideoPath != null;
 
     return Scaffold(
@@ -184,7 +174,9 @@ class _PostPageState extends State<PostPage> {
             child: PostGalleryPicker(
               key: ValueKey(_postType),
               openNotifier: _albumMenuOpen,
-              maxSelection: _maxSelection,
+              maxSelection: _postType == 'piece'
+                  ? _maxPieceSelection
+                  : _maxSceneSelection,
               allowVideos: _postType == 'scene',
               onAlbumChanged: (name) =>
                   setState(() => _selectedAlbumName = name),
@@ -211,23 +203,6 @@ class _PostPageState extends State<PostPage> {
               onNext: hasSelection ? _goToEdit : null,
               albumName: _selectedAlbumName,
               menuOpen: _albumMenuOpen,
-            ),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: bottomInset + _bottomControlsOffset,
-            child: ValueListenableBuilder<bool>(
-              valueListenable: _albumMenuOpen,
-              builder: (context, open, _) {
-                if (open) return const SizedBox.shrink();
-                return Center(
-                  child: _PostingSelector(
-                    postType: _postType,
-                    onChanged: _onPostTypeChanged,
-                  ),
-                );
-              },
             ),
           ),
         ],
@@ -387,72 +362,6 @@ class _PostingBanner extends StatelessWidget {
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PostingSelector extends StatelessWidget {
-  const _PostingSelector({required this.postType, required this.onChanged});
-
-  static const _selectorBg = Color(0xE6231F1B);
-
-  final String postType;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    const options = ['piece', 'scene'];
-
-    return Container(
-      width: 200,
-      height: 46,
-      padding: const EdgeInsets.symmetric(horizontal: 30),
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: _selectorBg,
-        borderRadius: BorderRadius.circular(100),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          for (final type in options)
-            _SelectorTab(
-              label: type == 'scene' ? 'Scene' : 'Piece',
-              selected: postType == type,
-              onTap: () => onChanged(type),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SelectorTab extends StatelessWidget {
-  const _SelectorTab({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  static const _textSecondary = Color(0xFF8C8880);
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Text(
-        label,
-        style: GoogleFonts.inter(
-          fontSize: 15,
-          fontWeight: selected ? FontWeight.w500 : FontWeight.w400,
-          color: selected ? HomeFeedTokens.textInverse : _textSecondary,
         ),
       ),
     );

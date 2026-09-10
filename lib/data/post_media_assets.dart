@@ -24,4 +24,6 @@ abstract final class PostMediaAssets {
   static const createAiToolsIcon = 'assets/post/create/ai_tools_icon.svg';
   static const createSearchIcon = 'assets/post/create/search_icon.svg';
   static const addPlusIcon = 'assets/post/create/add_plus_icon.svg';
+  static const sharePieceIcon = 'assets/post/create/share_piece_icon.svg';
+  static const shareSceneIcon = 'assets/post/create/share_scene_icon.svg';
 }
