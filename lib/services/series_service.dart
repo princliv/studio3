@@ -72,10 +72,12 @@ class SeriesService {
   Future<SeriesSummary> update(
     String id, {
     String? name,
+    String? description,
     List<String>? pieceOrder,
   }) async {
     final body = <String, dynamic>{};
     if (name != null) body['name'] = name;
+    if (description != null) body['description'] = description;
     if (pieceOrder != null) body['pieceOrder'] = pieceOrder;
     final json = await _api.patch('/api/series/$id', body: body);
     final data = _api.extractData(json) as Map<String, dynamic>;

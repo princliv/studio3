@@ -97,6 +97,71 @@ class _SeriesEditorPageState extends State<SeriesEditorPage> {
     }
   }
 
+  Future<void> _editDescription() async {
+    final series = _series;
+    if (series == null) return;
+    final controller = TextEditingController(text: series.description ?? '');
+    final saved = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: HomeFeedTokens.background,
+        title: Text(
+          'Series description',
+          style: GoogleFonts.inter(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: HomeFeedTokens.textPrimary,
+          ),
+        ),
+        content: TextField(
+          controller: controller,
+          maxLines: 5,
+          maxLength: 4000,
+          decoration: InputDecoration(
+            hintText: 'Describe this series',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.inter(color: HomeFeedTokens.textSecondary),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: Text(
+              'Save',
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.w600,
+                color: HomeFeedTokens.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (saved == null || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      final updated = await SeriesService.instance.update(
+        widget.seriesId,
+        description: saved,
+      );
+      if (!mounted) return;
+      setState(() {
+        _series = updated;
+        _busy = false;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _busy = false);
+      _showError(e);
+    }
+  }
+
   Future<void> _removePiece(String pieceId) async {
     setState(() => _busy = true);
     try {
@@ -222,6 +287,12 @@ class _SeriesEditorPageState extends State<SeriesEditorPage> {
                       fontSize: 14,
                       color: HomeFeedTokens.textSecondary,
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: _editDescription,
+                    icon: const Icon(Icons.notes_outlined),
+                    label: const Text('Edit description'),
                   ),
                   const SizedBox(height: 12),
                   OutlinedButton.icon(

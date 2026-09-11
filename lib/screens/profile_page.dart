@@ -25,6 +25,7 @@ import 'profile/widgets/profile_locked_placeholder.dart';
 import 'profile/widgets/profile_tab_content.dart';
 import 'profile/widgets/profile_tabs.dart';
 import 'profile/widgets/profile_viewer_mode_capsule.dart';
+import 'series_view_page.dart';
 import 'reels_page.dart' show routeObserver;
 import '../utils/scrolls_to_top_on_double_tap.dart';
 
@@ -782,6 +783,25 @@ class _ProfilePageState extends State<ProfilePage>
                         onPublishScene: _publishScene,
                         sceneFilter: _sceneFilter,
                         onSceneFilterChanged: _onSceneFilterChanged,
+                        onSeriesTap: (series) {
+                          final id = series.id;
+                          if (id == null || id.isEmpty) return;
+                          Navigator.of(context).push<void>(
+                            MaterialPageRoute<void>(
+                              builder: (_) => SeriesViewPage(
+                                seriesId: id,
+                                initialName: series.name,
+                                initialPieceCount: series.pieceCount,
+                                initialCoverUrl: series.stackUrls.isNotEmpty
+                                    ? series.stackUrls.first
+                                    : null,
+                                authorName: profile?.name,
+                                authorUsername: profile?.username,
+                                isOwner: isOwnProfile && !widget.viewerMode,
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ],

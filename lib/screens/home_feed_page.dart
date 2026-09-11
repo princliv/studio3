@@ -243,13 +243,10 @@ class _HomePageState extends State<HomePage>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
-              child: FeedHomeHeader(
-                filter: _contentFilter,
-                onFilterChanged: _onFilterTap,
-                onSavedTap: () => Navigator.pushNamed(context, '/saved'),
-              ),
+            FeedHomeHeader(
+              filter: _contentFilter,
+              onFilterChanged: _onFilterTap,
+              onSavedTap: () => Navigator.pushNamed(context, '/saved'),
             ),
             Expanded(
               child: _buildFeed(
@@ -427,7 +424,7 @@ class _ApiFeedTileState extends State<_ApiFeedTile> {
                   name: item.authorName ?? 'Artist',
                   medium: item.title,
                   authorUsername: item.authorUsername,
-                  showAvailable: item.isForSale,
+                  showAvailable: item.isAvailableListing,
                   showCollected: item.isCollected,
                 ),
             ],

@@ -34,6 +34,7 @@ class PieceSummary {
     this.authorIsFollowing = false,
     this.series,
     this.status,
+    this.listingState,
     this.materials = const [],
     this.styleTags = const [],
     this.aiDisclosed = false,
@@ -72,6 +73,8 @@ class PieceSummary {
   final bool authorIsFollowing;
   final PieceSeriesInfo? series;
   final String? status;
+  /// `available` | `collected` from the API; null on older payloads.
+  final String? listingState;
   final List<String> materials;
   final List<String> styleTags;
   final bool aiDisclosed;
@@ -79,6 +82,25 @@ class PieceSummary {
   final List<PostSummary>? relatedPosts;
 
   bool get isLive => status == null || status == 'live';
+
+  /// Listed and currently purchasable.
+  bool get isAvailableListing {
+    final state = listingState ?? _derivedListingState;
+    return state == 'available';
+  }
+
+  /// Sold, reserved, or otherwise no longer purchasable.
+  bool get isCollectedListing {
+    final state = listingState ?? _derivedListingState;
+    return state == 'collected';
+  }
+
+  String get _derivedListingState {
+    if (status == 'sold' || status == 'reserved') return 'collected';
+    if (status == 'delisted' && isForSale) return 'collected';
+    if (isForSale && isLive) return 'available';
+    return 'none';
+  }
 
   factory PieceSummary.fromJson(Map<String, dynamic> json) {
     final author = json['author'] as Map<String, dynamic>?;
@@ -127,6 +149,7 @@ class PieceSummary {
           ? PieceSeriesInfo.fromJson(seriesJson)
           : null,
       status: json['status'] as String?,
+      listingState: json['listingState'] as String?,
       materials: (json['materials'] as List?)?.whereType<String>().toList() ??
           const [],
       styleTags: (json['styleTags'] as List?)?.whereType<String>().toList() ??
@@ -187,6 +210,7 @@ class PieceSummary {
         'authorIsFollowing': authorIsFollowing,
         if (series != null) 'series': series!.toJson(),
         if (status != null) 'status': status,
+        if (listingState != null) 'listingState': listingState,
         'materials': materials,
         'styleTags': styleTags,
         'aiDisclosed': aiDisclosed,

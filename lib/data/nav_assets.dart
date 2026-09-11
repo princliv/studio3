@@ -8,4 +8,7 @@ abstract final class NavAssets {
   static const exploreIcon = 'assets/nav/explore.svg';
   static const postIcon = 'assets/nav/post.svg';
   static const eventIcon = 'assets/nav/event.svg';
+  static const headerActions = 'assets/nav/header_actions.svg';
+  static const availableDot = 'assets/nav/available_dot.svg';
+  static const collectedMark = 'assets/nav/collected_mark.svg';
 }

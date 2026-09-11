@@ -24,8 +24,6 @@ class FeedHomeHeader extends StatelessWidget {
   final ValueChanged<HomeFeedContentFilter> onFilterChanged;
   final VoidCallback onSavedTap;
 
-  static const _headerHeight = 52.0;
-
   String get _filterLabel => switch (filter) {
         HomeFeedContentFilter.all => 'All',
         HomeFeedContentFilter.piece => 'Piece',
@@ -34,53 +32,51 @@ class FeedHomeHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: _headerHeight,
-      child: Stack(
-        alignment: Alignment.center,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      child: Row(
         children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Padding(
-              padding: const EdgeInsets.only(left: 16),
-              child: _FeedTypeDropdown(
-                label: _filterLabel,
-                selected: filter,
-                onSelected: onFilterChanged,
+          _FeedTypeDropdown(
+            label: _filterLabel,
+            selected: filter,
+            onSelected: onFilterChanged,
+          ),
+          Expanded(
+            child: Text(
+              'studio 3',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.geist(
+                fontSize: 28,
+                fontWeight: FontWeight.w800,
+                color: Colors.black,
+                height: 1,
               ),
             ),
           ),
-          Text(
-            'studio 3',
-            style: GoogleFonts.inter(
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-              color: Colors.black,
-              height: 1,
-            ),
-          ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  GestureDetector(
-                    onTap: onSavedTap,
-                    behavior: HitTestBehavior.opaque,
-                    child: Padding(
-                      padding: const EdgeInsets.all(6),
-                      child: SvgPicture.asset(
-                        NavAssets.bookmarkIcon,
-                        width: 18,
-                        height: 20,
+          SizedBox(
+            width: 64,
+            height: 22,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                SvgPicture.asset(
+                  NavAssets.headerActions,
+                  width: 64,
+                  height: 22,
+                  fit: BoxFit.fill,
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: onSavedTap,
+                        behavior: HitTestBehavior.opaque,
                       ),
                     ),
-                  ),
-                  const _InboxMenuButton(),
-                ],
-              ),
+                    const Expanded(child: _InboxMenuButton()),
+                  ],
+                ),
+              ],
             ),
           ),
         ],
@@ -107,6 +103,12 @@ class _FeedTypeDropdown extends StatelessWidget {
       tooltip: 'Filter feed',
       offset: const Offset(0, 36),
       color: HomeFeedTokens.background,
+      style: const ButtonStyle(
+        padding: WidgetStatePropertyAll(EdgeInsets.zero),
+        minimumSize: WidgetStatePropertyAll(Size.zero),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.compact,
+      ),
       onSelected: onSelected,
       itemBuilder: (context) => [
         for (final option in HomeFeedContentFilter.values)
@@ -118,7 +120,7 @@ class _FeedTypeDropdown extends StatelessWidget {
                 HomeFeedContentFilter.piece => 'Piece',
                 HomeFeedContentFilter.scene => 'Scene',
               },
-              style: GoogleFonts.inter(
+              style: GoogleFonts.geist(
                 fontSize: 16,
                 fontWeight: option == selected
                     ? FontWeight.w600
@@ -133,7 +135,7 @@ class _FeedTypeDropdown extends StatelessWidget {
         children: [
           Text(
             label,
-            style: GoogleFonts.inter(
+            style: GoogleFonts.geist(
               fontSize: 20,
               fontWeight: FontWeight.w600,
               color: HomeFeedTokens.textPrimary,
@@ -218,45 +220,37 @@ class _InboxMenuButtonState extends State<_InboxMenuButton> {
 
   @override
   Widget build(BuildContext context) {
-    return Builder(
-      builder: (context) => GestureDetector(
-        onTap: () => _openInbox(context),
-        behavior: HitTestBehavior.opaque,
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              SvgPicture.asset(
-                NavAssets.bellIcon,
-                width: 20,
-                height: 20,
-              ),
-              if (_badgeCount > 0)
-                Positioned(
-                  top: -2,
-                  right: -2,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFE05252),
-                      shape: BoxShape.circle,
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      _badgeCount > 9 ? '9+' : '$_badgeCount',
-                      style: GoogleFonts.inter(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
+    return GestureDetector(
+      onTap: () => _openInbox(context),
+      behavior: HitTestBehavior.opaque,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          const SizedBox.expand(),
+          if (_badgeCount > 0)
+            Positioned(
+              top: -4,
+              right: -2,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFE05252),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  _badgeCount > 9 ? '9+' : '$_badgeCount',
+                  style: GoogleFonts.geist(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
                   ),
                 ),
-            ],
-          ),
-        ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -450,7 +444,7 @@ class FeedCardArtistStrip extends StatelessWidget {
                   name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
+                  style: GoogleFonts.geist(
                     fontSize: 12,
                     fontWeight: FontWeight.w400,
                     color: HomeFeedTokens.textInverse,
@@ -461,7 +455,7 @@ class FeedCardArtistStrip extends StatelessWidget {
                     medium!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(
+                    style: GoogleFonts.geist(
                       fontSize: 11,
                       fontWeight: FontWeight.w400,
                       color: HomeFeedTokens.textInverse.withValues(alpha: 0.6),
@@ -519,9 +513,15 @@ class FeedApiCardOverlay extends StatelessWidget {
                   ),
                 ),
                 if (showAvailable)
-                  const _StatusPill(label: 'Available')
+                  const _StatusPill(
+                    label: 'Available',
+                    iconAsset: NavAssets.availableDot,
+                  )
                 else if (showCollected)
-                  const _StatusPill(label: 'Collected'),
+                  const _StatusPill(
+                    label: 'Collected',
+                    iconAsset: NavAssets.collectedMark,
+                  ),
               ],
             ),
           ),
@@ -532,9 +532,10 @@ class FeedApiCardOverlay extends StatelessWidget {
 }
 
 class _StatusPill extends StatelessWidget {
-  const _StatusPill({required this.label});
+  const _StatusPill({required this.label, required this.iconAsset});
 
   final String label;
+  final String iconAsset;
 
   @override
   Widget build(BuildContext context) {
@@ -547,18 +548,15 @@ class _StatusPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
+          SvgPicture.asset(
+            iconAsset,
             width: 8,
             height: 8,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: Color(0xFF3DDC84),
-            ),
           ),
           const SizedBox(width: 4),
           Text(
             label,
-            style: GoogleFonts.inter(
+            style: GoogleFonts.geist(
               fontSize: 11,
               fontWeight: FontWeight.w400,
               color: HomeFeedTokens.textInverse,

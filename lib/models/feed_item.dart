@@ -52,8 +52,9 @@ class FeedItem {
   bool get isForSale =>
       type == FeedItemType.piece ? (piece?.isForSale ?? false) : false;
 
-  bool get isCollected =>
-      type == FeedItemType.piece && piece?.status == 'sold';
+  bool get isAvailableListing => piece?.isAvailableListing ?? false;
+
+  bool get isCollected => piece?.isCollectedListing ?? false;
 
   String? get priceDisplay =>
       type == FeedItemType.piece ? piece?.priceDisplay : null;

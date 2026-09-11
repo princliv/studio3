@@ -104,8 +104,10 @@ Future<void> _preloadInterFont() async {
     FontWeight.w500,
     FontWeight.w600,
     FontWeight.w700,
+    FontWeight.w800,
   ]) {
     GoogleFonts.inter(fontWeight: weight);
+    GoogleFonts.geist(fontWeight: weight);
   }
   try {
     await GoogleFonts.pendingFonts().timeout(const Duration(seconds: 3));
