@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:shimmer/shimmer.dart';
 
 import '../models/feed_item.dart';
 import '../models/feed_page.dart';
@@ -414,6 +415,19 @@ class _ApiFeedTileState extends State<_ApiFeedTile> {
                       (MediaQuery.sizeOf(context).width *
                               MediaQuery.devicePixelRatioOf(context))
                           .round(),
+                  // Same left-to-right shimmer wave as the initial feed
+                  // skeleton, so a card loading its image mid-scroll reads
+                  // the same "loading" way instead of popping in blank.
+                  placeholder: (context, url) => Shimmer.fromColors(
+                    baseColor: HomeFeedTokens.skeletonBase,
+                    highlightColor: Colors.white,
+                    period: const Duration(milliseconds: 1100),
+                    direction: ShimmerDirection.ltr,
+                    child: const DecoratedBox(
+                      decoration:
+                          BoxDecoration(color: HomeFeedTokens.skeletonBase),
+                    ),
+                  ),
                   errorWidget: (context, error, stackTrace) =>
                       ColoredBox(color: Colors.grey.shade300),
                 )

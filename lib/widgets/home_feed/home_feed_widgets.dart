@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shimmer/shimmer.dart';
 
 import '../../data/nav_assets.dart';
 import '../../models/feed_preview_item.dart';
@@ -593,13 +594,17 @@ class FeedPicsumImage extends StatelessWidget {
           width: double.infinity,
           height: double.infinity,
           memCacheWidth: cacheWidth,
-          progressIndicatorBuilder: (context, child, progress) => Container(
-            color: Colors.grey.shade300,
-            alignment: Alignment.center,
-            child: const SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(strokeWidth: 2),
+          // Animated left-to-right wave instead of a static gray box +
+          // spinner, so an individual piece/post image loading in mid-scroll
+          // reads the same "loading" way the initial feed skeleton does.
+          progressIndicatorBuilder: (context, child, progress) =>
+              Shimmer.fromColors(
+            baseColor: HomeFeedTokens.skeletonBase,
+            highlightColor: Colors.white,
+            period: const Duration(milliseconds: 1100),
+            direction: ShimmerDirection.ltr,
+            child: const DecoratedBox(
+              decoration: BoxDecoration(color: HomeFeedTokens.skeletonBase),
             ),
           ),
           errorWidget: (context, error, stackTrace) => Container(

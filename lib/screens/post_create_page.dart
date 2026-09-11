@@ -11,15 +11,20 @@ import '../data/post_picker_options.dart';
 import '../data/post_media_assets.dart';
 import '../models/listing_details.dart';
 import '../models/piece_summary.dart';
+import '../models/post_summary.dart';
 import '../models/post_image_transform.dart';
 import '../services/auth_session.dart';
 import '../services/api_exception.dart';
 import '../services/piece_service.dart';
+import '../services/post_service.dart';
 import '../services/post_publish_service.dart';
 import '../theme/home_feed_tokens.dart';
 import '../widgets/choose_location_sheet.dart';
 import '../widgets/create_flow/create_flow_widgets.dart';
 import '../widgets/create_flow/listing_details_form.dart';
+import '../widgets/create_flow/piece_availability_form.dart';
+import '../widgets/create_flow/piece_details_form.dart';
+import '../widgets/create_flow/related_scenes_picker_page.dart';
 import '../widgets/create_flow/series_picker_sheet.dart';
 import '../widgets/post_create_option_sheet.dart';
 import '../widgets/post_crop_preview.dart';
@@ -62,11 +67,18 @@ class _PostCreatePageState extends State<PostCreatePage> {
 
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _priceController = TextEditingController();
+  final _pieceDetailsKey = GlobalKey<PieceDetailsFormState>();
   final _listingFormKey = GlobalKey<ListingDetailsFormState>();
   bool _aiToolsUsed = false;
   bool _isProcess = false;
   bool _publishing = false;
   bool _listForSale = false;
+  bool? _forSaleChoice;
+  String? _sellMode;
+  int _auctionDays = 3;
+  int _pieceTab = 0;
+  int _unlockedTab = 0;
   bool _reviewMode = false;
   PostLocationOption? _selectedLocation;
   String? _selectedMediumId;
@@ -77,6 +89,7 @@ class _PostCreatePageState extends State<PostCreatePage> {
   String? _seriesLabel;
   String? _linkedPieceId;
   String? _linkedPieceLabel;
+  final Set<String> _relatedSceneIds = {};
 
   bool get _isPiece => widget.postType == 'piece';
 
@@ -84,12 +97,21 @@ class _PostCreatePageState extends State<PostCreatePage> {
   void initState() {
     super.initState();
     _listForSale = false;
+    _priceController.addListener(_onPriceChanged);
+    _nameController.addListener(_onPriceChanged);
+  }
+
+  void _onPriceChanged() {
+    if (_isPiece) setState(() {});
   }
 
   @override
   void dispose() {
+    _priceController.removeListener(_onPriceChanged);
+    _nameController.removeListener(_onPriceChanged);
     _nameController.dispose();
     _descriptionController.dispose();
+    _priceController.dispose();
     super.dispose();
   }
 
@@ -107,6 +129,25 @@ class _PostCreatePageState extends State<PostCreatePage> {
     if (allowed) setState(() => _listForSale = true);
   }
 
+  Future<void> _onPieceForSaleChanged(bool value) async {
+    if (!value) {
+      setState(() {
+        _forSaleChoice = false;
+        _listForSale = false;
+        _sellMode = null;
+      });
+      return;
+    }
+    final allowed = await ensureCanListForSale(context);
+    if (!mounted) return;
+    if (allowed) {
+      setState(() {
+        _forSaleChoice = true;
+        _listForSale = true;
+      });
+    }
+  }
+
   void _openLocationPicker() {
     ChooseLocationSheet.show(
       context,
@@ -119,12 +160,12 @@ class _PostCreatePageState extends State<PostCreatePage> {
   void _openMediumPicker() {
     PostCreateOptionSheet.show(
       context,
-      title: 'Select medium',
+      title: 'Medium',
+      subtitle: 'Choose one',
       searchHint: 'Search medium',
       options: PostMediumOptions.all,
       selectedIds: _selectedMediumId != null ? {_selectedMediumId!} : const {},
       mode: PostPickerSelectionMode.singleRadio,
-      closeOnSelection: true,
       onSelectionChanged: (ids) {
         setState(() {
           _selectedMediumId = ids.isEmpty ? null : ids.first;
@@ -136,7 +177,8 @@ class _PostCreatePageState extends State<PostCreatePage> {
   void _openStylePicker() {
     PostCreateOptionSheet.show(
       context,
-      title: 'Select style',
+      title: 'Style',
+      subtitle: 'Choose up to 3',
       searchHint: 'Search style',
       options: PostStyleOptions.all,
       selectedIds: Set<String>.from(_selectedStyleIds),
@@ -155,6 +197,26 @@ class _PostCreatePageState extends State<PostCreatePage> {
   String? get _mediumTrailing =>
       PostMediumOptions.byId(_selectedMediumId ?? '')?.name;
 
+  String? get _pieceStyleTrailing {
+    if (_selectedStyleIds.isEmpty) return null;
+    final names = _selectedStyleIds
+        .map((id) => PostStyleOptions.byId(id)?.name)
+        .whereType<String>()
+        .toList();
+    if (names.isEmpty) return null;
+    return names.join(', ');
+  }
+
+  String? get _pieceMaterialsTrailing {
+    if (_selectedMaterials.isEmpty) return null;
+    return '${_selectedMaterials.length} added';
+  }
+
+  String? get _relatedScenesTrailing {
+    if (_relatedSceneIds.isEmpty) return null;
+    return '${_relatedSceneIds.length} linked';
+  }
+
   String? get _styleTrailing {
     if (_selectedStyleIds.isEmpty) return null;
     if (_selectedStyleIds.length == 1) {
@@ -168,8 +230,6 @@ class _PostCreatePageState extends State<PostCreatePage> {
       context,
       MaterialPageRoute<List<PostMaterialOption>>(
         builder: (_) => AddMaterialsPage(
-          previewImagePath: widget.imagePaths[widget.previewImageIndex],
-          transform: widget.transforms[widget.previewImageIndex],
           initialMaterials: List<PostMaterialOption>.from(_selectedMaterials),
         ),
       ),
@@ -181,6 +241,33 @@ class _PostCreatePageState extends State<PostCreatePage> {
           ..addAll(result);
       });
     }
+  }
+
+  Future<void> _openRelatedScenesPicker() async {
+    final username = AuthSession.instance.user?.username;
+    if (username == null || username.isEmpty) return;
+    List<PostSummary> scenes;
+    try {
+      scenes = await PostService.instance.getUserPosts(username);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not load your scenes')),
+      );
+      return;
+    }
+    if (!mounted) return;
+    final selected = await RelatedScenesPickerPage.show(
+      context,
+      scenes: scenes,
+      selectedIds: Set<String>.from(_relatedSceneIds),
+    );
+    if (selected == null || !mounted) return;
+    setState(() {
+      _relatedSceneIds
+        ..clear()
+        ..addAll(selected);
+    });
   }
 
   Future<void> _openLinkedPiecePicker() async {
@@ -238,7 +325,25 @@ class _PostCreatePageState extends State<PostCreatePage> {
   PostDraft _buildDraft() {
     ListingDetails? listingDetails;
     if (_isPiece) {
-      listingDetails = _listingFormKey.currentState?.buildListingDetails();
+      listingDetails = _pieceDetailsKey.currentState?.buildListingDetails() ??
+          _listingFormKey.currentState?.buildListingDetails();
+      final priceUsd = double.tryParse(_priceController.text.trim());
+      if (listingDetails != null) {
+        listingDetails = listingDetails.copyWith(
+          priceUsd: priceUsd ?? listingDetails.priceUsd,
+          listingType: _listForSale ? _sellMode : listingDetails.listingType,
+          auctionDurationDays: _listForSale && _sellMode == 'auction'
+              ? _auctionDays
+              : listingDetails.auctionDurationDays,
+          location: _selectedLocation?.name ?? listingDetails.location,
+        );
+      } else if (_listForSale) {
+        listingDetails = ListingDetails(
+          priceUsd: priceUsd,
+          listingType: _sellMode,
+          auctionDurationDays: _sellMode == 'auction' ? _auctionDays : null,
+        );
+      }
     }
 
     return PostDraft(
@@ -260,6 +365,7 @@ class _PostCreatePageState extends State<PostCreatePage> {
       previewImageIndex: widget.previewImageIndex,
       aiDisclosed: _aiToolsUsed,
       linkedPieceId: _linkedPieceId,
+      relatedSceneIds: _relatedSceneIds.toList(),
       isProcess: _isProcess,
       isForSale: _isPiece && _listForSale,
     );
@@ -323,15 +429,64 @@ class _PostCreatePageState extends State<PostCreatePage> {
     }
   }
 
+  bool get _priceValid {
+    final price = double.tryParse(_priceController.text.trim());
+    return price != null && price > 0;
+  }
+
+  bool get _detailsContinueEnabled {
+    if (_nameController.text.trim().isEmpty) return false;
+    if (!_listForSale) return true;
+    return _selectedMediumId != null &&
+        (_pieceDetailsKey.currentState?.hasDimensions ?? false);
+  }
+
+  bool get _availabilityComplete {
+    if (_forSaleChoice == false) return true;
+    if (_forSaleChoice != true) return false;
+    if (_sellMode == 'fixed') return _priceValid;
+    if (_sellMode == 'auction') {
+      return _priceValid &&
+          _auctionDays >= PieceAvailabilityForm.minAuctionDays &&
+          _auctionDays <= PieceAvailabilityForm.maxAuctionDays;
+    }
+    return false;
+  }
+
   bool _validate() {
     if (_isPiece && _listForSale) {
-      final form = _listingFormKey.currentState;
-      if (form == null || !form.isPriceValid) {
+      if (!_priceValid) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Enter a valid price to list for sale')),
         );
         return false;
       }
+      if (_sellMode == 'auction' &&
+          (_auctionDays < PieceAvailabilityForm.minAuctionDays ||
+              _auctionDays > PieceAvailabilityForm.maxAuctionDays)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Auction duration must be 3–14 days')),
+        );
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool _validateDetailsForContinue() {
+    if (!_isPiece || !_listForSale) return true;
+    if (_selectedMediumId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select a medium to list for sale')),
+      );
+      return false;
+    }
+    final form = _pieceDetailsKey.currentState;
+    if (form == null || !form.hasDimensions) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter width and height to list for sale')),
+      );
+      return false;
     }
     return true;
   }
@@ -354,8 +509,41 @@ class _PostCreatePageState extends State<PostCreatePage> {
     _publish(_buildDraft());
   }
 
+  void _onPieceBannerBack() {
+    if (_pieceTab > 0) {
+      setState(() => _pieceTab -= 1);
+      return;
+    }
+    (widget.onEdit ?? widget.onClose)();
+  }
+
+  void _onPieceContinue() {
+    if (_pieceTab == 0) {
+      if (!_availabilityComplete) return;
+      setState(() {
+        _pieceTab = 1;
+        if (_unlockedTab < 1) _unlockedTab = 1;
+      });
+      return;
+    }
+    if (_pieceTab == 1) {
+      if (!_validateDetailsForContinue()) return;
+      setState(() {
+        _pieceTab = 2;
+        _unlockedTab = 2;
+      });
+      return;
+    }
+    _onCreate();
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isPiece) return _buildPieceFlow(context);
+    return _buildSceneFlow(context);
+  }
+
+  Widget _buildSceneFlow(BuildContext context) {
     final topInset = MediaQuery.paddingOf(context).top;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
 
@@ -419,10 +607,231 @@ class _PostCreatePageState extends State<PostCreatePage> {
     );
   }
 
-  Widget _buildEditableForm() {
+  Widget _buildPieceFlow(BuildContext context) {
+    final topInset = MediaQuery.paddingOf(context).top;
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final continueEnabled = _pieceTab == 0
+        ? _availabilityComplete
+        : _pieceTab == 1
+            ? _detailsContinueEnabled
+            : !_publishing;
+    final ctaLabel = _pieceTab == 2 ? 'Publish' : 'Save and continue';
+
+    return PopScope(
+      canPop: _pieceTab == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _onPieceBannerBack();
+      },
+      child: Scaffold(
+        backgroundColor: HomeFeedTokens.background,
+        body: Column(
+          children: [
+            CreateFlowBanner(
+              topInset: topInset,
+              title: 'Piece',
+              onClose: _onPieceBannerBack,
+              useBackChevron: true,
+              height: 53,
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    _buildPieceCoverAndTabs(),
+                    if (_pieceTab == 0)
+                      PieceAvailabilityForm(
+                        forSale: _forSaleChoice,
+                        sellMode: _sellMode,
+                        auctionDays: _auctionDays,
+                        priceController: _priceController,
+                        onForSaleChanged: _onPieceForSaleChanged,
+                        onSellModeChanged: (mode) {
+                          setState(() => _sellMode = mode);
+                        },
+                        onAuctionDaysChanged: (days) {
+                          setState(() => _auctionDays = days);
+                        },
+                      ),
+                    Visibility(
+                      visible: _pieceTab == 1,
+                      maintainState: true,
+                      maintainAnimation: true,
+                      child: PieceDetailsForm(
+                        key: _pieceDetailsKey,
+                        titleController: _nameController,
+                        descriptionController: _descriptionController,
+                        locationTrailing: _selectedLocation?.name,
+                        mediumTrailing: _mediumTrailing,
+                        styleTrailing: _pieceStyleTrailing,
+                        materialsTrailing: _pieceMaterialsTrailing,
+                        seriesTrailing: _seriesLabel,
+                        relatedScenesTrailing: _relatedScenesTrailing,
+                        onLocation: _openLocationPicker,
+                        onMedium: _openMediumPicker,
+                        onStyle: _openStylePicker,
+                        onMaterials: _openMaterialsPage,
+                        onSeries: _openSeriesPicker,
+                        onRelatedScenes: _openRelatedScenesPicker,
+                        onChanged: () {
+                          if (mounted) setState(() {});
+                        },
+                      ),
+                    ),
+                    if (_pieceTab == 2)
+                      _buildSummary(includePreview: false),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(10, 24, 10, bottomInset + 24),
+              child: Opacity(
+                opacity: continueEnabled && !_publishing ? 1 : 0.4,
+                child: CreateFlowBottomButton(
+                  label: ctaLabel,
+                  height: 40,
+                  backgroundColor: HomeFeedTokens.neutral800,
+                  textColor: HomeFeedTokens.textInverse,
+                  onTap: _publishing || !continueEnabled
+                      ? null
+                      : _onPieceContinue,
+                  child: _publishing
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: HomeFeedTokens.textInverse,
+                          ),
+                        )
+                      : Text(
+                          ctaLabel,
+                          style: GoogleFonts.geist(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w400,
+                            color: HomeFeedTokens.textInverse,
+                          ),
+                        ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPieceCoverAndTabs() {
+    const tabLabels = ['Availability', 'Details', 'Review'];
+    return Column(
+      children: [
+        const SizedBox(height: 11),
+        Center(
+          child: _PieceCoverPreview(
+            imagePath: widget.imagePaths[widget.previewImageIndex],
+            transform: widget.transforms[widget.previewImageIndex],
+            onEdit: widget.onEdit,
+            counterLabel:
+                '${widget.previewImageIndex + 1}/${widget.imagePaths.length}',
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  _pieceTabButton(
+                    index: 0,
+                    label: tabLabels[0],
+                    alignment: Alignment.centerLeft,
+                  ),
+                  _pieceTabButton(
+                    index: 1,
+                    label: tabLabels[1],
+                    alignment: Alignment.center,
+                  ),
+                  _pieceTabButton(
+                    index: 2,
+                    label: tabLabels[2],
+                    alignment: Alignment.centerRight,
+                  ),
+                ],
+              ),
+              const Positioned(
+                left: -24,
+                right: -24,
+                bottom: 0,
+                child: ColoredBox(
+                  color: Color(0xFFC8C5BC),
+                  child: SizedBox(height: 0.5),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _pieceTabButton({
+    required int index,
+    required String label,
+    required Alignment alignment,
+  }) {
+    final selected = index == _pieceTab;
+    return Expanded(
+      child: Align(
+        alignment: alignment,
+        child: GestureDetector(
+          onTap: index <= _unlockedTab
+              ? () => setState(() => _pieceTab = index)
+              : null,
+          behavior: HitTestBehavior.opaque,
+          child: IntrinsicWidth(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.geist(
+                    fontSize: 13,
+                    fontWeight:
+                        selected ? FontWeight.w500 : FontWeight.w400,
+                    color: selected
+                        ? HomeFeedTokens.textPrimary
+                        : HomeFeedTokens.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  height: 2,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? HomeFeedTokens.textPrimary
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEditableForm({
+    bool includePreview = true,
+    bool includeSaleToggle = true,
+    bool includePrice = true,
+  }) {
     return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (includePreview) ...[
                   const SizedBox(height: 13),
                   Center(
                     child: widget.mediaKind == 'video'
@@ -439,6 +848,7 @@ class _PostCreatePageState extends State<PostCreatePage> {
                           ),
                   ),
                   const SizedBox(height: 24),
+                  ],
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
                     child: CreateFlowTextField(
@@ -546,14 +956,16 @@ class _PostCreatePageState extends State<PostCreatePage> {
                     onChanged: (value) => setState(() => _aiToolsUsed = value),
                   ),
                   if (_isPiece) ...[
-                    CreateFlowToggleRow(
-                      label: 'List for sale',
-                      value: _listForSale,
-                      onChanged: _onListForSaleChanged,
-                    ),
+                    if (includeSaleToggle)
+                      CreateFlowToggleRow(
+                        label: 'List for sale',
+                        value: _listForSale,
+                        onChanged: _onListForSaleChanged,
+                      ),
                     ListingDetailsForm(
                       key: _listingFormKey,
                       showSaleFields: _listForSale,
+                      includePrice: includePrice,
                     ),
                   ],
                 ],
@@ -564,10 +976,21 @@ class _PostCreatePageState extends State<PostCreatePage> {
   /// as [_buildEditableForm] but as plain text (no fields, no chevrons, no
   /// toggles, no edit affordance on the preview image), so this reads as a
   /// summary to confirm rather than a second copy of the editable form.
-  Widget _buildSummary() {
+  Widget _buildSummary({bool includePreview = true}) {
     ListingDetails? listingDetails;
-    if (_isPiece && _listForSale) {
-      listingDetails = _listingFormKey.currentState?.buildListingDetails();
+    if (_isPiece) {
+      listingDetails = _pieceDetailsKey.currentState?.buildListingDetails();
+      if (_listForSale) {
+        final priceUsd = double.tryParse(_priceController.text.trim());
+        if (listingDetails != null && priceUsd != null) {
+          listingDetails = listingDetails.copyWith(
+            priceUsd: priceUsd,
+            listingType: _sellMode,
+            auctionDurationDays:
+                _sellMode == 'auction' ? _auctionDays : null,
+          );
+        }
+      }
     }
     final materialsLabel = _selectedMaterials.isEmpty
         ? null
@@ -578,6 +1001,7 @@ class _PostCreatePageState extends State<PostCreatePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (includePreview) ...[
         const SizedBox(height: 13),
         Center(
           child: widget.mediaKind == 'video'
@@ -588,6 +1012,7 @@ class _PostCreatePageState extends State<PostCreatePage> {
                 ),
         ),
         const SizedBox(height: 24),
+        ],
         if (title.isNotEmpty) _summaryRow('Name', title),
         if (description.isNotEmpty) _summaryRow('Description', description),
         const Padding(
@@ -604,34 +1029,43 @@ class _PostCreatePageState extends State<PostCreatePage> {
         if (materialsLabel != null) _summaryRow('Materials', materialsLabel),
         if (_isPiece) ...[
           if (_seriesLabel != null) _summaryRow('Series', _seriesLabel!),
+          if (_relatedScenesTrailing != null)
+            _summaryRow('Related scenes', _relatedScenesTrailing!),
         ] else ...[
           if (_linkedPieceLabel != null)
             _summaryRow('Link to piece', _linkedPieceLabel!),
           if (_isProcess) _summaryRow('Process / work-in-progress', 'Yes'),
         ],
         if (_aiToolsUsed) _summaryRow('AI tools used', 'Yes'),
+        if (_isPiece && listingDetails?.dimensionsString != null)
+          _summaryRow('Dimensions', listingDetails!.dimensionsString!),
+        if (_isPiece && listingDetails?.yearCreated != null)
+          _summaryRow('Year created', '${listingDetails!.yearCreated}'),
+        if (_isPiece &&
+            listingDetails?.framingMounting?.trim().isNotEmpty == true)
+          _summaryRow(
+            'Framing/mounting',
+            listingDetails!.framingMounting!.trim(),
+          ),
+        if (_isPiece &&
+            listingDetails?.handlingNotes?.trim().isNotEmpty == true)
+          _summaryRow(
+            'Handling notes',
+            listingDetails!.handlingNotes!.trim(),
+          ),
+        if (_isPiece && !_listForSale && _forSaleChoice == false)
+          _summaryRow('List for sale', 'No'),
         if (_isPiece && _listForSale) ...[
           _summaryRow('List for sale', 'Yes'),
+          if (_sellMode == 'fixed') _summaryRow('Sale type', 'Fixed price'),
+          if (_sellMode == 'auction') ...[
+            _summaryRow('Sale type', 'Auction'),
+            _summaryRow('Duration', '$_auctionDays days'),
+          ],
           if (listingDetails?.priceUsd != null)
             _summaryRow(
-              'Price',
+              _sellMode == 'auction' ? 'Starting bid' : 'Price',
               '\$${listingDetails!.priceUsd!.toStringAsFixed(2)}',
-            ),
-          if (listingDetails?.dimensionsString != null)
-            _summaryRow('Dimensions', listingDetails!.dimensionsString!),
-          if (listingDetails?.framingMounting?.trim().isNotEmpty == true)
-            _summaryRow(
-              'Framing/mounting',
-              listingDetails!.framingMounting!.trim(),
-            ),
-          if (listingDetails?.provenance?.trim().isNotEmpty == true)
-            _summaryRow('Provenance', listingDetails!.provenance!.trim()),
-          if (listingDetails?.yearCreated != null)
-            _summaryRow('Year created', '${listingDetails!.yearCreated}'),
-          if (listingDetails?.handlingNotes?.trim().isNotEmpty == true)
-            _summaryRow(
-              'Handling notes',
-              listingDetails!.handlingNotes!.trim(),
             ),
         ],
         const SizedBox(height: 8),
@@ -663,6 +1097,76 @@ class _PostCreatePageState extends State<PostCreatePage> {
                 fontSize: 14,
                 fontWeight: FontWeight.w400,
                 color: HomeFeedTokens.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PieceCoverPreview extends StatelessWidget {
+  const _PieceCoverPreview({
+    required this.imagePath,
+    required this.transform,
+    required this.counterLabel,
+    this.onEdit,
+  });
+
+  static const _width = 156.0;
+  static const _height = 197.0;
+  static const _radius = 8.0;
+
+  final String imagePath;
+  final PostImageTransform transform;
+  final String counterLabel;
+  final VoidCallback? onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: _width,
+      height: _height,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          PostCropPreview(
+            imagePath: imagePath,
+            transform: transform,
+            borderRadius: BorderRadius.circular(_radius),
+            frameSize: const Size(_width, _height),
+          ),
+          if (onEdit != null)
+            Positioned(
+              top: 7,
+              right: 11,
+              child: GestureDetector(
+                onTap: onEdit,
+                behavior: HitTestBehavior.opaque,
+                child: SvgPicture.asset(
+                  PostMediaAssets.createCoverEditIcon,
+                  width: 26,
+                  height: 18,
+                ),
+              ),
+            ),
+          Positioned(
+            left: 5,
+            bottom: 8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0x4D231F1B),
+                borderRadius: BorderRadius.circular(22),
+              ),
+              child: Text(
+                counterLabel,
+                style: GoogleFonts.geist(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w400,
+                  color: HomeFeedTokens.textInverse,
+                ),
               ),
             ),
           ),

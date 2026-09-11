@@ -21,29 +21,22 @@ class PostPickerSearchField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 32,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: _textSecondary.withValues(alpha: 0.5),
-          width: 0.5,
-        ),
+        border: Border.all(color: HomeFeedTokens.textPrimary, width: 1),
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.search,
-            size: 16,
-            color: _textSecondary,
-          ),
+          const Icon(Icons.search, size: 16, color: _textSecondary),
           const SizedBox(width: 8),
           Expanded(
             child: TextField(
               controller: controller,
               onChanged: onChanged,
-              style: GoogleFonts.inter(
-                fontSize: 12,
+              style: GoogleFonts.geist(
+                fontSize: 13,
                 fontWeight: FontWeight.w400,
                 color: HomeFeedTokens.textPrimary,
               ),
@@ -52,8 +45,8 @@ class PostPickerSearchField extends StatelessWidget {
                 isDense: true,
                 border: InputBorder.none,
                 hintText: hintText,
-                hintStyle: GoogleFonts.inter(
-                  fontSize: 12,
+                hintStyle: GoogleFonts.geist(
+                  fontSize: 13,
                   fontWeight: FontWeight.w400,
                   color: _textSecondary,
                 ),

@@ -13,9 +13,15 @@ import 'create_flow_widgets.dart';
 /// ("List for sale" toggled on); year/framing/provenance/handling notes are
 /// general piece metadata and always render regardless of sale status.
 class ListingDetailsForm extends StatefulWidget {
-  const ListingDetailsForm({super.key, this.showSaleFields = true});
+  const ListingDetailsForm({
+    super.key,
+    this.showSaleFields = true,
+    this.includePrice = true,
+  });
 
   final bool showSaleFields;
+  /// Price lives on the Availability tab for piece posting.
+  final bool includePrice;
 
   @override
   ListingDetailsFormState createState() => ListingDetailsFormState();
@@ -154,44 +160,57 @@ class ListingDetailsFormState extends State<ListingDetailsForm> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (widget.showSaleFields) ...[
-          const SizedBox(height: 8),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: createFlowHorizontalInset),
-            child: CreateFlowDivider(),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                CreateFlowTextField(
-                  controller: _priceController,
-                  hint: 'Price (required)',
-                  prefixText: '\$ ',
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                ),
-                if (!isPriceValid && _priceController.text.trim().isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Text(
-                      'Enter a valid price greater than 0',
-                      style: GoogleFonts.inter(fontSize: 11, color: _textSecondary),
-                    ),
-                  ),
-                ] else if (_priceController.text.trim().isEmpty) ...[
-                  const SizedBox(height: 6),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Text(
-                      'Required to list for sale',
-                      style: GoogleFonts.inter(fontSize: 11, color: _textSecondary),
-                    ),
-                  ),
-                ],
-              ],
+          if (widget.includePrice) ...[
+            const SizedBox(height: 8),
+            const Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: createFlowHorizontalInset,
+              ),
+              child: CreateFlowDivider(),
             ),
-          ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CreateFlowTextField(
+                    controller: _priceController,
+                    hint: 'Price (required)',
+                    prefixText: '\$ ',
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                  ),
+                  if (!isPriceValid &&
+                      _priceController.text.trim().isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Text(
+                        'Enter a valid price greater than 0',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: _textSecondary,
+                        ),
+                      ),
+                    ),
+                  ] else if (_priceController.text.trim().isEmpty) ...[
+                    const SizedBox(height: 6),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Text(
+                        'Required to list for sale',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: _textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: createFlowHorizontalInset),

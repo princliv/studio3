@@ -17,11 +17,13 @@ Widget _shimmer(
   Widget child, {
   required Color baseColor,
   required Color highlightColor,
+  Duration period = const Duration(milliseconds: 1400),
 }) {
   return Shimmer.fromColors(
     baseColor: baseColor,
     highlightColor: highlightColor,
-    period: const Duration(milliseconds: 1400),
+    period: period,
+    direction: ShimmerDirection.ltr,
     child: child,
   );
 }
@@ -163,7 +165,12 @@ class FeedListSkeleton extends StatelessWidget {
         itemBuilder: (_, __) => card(),
       ),
       baseColor: fill,
-      highlightColor: HomeFeedTokens.skeletonHighlight,
+      // Brighter than the shared skeletonHighlight token and a shorter
+      // period — this is the first thing a user sees on entering the app,
+      // so the left-to-right wave needs to actually read as motion instead
+      // of the subtle tan-on-tan sweep used for lower-visibility skeletons.
+      highlightColor: Colors.white,
+      period: const Duration(milliseconds: 1100),
     );
   }
 }

@@ -16,7 +16,14 @@ abstract final class PostMediaAssets {
 
   static const createCloseIcon = 'assets/post/create/close_icon.svg';
   static const createPencilIcon = 'assets/post/create/pencil_icon.svg';
+  static const createCoverEditIcon = 'assets/post/create/cover_edit_icon.svg';
+  static const createBannerBack = 'assets/post/create/banner_back.svg';
   static const createChevronRight = 'assets/post/create/chevron_right.svg';
+  static const createDetailsChevron = 'assets/post/create/details_chevron.svg';
+  static const createDetailsChevronSm =
+      'assets/post/create/details_chevron_sm.svg';
+  static const createDimensionClose = 'assets/post/create/dimension_close.svg';
+  static const createUnitChevron = 'assets/post/create/unit_chevron.svg';
   static const createLocationIcon = 'assets/post/create/location_icon.svg';
   static const createMediumIcon = 'assets/post/create/medium_icon.svg';
   static const createStyleIcon = 'assets/post/create/style_icon.svg';

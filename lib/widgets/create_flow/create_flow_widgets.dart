@@ -17,11 +17,15 @@ class CreateFlowBanner extends StatelessWidget {
     required this.topInset,
     required this.title,
     required this.onClose,
+    this.useBackChevron = false,
+    this.height = 64,
   });
 
   final double topInset;
   final String title;
   final VoidCallback onClose;
+  final bool useBackChevron;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +34,7 @@ class CreateFlowBanner extends StatelessWidget {
       child: Padding(
         padding: EdgeInsets.only(top: topInset),
         child: SizedBox(
-          height: 64,
+          height: height,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
             child: Stack(
@@ -41,20 +45,30 @@ class CreateFlowBanner extends StatelessWidget {
                   child: GestureDetector(
                     onTap: onClose,
                     behavior: HitTestBehavior.opaque,
-                    child: SvgPicture.asset(
-                      PostMediaAssets.createCloseIcon,
-                      width: 14,
-                      height: 14,
-                      colorFilter: const ColorFilter.mode(
-                        HomeFeedTokens.textPrimary,
-                        BlendMode.srcIn,
-                      ),
-                    ),
+                    child: useBackChevron
+                        ? SvgPicture.asset(
+                            PostMediaAssets.createBannerBack,
+                            width: 7,
+                            height: 14,
+                            colorFilter: const ColorFilter.mode(
+                              HomeFeedTokens.textPrimary,
+                              BlendMode.srcIn,
+                            ),
+                          )
+                        : SvgPicture.asset(
+                            PostMediaAssets.createCloseIcon,
+                            width: 14,
+                            height: 14,
+                            colorFilter: const ColorFilter.mode(
+                              HomeFeedTokens.textPrimary,
+                              BlendMode.srcIn,
+                            ),
+                          ),
                   ),
                 ),
                 Text(
                   title,
-                  style: GoogleFonts.inter(
+                  style: GoogleFonts.geist(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                     color: HomeFeedTokens.textPrimary,
@@ -461,6 +475,7 @@ class CreateFlowBottomButton extends StatelessWidget {
     required this.textColor,
     required this.onTap,
     this.width,
+    this.height = 32,
     this.child,
   });
 
@@ -469,6 +484,7 @@ class CreateFlowBottomButton extends StatelessWidget {
   final Color textColor;
   final VoidCallback? onTap;
   final double? width;
+  final double height;
   final Widget? child;
 
   @override
@@ -480,7 +496,7 @@ class CreateFlowBottomButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         child: Ink(
           width: width,
-          height: 32,
+          height: height,
           decoration: BoxDecoration(
             color: backgroundColor,
             borderRadius: BorderRadius.circular(8),

@@ -34,6 +34,7 @@ class PostDraft {
     this.aiDisclosed = false,
     this.altText,
     this.linkedPieceId,
+    this.relatedSceneIds = const [],
     this.isProcess = false,
     this.isForSale = false,
     this.status = 'live',
@@ -58,6 +59,7 @@ class PostDraft {
   final bool aiDisclosed;
   final String? altText;
   final String? linkedPieceId;
+  final List<String> relatedSceneIds;
   final bool isProcess;
   final bool isForSale;
 
@@ -87,6 +89,7 @@ class PostDraft {
     bool? aiDisclosed,
     String? altText,
     String? linkedPieceId,
+    List<String>? relatedSceneIds,
     bool? isProcess,
     bool? isForSale,
     String? status,
@@ -110,6 +113,7 @@ class PostDraft {
       aiDisclosed: aiDisclosed ?? this.aiDisclosed,
       altText: altText ?? this.altText,
       linkedPieceId: linkedPieceId ?? this.linkedPieceId,
+      relatedSceneIds: relatedSceneIds ?? this.relatedSceneIds,
       isProcess: isProcess ?? this.isProcess,
       isForSale: isForSale ?? this.isForSale,
       status: status ?? this.status,
@@ -236,7 +240,7 @@ class PostPublishService {
     }
 
     final caption = draft.description.trim();
-    final materials = draft.materials.map((m) => m.name).toList();
+    final materials = draft.materials.map((m) => m.publishLabel).toList();
 
     final body = <String, dynamic>{
       'title': draft.title.trim().isNotEmpty ? draft.title.trim() : 'Untitled',
@@ -264,10 +268,16 @@ class PostPublishService {
         'isForSale': true,
         if (draft.listingDetails?.priceCents != null)
           'priceCents': draft.listingDetails!.priceCents,
+        if (draft.listingDetails?.listingType != null)
+          'listingType': draft.listingDetails!.listingType,
+        if (draft.listingDetails?.listingType == 'auction' &&
+            draft.listingDetails?.auctionDurationDays != null)
+          'auctionDurationDays': draft.listingDetails!.auctionDurationDays,
         if (draft.listingDetails?.dimensionsString != null)
           'dimensions': draft.listingDetails!.dimensionsString,
-        if (draft.listingDetails?.location != null)
-          'shippingRegion': draft.listingDetails!.location,
+        if ((draft.listingDetails?.location ?? draft.location) != null)
+          'shippingRegion':
+              draft.listingDetails?.location ?? draft.location,
         // Courier-facing shipping attributes — the API rejects a for-sale
         // listing without these, since ops can't book a shipment without them.
         if (draft.listingDetails?.weightKg != null)
@@ -285,6 +295,7 @@ class PostPublishService {
 
     final piece = await _pieces.create(body);
     await _assignPieceToSeries(draft, piece.id);
+    await _linkRelatedScenes(draft, piece.id);
   }
 
   /// Uploads the poster-frame bytes captured at pick-time (via
@@ -306,6 +317,17 @@ class PostPublishService {
       );
     } catch (_) {
       return null;
+    }
+  }
+
+  Future<void> _linkRelatedScenes(PostDraft draft, String pieceId) async {
+    for (final id in draft.relatedSceneIds) {
+      if (id.isEmpty) continue;
+      try {
+        await _posts.update(id, {'linkedPieceId': pieceId});
+      } catch (_) {
+        // Linking is best-effort — the piece itself already published.
+      }
     }
   }
 

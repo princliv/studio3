@@ -19,6 +19,8 @@ class ListingDetails {
     this.packageHeight,
     this.packageUnit = 'in',
     this.declaredValueUsd,
+    this.listingType,
+    this.auctionDurationDays,
   });
 
   final double? priceUsd;
@@ -43,6 +45,10 @@ class ListingDetails {
   final double? packageHeight;
   final String packageUnit;
   final double? declaredValueUsd;
+
+  /// `'fixed'` or `'auction'` when the piece is listed for sale.
+  final String? listingType;
+  final int? auctionDurationDays;
 
   int? get priceCents =>
       priceUsd == null ? null : (priceUsd! * 100).round();
@@ -72,7 +78,54 @@ class ListingDetails {
     if (width == null && height == null && depth == null) return null;
     final w = width?.toString() ?? '?';
     final h = height?.toString() ?? '?';
-    final d = depth?.toString() ?? '?';
-    return '${w}x${h}x$d $dimensionUnit';
+    if (depth == null) return '${w}x$h $dimensionUnit';
+    return '${w}x${h}x$depth $dimensionUnit';
+  }
+
+  ListingDetails copyWith({
+    double? priceUsd,
+    double? width,
+    double? height,
+    double? depth,
+    String? dimensionUnit,
+    bool? nonStandardFormat,
+    String? nonStandardDescription,
+    String? framingMounting,
+    String? location,
+    String? provenance,
+    int? yearCreated,
+    String? handlingNotes,
+    double? weightKg,
+    double? packageLength,
+    double? packageWidth,
+    double? packageHeight,
+    String? packageUnit,
+    double? declaredValueUsd,
+    String? listingType,
+    int? auctionDurationDays,
+  }) {
+    return ListingDetails(
+      priceUsd: priceUsd ?? this.priceUsd,
+      width: width ?? this.width,
+      height: height ?? this.height,
+      depth: depth ?? this.depth,
+      dimensionUnit: dimensionUnit ?? this.dimensionUnit,
+      nonStandardFormat: nonStandardFormat ?? this.nonStandardFormat,
+      nonStandardDescription:
+          nonStandardDescription ?? this.nonStandardDescription,
+      framingMounting: framingMounting ?? this.framingMounting,
+      location: location ?? this.location,
+      provenance: provenance ?? this.provenance,
+      yearCreated: yearCreated ?? this.yearCreated,
+      handlingNotes: handlingNotes ?? this.handlingNotes,
+      weightKg: weightKg ?? this.weightKg,
+      packageLength: packageLength ?? this.packageLength,
+      packageWidth: packageWidth ?? this.packageWidth,
+      packageHeight: packageHeight ?? this.packageHeight,
+      packageUnit: packageUnit ?? this.packageUnit,
+      declaredValueUsd: declaredValueUsd ?? this.declaredValueUsd,
+      listingType: listingType ?? this.listingType,
+      auctionDurationDays: auctionDurationDays ?? this.auctionDurationDays,
+    );
   }
 }
