@@ -365,7 +365,7 @@ class _PostCreatePageState extends State<PostCreatePage> {
         if (!didPop) _onBackToEdit();
       },
       child: Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: HomeFeedTokens.background,
       body: Column(
         children: [
           CreateFlowBanner(
@@ -662,7 +662,7 @@ class _PostCreatePageState extends State<PostCreatePage> {
               style: GoogleFonts.inter(
                 fontSize: 14,
                 fontWeight: FontWeight.w400,
-                color: HomeFeedTokens.textInverse,
+                color: HomeFeedTokens.textPrimary,
               ),
             ),
           ),
@@ -819,7 +819,7 @@ class _LinkedPiecePickerSheet extends StatelessWidget {
         builder: (context, scrollController) {
           return DecoratedBox(
             decoration: const BoxDecoration(
-              color: Color(0xFF231F1B),
+              color: HomeFeedTokens.background,
               borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
             ),
             child: Column(
@@ -829,7 +829,7 @@ class _LinkedPiecePickerSheet extends StatelessWidget {
                   width: 36,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF4A4843),
+                    color: const Color(0xFFC8C5BC),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -840,7 +840,7 @@ class _LinkedPiecePickerSheet extends StatelessWidget {
                     style: GoogleFonts.inter(
                       fontSize: 17,
                       fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                      color: HomeFeedTokens.textPrimary,
                     ),
                   ),
                 ),
@@ -915,7 +915,9 @@ class _LinkedPieceTile extends StatelessWidget {
             children: [
               Icon(
                 selected ? Icons.radio_button_checked : Icons.radio_button_off,
-                color: selected ? Colors.white : Colors.white38,
+                color: selected
+                    ? HomeFeedTokens.textPrimary
+                    : HomeFeedTokens.textSecondary,
                 size: 22,
               ),
               const SizedBox(width: 12),
@@ -925,7 +927,7 @@ class _LinkedPieceTile extends StatelessWidget {
                   style: GoogleFonts.inter(
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
-                    color: Colors.white,
+                    color: HomeFeedTokens.textPrimary,
                   ),
                 ),
               ),

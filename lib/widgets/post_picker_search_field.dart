@@ -45,9 +45,9 @@ class PostPickerSearchField extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 12,
                 fontWeight: FontWeight.w400,
-                color: HomeFeedTokens.textInverse,
+                color: HomeFeedTokens.textPrimary,
               ),
-              cursorColor: HomeFeedTokens.textInverse,
+              cursorColor: HomeFeedTokens.textPrimary,
               decoration: InputDecoration(
                 isDense: true,
                 border: InputBorder.none,

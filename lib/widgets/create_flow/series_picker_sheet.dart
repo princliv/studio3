@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../theme/home_feed_tokens.dart';
 import '../../models/series_summary.dart';
 import '../../services/series_service.dart';
 import 'create_series_dialog.dart';
@@ -56,9 +57,9 @@ class SeriesPickerSheet extends StatefulWidget {
 }
 
 class _SeriesPickerSheetState extends State<SeriesPickerSheet> {
-  static const _sheetBg = Color(0xFF231F1B);
+  static const _sheetBg = HomeFeedTokens.background;
   static const _textSecondary = Color(0xFF8C8880);
-  static const _handleColor = Color(0xFF4A4843);
+  static const _handleColor = Color(0xFFC8C5BC);
 
   List<SeriesSummary> _series = [];
   bool _loading = true;
@@ -160,7 +161,7 @@ class _SeriesPickerSheetState extends State<SeriesPickerSheet> {
                         style: GoogleFonts.inter(
                           fontSize: 17,
                           fontWeight: FontWeight.w600,
-                          color: Colors.white,
+                          color: HomeFeedTokens.textPrimary,
                         ),
                       ),
                     ),
@@ -171,7 +172,7 @@ class _SeriesPickerSheetState extends State<SeriesPickerSheet> {
                         style: GoogleFonts.inter(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
-                          color: Colors.white.withValues(alpha: 0.85),
+                          color: HomeFeedTokens.textPrimary.withValues(alpha: 0.85),
                         ),
                       ),
                     ),
@@ -183,7 +184,7 @@ class _SeriesPickerSheetState extends State<SeriesPickerSheet> {
                     ? const Center(
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.white54,
+                          color: HomeFeedTokens.textSecondary,
                         ),
                       )
                     : _error != null
@@ -268,7 +269,9 @@ class _SeriesRadioTile extends StatelessWidget {
                 selected
                     ? Icons.radio_button_checked
                     : Icons.radio_button_off,
-                color: selected ? Colors.white : Colors.white38,
+                color: selected
+                    ? HomeFeedTokens.textPrimary
+                    : HomeFeedTokens.textSecondary,
                 size: 22,
               ),
               const SizedBox(width: 12),
@@ -281,7 +284,7 @@ class _SeriesRadioTile extends StatelessWidget {
                       style: GoogleFonts.inter(
                         fontSize: 15,
                         fontWeight: FontWeight.w500,
-                        color: Colors.white,
+                        color: HomeFeedTokens.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 2),

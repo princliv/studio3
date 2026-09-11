@@ -82,11 +82,11 @@ class _PickMaterialsPageState extends State<PickMaterialsPage> {
     final byCategory = PostMaterialOptions.byCategory;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: HomeFeedTokens.background,
       body: Column(
         children: [
           ColoredBox(
-            color: Colors.black,
+            color: HomeFeedTokens.background,
             child: Padding(
               padding: EdgeInsets.only(top: topInset),
               child: SizedBox(
@@ -103,6 +103,10 @@ class _PickMaterialsPageState extends State<PickMaterialsPage> {
                           PostMediaAssets.createCloseIcon,
                           width: 14,
                           height: 14,
+                          colorFilter: const ColorFilter.mode(
+                            HomeFeedTokens.textPrimary,
+                            BlendMode.srcIn,
+                          ),
                         ),
                       ),
                       Expanded(
@@ -112,7 +116,7 @@ class _PickMaterialsPageState extends State<PickMaterialsPage> {
                             style: GoogleFonts.inter(
                               fontSize: 16,
                               fontWeight: FontWeight.w500,
-                              color: HomeFeedTokens.textInverse,
+                              color: HomeFeedTokens.textPrimary,
                             ),
                           ),
                         ),
@@ -214,7 +218,7 @@ class _MaterialRow extends StatelessWidget {
         style: GoogleFonts.inter(
           fontSize: 13,
           fontWeight: FontWeight.w400,
-          color: HomeFeedTokens.textInverse,
+          color: HomeFeedTokens.textPrimary,
           height: 1.25,
         ),
       ),
@@ -237,7 +241,7 @@ class _MaterialPickerTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: selected
-          ? Colors.white.withValues(alpha: 0.06)
+          ? HomeFeedTokens.detailBackground
           : Colors.transparent,
       child: InkWell(
         onTap: onTap,

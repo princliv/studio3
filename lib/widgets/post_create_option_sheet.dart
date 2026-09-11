@@ -64,9 +64,9 @@ class PostCreateOptionSheet extends StatefulWidget {
 }
 
 class _PostCreateOptionSheetState extends State<PostCreateOptionSheet> {
-  static const _sheetBg = Color(0xFF231F1B);
+  static const _sheetBg = HomeFeedTokens.background;
   static const _textSecondary = Color(0xFF8C8880);
-  static const _handleColor = Color(0xFF4A4843);
+  static const _handleColor = Color(0xFFC8C5BC);
 
   static const _initialSize = 0.33;
   static const _maxSize = 0.88;
@@ -193,7 +193,7 @@ class _PostCreateOptionSheetState extends State<PostCreateOptionSheet> {
                           style: GoogleFonts.inter(
                             fontSize: 16,
                             fontWeight: FontWeight.w500,
-                            color: HomeFeedTokens.textInverse,
+                            color: HomeFeedTokens.textPrimary,
                           ),
                         ),
                       ),
@@ -261,7 +261,7 @@ class _OptionListTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: selected
-          ? Colors.white.withValues(alpha: 0.06)
+          ? HomeFeedTokens.detailBackground
           : Colors.transparent,
       child: InkWell(
         onTap: onTap,
@@ -275,7 +275,7 @@ class _OptionListTile extends StatelessWidget {
                   style: GoogleFonts.inter(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
-                    color: HomeFeedTokens.textInverse,
+                    color: HomeFeedTokens.textPrimary,
                   ),
                 ),
               ),
@@ -305,7 +305,7 @@ class _SelectionIndicator extends StatelessWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           border: Border.all(
-            color: selected ? HomeFeedTokens.textInverse : _borderColor,
+            color: selected ? HomeFeedTokens.textPrimary : _borderColor,
             width: 1.5,
           ),
         ),
@@ -315,7 +315,7 @@ class _SelectionIndicator extends StatelessWidget {
                 width: 8,
                 height: 8,
                 decoration: const BoxDecoration(
-                  color: HomeFeedTokens.textInverse,
+                  color: HomeFeedTokens.textPrimary,
                   shape: BoxShape.circle,
                 ),
               )
@@ -329,14 +329,14 @@ class _SelectionIndicator extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(4),
         border: Border.all(
-          color: selected ? HomeFeedTokens.textInverse : _borderColor,
+          color: selected ? HomeFeedTokens.textPrimary : _borderColor,
           width: 1.5,
         ),
-        color: selected ? HomeFeedTokens.textInverse : Colors.transparent,
+        color: selected ? HomeFeedTokens.textPrimary : Colors.transparent,
       ),
       alignment: Alignment.center,
       child: selected
-          ? const Icon(Icons.check, size: 12, color: HomeFeedTokens.textPrimary)
+          ? const Icon(Icons.check, size: 12, color: HomeFeedTokens.textInverse)
           : null,
     );
   }

@@ -169,28 +169,27 @@ class PostPublishService {
     if (draft.imagePaths.isEmpty) {
       throw Exception('No image selected');
     }
-    final imageIndex = draft.previewImageIndex.clamp(
-      0,
-      draft.imagePaths.length - 1,
-    );
-    final imagePath = draft.imagePaths[imageIndex];
-    final transform = imageIndex < draft.transforms.length
-        ? draft.transforms[imageIndex]
-        : PostImageTransform();
-    final bytes = await PostImageRenderer.render(
-      imagePath: imagePath,
-      transform: transform,
-    );
-    final mediaUrl = await _media.uploadBytes(
-      purpose: purpose,
-      bytes: bytes,
-      contentType: 'image/png',
-    );
-    final mediaAspectRatio = transform.aspectRatio == CropAspectRatio.ratio16x9
-        ? '16:9'
-        : '3:4';
 
     if (isScene) {
+      final imageIndex = draft.previewImageIndex.clamp(
+        0,
+        draft.imagePaths.length - 1,
+      );
+      final imagePath = draft.imagePaths[imageIndex];
+      final transform = imageIndex < draft.transforms.length
+          ? draft.transforms[imageIndex]
+          : PostImageTransform();
+      final bytes = await PostImageRenderer.render(
+        imagePath: imagePath,
+        transform: transform,
+      );
+      final mediaUrl = await _media.uploadBytes(
+        purpose: purpose,
+        bytes: bytes,
+        contentType: 'image/png',
+      );
+      final mediaAspectRatio =
+          transform.aspectRatio == CropAspectRatio.ratio16x9 ? '16:9' : '3:4';
       await _posts.create({
         'mediaUrl': mediaUrl,
         'mediaType': 'image',
@@ -207,12 +206,41 @@ class PostPublishService {
       return;
     }
 
+    // Piece: every picked image is uploaded and sent as an ordered gallery —
+    // index 0 is the cover chosen on the "Set your cover" step (Figma
+    // 2716:5774); the rest ride along as the piece's remaining gallery
+    // images. The backend mirrors images[0] onto the piece's own cover
+    // fields, so every existing single-image read path keeps working.
+    final images = <Map<String, dynamic>>[];
+    for (var i = 0; i < draft.imagePaths.length; i++) {
+      final transform = i < draft.transforms.length
+          ? draft.transforms[i]
+          : PostImageTransform();
+      final bytes = await PostImageRenderer.render(
+        imagePath: draft.imagePaths[i],
+        transform: transform,
+      );
+      final url = await _media.uploadBytes(
+        purpose: purpose,
+        bytes: bytes,
+        contentType: 'image/png',
+      );
+      images.add({
+        'mediaUrl': url,
+        'mediaType': 'image',
+        'mediaAspectRatio':
+            transform.aspectRatio == CropAspectRatio.ratio16x9
+                ? '16:9'
+                : '3:4',
+      });
+    }
+
     final caption = draft.description.trim();
     final materials = draft.materials.map((m) => m.name).toList();
 
     final body = <String, dynamic>{
       'title': draft.title.trim().isNotEmpty ? draft.title.trim() : 'Untitled',
-      'mediaUrl': mediaUrl,
+      'images': images,
       'mediaType': 'image',
       if (caption.isNotEmpty) 'caption': caption,
       if (draft.mediumId != null) 'medium': draft.mediumId,
@@ -228,7 +256,6 @@ class PostPublishService {
       if (draft.styleTags.isNotEmpty) 'styleTags': draft.styleTags,
       if (draft.location != null && draft.location!.isNotEmpty)
         'location': draft.location,
-      'mediaAspectRatio': mediaAspectRatio,
       'status': draft.status,
       'aiDisclosed': draft.aiDisclosed,
       if (draft.altText != null && draft.altText!.trim().isNotEmpty)

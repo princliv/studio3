@@ -2,6 +2,8 @@
 abstract final class PostMediaAssets {
   static const closeIcon = 'assets/post/close_icon.svg';
   static const chevronDown = 'assets/post/chevron_down.svg';
+  static const chevronBack = 'assets/post/chevron_back.svg';
+  static const coverAddIcon = 'assets/post/cover_add_icon.svg';
 
   static const cropRotate = 'assets/post/crop/rotate.svg';
   static const cropPerspectiveV = 'assets/post/crop/perspective_v.svg';

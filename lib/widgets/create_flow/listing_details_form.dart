@@ -297,7 +297,7 @@ class ListingDetailsFormState extends State<ListingDetailsForm> {
                   style: GoogleFonts.inter(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
-                    color: HomeFeedTokens.textInverse,
+                    color: HomeFeedTokens.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 4),

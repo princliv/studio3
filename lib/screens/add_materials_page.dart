@@ -66,7 +66,7 @@ class _AddMaterialsPageState extends State<AddMaterialsPage> {
     final bottomInset = MediaQuery.paddingOf(context).bottom;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: HomeFeedTokens.background,
       body: Column(
         children: [
           _AddMaterialsBanner(
@@ -132,7 +132,7 @@ class _AddMaterialsPageState extends State<AddMaterialsPage> {
                         const Icon(
                           Icons.add,
                           size: 30,
-                          color: HomeFeedTokens.textInverse,
+                          color: HomeFeedTokens.textPrimary,
                         ),
                       ],
                     ),
@@ -165,7 +165,7 @@ class _AddMaterialsBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
-      color: Colors.black,
+      color: HomeFeedTokens.background,
       child: Padding(
         padding: EdgeInsets.only(top: topInset),
         child: SizedBox(
@@ -181,6 +181,10 @@ class _AddMaterialsBanner extends StatelessWidget {
                     PostMediaAssets.createCloseIcon,
                     width: 14,
                     height: 14,
+                    colorFilter: const ColorFilter.mode(
+                      HomeFeedTokens.textPrimary,
+                      BlendMode.srcIn,
+                    ),
                   ),
                 ),
                 Expanded(
@@ -190,7 +194,7 @@ class _AddMaterialsBanner extends StatelessWidget {
                       style: GoogleFonts.inter(
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
-                        color: HomeFeedTokens.textInverse,
+                        color: HomeFeedTokens.textPrimary,
                       ),
                     ),
                   ),
@@ -243,7 +247,7 @@ class _MaterialRow extends StatelessWidget {
       style: GoogleFonts.inter(
         fontSize: 13,
         fontWeight: FontWeight.w400,
-        color: HomeFeedTokens.textInverse,
+        color: HomeFeedTokens.textPrimary,
         height: 1.25,
       ),
     );

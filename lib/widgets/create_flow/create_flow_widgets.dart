@@ -26,7 +26,7 @@ class CreateFlowBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
-      color: Colors.black,
+      color: HomeFeedTokens.background,
       child: Padding(
         padding: EdgeInsets.only(top: topInset),
         child: SizedBox(
@@ -45,6 +45,10 @@ class CreateFlowBanner extends StatelessWidget {
                       PostMediaAssets.createCloseIcon,
                       width: 14,
                       height: 14,
+                      colorFilter: const ColorFilter.mode(
+                        HomeFeedTokens.textPrimary,
+                        BlendMode.srcIn,
+                      ),
                     ),
                   ),
                 ),
@@ -53,7 +57,7 @@ class CreateFlowBanner extends StatelessWidget {
                   style: GoogleFonts.inter(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
-                    color: HomeFeedTokens.textInverse,
+                    color: HomeFeedTokens.textPrimary,
                   ),
                 ),
               ],
@@ -119,7 +123,7 @@ class CreateFlowDivider extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: 0.5,
-      color: const Color(0xFF2E2C28),
+      color: HomeFeedTokens.skeletonBase,
     );
   }
 }
@@ -137,9 +141,9 @@ class CreateFlowTextField extends StatelessWidget {
     this.prefixText,
   });
 
-  static const _textDim = Color(0x80FFFFFF);
-  static const _border = Color(0x26FFFFFF);
-  static const _borderFocus = Color(0x55FFFFFF);
+  static const _textDim = Color(0x998C8880);
+  static const _border = Color(0x26231F1B);
+  static const _borderFocus = Color(0x55231F1B);
 
   final TextEditingController controller;
   final String hint;
@@ -162,10 +166,10 @@ class CreateFlowTextField extends StatelessWidget {
       prefixStyle: GoogleFonts.inter(
         fontSize: 15,
         fontWeight: FontWeight.w500,
-        color: HomeFeedTokens.textInverse,
+        color: HomeFeedTokens.textPrimary,
       ),
       filled: true,
-      fillColor: Colors.black.withValues(alpha: 0.35),
+      fillColor: HomeFeedTokens.detailBackground,
       contentPadding: EdgeInsets.symmetric(
         horizontal: 16,
         vertical: multiline ? 14 : 0,
@@ -198,10 +202,10 @@ class CreateFlowTextField extends StatelessWidget {
         fontWeight: style == CreateFlowTextFieldStyle.title
             ? FontWeight.w500
             : FontWeight.w400,
-        color: HomeFeedTokens.textInverse,
+        color: HomeFeedTokens.textPrimary,
         height: multiline ? 1.35 : null,
       ),
-      cursorColor: HomeFeedTokens.textInverse,
+      cursorColor: HomeFeedTokens.textPrimary,
       decoration: _decoration(multiline: multiline),
     );
 
@@ -256,6 +260,10 @@ class CreateFlowMetadataRow extends StatelessWidget {
               iconAsset,
               width: iconWidth,
               height: iconHeight,
+              colorFilter: const ColorFilter.mode(
+                HomeFeedTokens.textPrimary,
+                BlendMode.srcIn,
+              ),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -264,7 +272,7 @@ class CreateFlowMetadataRow extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: HomeFeedTokens.textInverse,
+                  color: HomeFeedTokens.textPrimary,
                 ),
               ),
             ),
@@ -285,7 +293,7 @@ class CreateFlowMetadataRow extends StatelessWidget {
                 height: 20,
                 alignment: Alignment.center,
                 decoration: const BoxDecoration(
-                  color: Colors.white,
+                  color: HomeFeedTokens.textPrimary,
                   shape: BoxShape.circle,
                 ),
                 child: Text(
@@ -293,7 +301,7 @@ class CreateFlowMetadataRow extends StatelessWidget {
                   style: GoogleFonts.inter(
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
-                    color: HomeFeedTokens.textPrimary,
+                    color: HomeFeedTokens.textInverse,
                   ),
                 ),
               ),
@@ -387,6 +395,10 @@ class CreateFlowToggleRow extends StatelessWidget {
               iconAsset!,
               width: iconWidth,
               height: iconHeight,
+              colorFilter: const ColorFilter.mode(
+                HomeFeedTokens.textPrimary,
+                BlendMode.srcIn,
+              ),
             ),
             const SizedBox(width: 8),
           ],
@@ -396,7 +408,7 @@ class CreateFlowToggleRow extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
-                color: HomeFeedTokens.textInverse,
+                color: HomeFeedTokens.textPrimary,
               ),
             ),
           ),

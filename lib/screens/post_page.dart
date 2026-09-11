@@ -123,6 +123,26 @@ class _PostPageState extends State<PostPage> {
     setState(() => _step = _PostFlowStep.gallery);
   }
 
+  /// Piece flow's "+" tile (Figma 2716:5774): pushes the gallery picker as
+  /// its own route, seeded with everything already picked, so the running
+  /// edit session (crop/adjust work, reorder) never gets torn down the way
+  /// switching `_step` back to `.gallery` would.
+  Future<List<AssetEntity>?> _pickMoreImages(int remainingSlots) async {
+    final result = await Navigator.push<List<AssetEntity>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _AddMorePickerPage(
+          initialSelection: _pickedAssets,
+          maxSelection: _pickedAssets.length + remainingSlots,
+        ),
+      ),
+    );
+    if (result != null && mounted) {
+      setState(() => _pickedAssets = result);
+    }
+    return result;
+  }
+
   bool _handleBack() {
     switch (_step) {
       case _PostFlowStep.gallery:
@@ -163,7 +183,7 @@ class _PostPageState extends State<PostPage> {
     final hasSelection = _pickedAssets.isNotEmpty || _pickedVideoPath != null;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: HomeFeedTokens.background,
       body: Stack(
         children: [
           Positioned(
@@ -178,6 +198,7 @@ class _PostPageState extends State<PostPage> {
                   ? _maxPieceSelection
                   : _maxSceneSelection,
               allowVideos: _postType == 'scene',
+              initialSelection: _pickedAssets,
               onAlbumChanged: (name) =>
                   setState(() => _selectedAlbumName = name),
               onSelectionChanged: (assets) =>
@@ -220,7 +241,8 @@ class _PostPageState extends State<PostPage> {
       customImagePaths: isPicked ? _pickedImagePaths : null,
       initialImageIndex: _previewImageIndex,
       initialTransforms: _editTransforms.isNotEmpty ? _editTransforms : null,
-      onClose: _exitFlow,
+      onClose: _postType == 'piece' ? _backToGallery : _exitFlow,
+      onPickMore: _postType == 'piece' ? _pickMoreImages : null,
       onNext: _goToDetails,
     );
   }
@@ -262,8 +284,6 @@ class _PostingBanner extends StatelessWidget {
     required this.menuOpen,
   });
 
-  static const _neutral300 = Color(0xFFC8C5BC);
-
   final double topInset;
   final VoidCallback onClose;
   final bool hasSelection;
@@ -274,7 +294,7 @@ class _PostingBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
-      color: Colors.black,
+      color: HomeFeedTokens.background,
       child: Padding(
         padding: EdgeInsets.only(top: topInset),
         child: SizedBox(
@@ -293,6 +313,10 @@ class _PostingBanner extends StatelessWidget {
                         PostMediaAssets.closeIcon,
                         width: 14,
                         height: 14,
+                        colorFilter: const ColorFilter.mode(
+                          HomeFeedTokens.textPrimary,
+                          BlendMode.srcIn,
+                        ),
                       ),
                     ),
                     const Spacer(),
@@ -302,19 +326,14 @@ class _PostingBanner extends StatelessWidget {
                         color: Colors.transparent,
                         child: InkWell(
                           onTap: onNext,
-                          borderRadius: BorderRadius.circular(100),
-                          child: Container(
-                            width: 60,
-                            height: 32,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: _neutral300,
-                              borderRadius: BorderRadius.circular(100),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
                             ),
                             child: Text(
                               'Next',
                               style: GoogleFonts.inter(
-                                fontSize: 12,
+                                fontSize: 16,
                                 fontWeight: FontWeight.w500,
                                 color: HomeFeedTokens.textPrimary,
                               ),
@@ -338,7 +357,7 @@ class _PostingBanner extends StatelessWidget {
                           style: GoogleFonts.inter(
                             fontSize: 16,
                             fontWeight: FontWeight.w500,
-                            color: HomeFeedTokens.textInverse,
+                            color: HomeFeedTokens.textPrimary,
                           ),
                         ),
                         const SizedBox(width: 4),
@@ -349,8 +368,8 @@ class _PostingBanner extends StatelessWidget {
                             PostMediaAssets.chevronDown,
                             width: 9,
                             height: 9,
-                            colorFilter: ColorFilter.mode(
-                              HomeFeedTokens.textInverse,
+                            colorFilter: const ColorFilter.mode(
+                              HomeFeedTokens.textPrimary,
                               BlendMode.srcIn,
                             ),
                           ),
@@ -363,6 +382,86 @@ class _PostingBanner extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Modal "add more" gallery route used by the piece flow's "+" tile — the
+/// same banner/grid as the initial gallery step, but as its own pushed
+/// route (rather than a `_step` switch) so it never tears down the
+/// in-progress edit session underneath it. Pops with the final selection,
+/// or null if the user backs out without confirming.
+class _AddMorePickerPage extends StatefulWidget {
+  const _AddMorePickerPage({
+    required this.initialSelection,
+    required this.maxSelection,
+  });
+
+  final List<AssetEntity> initialSelection;
+  final int maxSelection;
+
+  @override
+  State<_AddMorePickerPage> createState() => _AddMorePickerPageState();
+}
+
+class _AddMorePickerPageState extends State<_AddMorePickerPage> {
+  late List<AssetEntity> _selected = List.of(widget.initialSelection);
+  final ValueNotifier<bool> _albumMenuOpen = ValueNotifier(false);
+  String _selectedAlbumName = 'Recents';
+
+  @override
+  void dispose() {
+    _albumMenuOpen.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final topInset = MediaQuery.paddingOf(context).top;
+    return Scaffold(
+      backgroundColor: HomeFeedTokens.background,
+      body: Stack(
+        children: [
+          Positioned(
+            top: topInset + _PostPageState._bannerHeight,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: PostGalleryPicker(
+              openNotifier: _albumMenuOpen,
+              maxSelection: widget.maxSelection,
+              initialSelection: widget.initialSelection,
+              onAlbumChanged: (name) =>
+                  setState(() => _selectedAlbumName = name),
+              onSelectionChanged: (assets) =>
+                  setState(() => _selected = assets),
+              onPermissionPermanentlyDenied: () {
+                showPermissionDeniedSheet(
+                  context,
+                  title: 'Photo access needed',
+                  message:
+                      'Enable photo library access in Settings to continue.',
+                );
+              },
+            ),
+          ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: _PostingBanner(
+              topInset: topInset,
+              onClose: () => Navigator.pop(context),
+              hasSelection: _selected.isNotEmpty,
+              onNext: _selected.isNotEmpty
+                  ? () => Navigator.pop(context, _selected)
+                  : null,
+              albumName: _selectedAlbumName,
+              menuOpen: _albumMenuOpen,
+            ),
+          ),
+        ],
       ),
     );
   }

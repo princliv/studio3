@@ -1,12 +1,43 @@
 import 'post_summary.dart';
 import 'series_summary.dart';
 
+/// One image in a piece's gallery (Figma 2716:5774 cover/reorder posting
+/// flow) — `sortOrder == 0` is the cover, mirrored onto [PieceSummary.mediaUrl].
+class PieceImage {
+  const PieceImage({
+    required this.mediaUrl,
+    this.mediaType,
+    this.mediaAspectRatio,
+    this.sortOrder = 0,
+  });
+
+  final String mediaUrl;
+  final String? mediaType;
+  final String? mediaAspectRatio;
+  final int sortOrder;
+
+  factory PieceImage.fromJson(Map<String, dynamic> json) => PieceImage(
+        mediaUrl: json['mediaUrl'] as String? ?? '',
+        mediaType: json['mediaType'] as String?,
+        mediaAspectRatio: json['mediaAspectRatio'] as String?,
+        sortOrder: (json['sortOrder'] as num?)?.toInt() ?? 0,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'mediaUrl': mediaUrl,
+        if (mediaType != null) 'mediaType': mediaType,
+        if (mediaAspectRatio != null) 'mediaAspectRatio': mediaAspectRatio,
+        'sortOrder': sortOrder,
+      };
+}
+
 class PieceSummary {
   const PieceSummary({
     required this.id,
     required this.title,
     this.mediaUrl,
     this.mediaType,
+    this.images = const [],
     this.caption,
     this.medium,
     this.isForSale = false,
@@ -46,6 +77,9 @@ class PieceSummary {
   final String title;
   final String? mediaUrl;
   final String? mediaType;
+  /// Full ordered gallery — index 0 is the cover and matches [mediaUrl].
+  /// Empty on older cached payloads; callers should fall back to [mediaUrl].
+  final List<PieceImage> images;
   final String? caption;
   final String? medium;
   final bool isForSale;
@@ -112,6 +146,11 @@ class PieceSummary {
       title: json['title'] as String? ?? '',
       mediaUrl: json['mediaUrl'] as String?,
       mediaType: json['mediaType'] as String?,
+      images: (json['images'] as List?)
+              ?.whereType<Map<String, dynamic>>()
+              .map(PieceImage.fromJson)
+              .toList() ??
+          const [],
       caption: json['caption'] as String?,
       medium: json['medium'] as String?,
       isForSale: json['isForSale'] as bool? ?? false,
@@ -183,6 +222,7 @@ class PieceSummary {
         'title': title,
         if (mediaUrl != null) 'mediaUrl': mediaUrl,
         if (mediaType != null) 'mediaType': mediaType,
+        if (images.isNotEmpty) 'images': images.map((i) => i.toJson()).toList(),
         if (caption != null) 'caption': caption,
         if (medium != null) 'medium': medium,
         'isForSale': isForSale,

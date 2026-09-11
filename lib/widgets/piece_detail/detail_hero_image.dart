@@ -27,13 +27,11 @@ class _DetailHeroImageState extends State<DetailHeroImage> {
   @override
   void initState() {
     super.initState();
-    final heroUrl = item.heroImageUrl;
-    final useCarousel =
-        (heroUrl == null || heroUrl.isEmpty) && item.imageCount > 1;
+    final useCarousel = item.galleryImageUrls.length > 1;
     _pageController = useCarousel
         ? PageController(initialPage: widget.initialImageIndex.clamp(
             0,
-            item.imageCount - 1,
+            item.galleryImageUrls.length - 1,
           ))
         : null;
   }
@@ -46,28 +44,15 @@ class _DetailHeroImageState extends State<DetailHeroImage> {
 
   @override
   Widget build(BuildContext context) {
-    final heroUrl = item.heroImageUrl;
-    if (heroUrl != null && heroUrl.isNotEmpty) {
-      return GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => openImagePreview(
-          context,
-          imageUrls: [heroUrl],
-          initialIndex: 0,
-        ),
-        child: FeedPicsumImage(url: heroUrl),
-      );
-    }
-
-    if (item.imageCount > 1 && _pageController != null) {
-      final urls = List.generate(
-        item.imageCount,
-        (i) => feedPreviewImageUrl(item, imageIndex: i),
-      );
+    // A piece's real gallery (Figma 2716:5774 cover/reorder posting flow)
+    // takes priority — only single-image pieces/scenes fall back to the
+    // plain heroImageUrl.
+    if (item.galleryImageUrls.length > 1 && _pageController != null) {
+      final urls = item.galleryImageUrls;
       return PageView.builder(
         controller: _pageController,
         physics: const BouncingScrollPhysics(),
-        itemCount: item.imageCount,
+        itemCount: urls.length,
         itemBuilder: (context, index) {
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
@@ -82,10 +67,9 @@ class _DetailHeroImageState extends State<DetailHeroImage> {
       );
     }
 
-    final fallbackUrl = feedPreviewImageUrl(
-      item,
-      imageIndex: widget.initialImageIndex,
-    );
+    final heroUrl = item.heroImageUrl ??
+        (item.galleryImageUrls.isNotEmpty ? item.galleryImageUrls.first : null);
+    final fallbackUrl = heroUrl ?? '';
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => openImagePreview(

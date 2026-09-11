@@ -74,6 +74,7 @@ class FeedPreviewItem {
     this.framingNote,
     this.provenanceNote,
     this.heroImageUrl,
+    this.galleryImageUrls = const [],
     this.isLiked = false,
     this.isSaved = false,
     this.likeCount = 0,
@@ -106,6 +107,10 @@ class FeedPreviewItem {
   final String? framingNote;
   final String? provenanceNote;
   final String? heroImageUrl;
+  /// A piece's full ordered gallery (Figma 2716:5774 cover/reorder posting
+  /// flow) — index 0 matches [heroImageUrl]. Empty for scenes/posts (still
+  /// single-image) and for pieces created before the gallery existed.
+  final List<String> galleryImageUrls;
   final bool isLiked;
   final bool isSaved;
   final int likeCount;
@@ -118,7 +123,8 @@ class FeedPreviewItem {
 
   bool get isLive => status == null || status == 'live';
 
-  int get imageCount => imageSeeds.length;
+  int get imageCount =>
+      galleryImageUrls.isNotEmpty ? galleryImageUrls.length : imageSeeds.length;
 
   /// All feed items are real/API-backed now that no dummy generator exists.
   bool get isApiBacked => true;
@@ -166,6 +172,7 @@ class FeedPreviewItem {
     String? framingNote,
     String? provenanceNote,
     String? heroImageUrl,
+    List<String>? galleryImageUrls,
     bool? isLiked,
     bool? isSaved,
     int? likeCount,
@@ -198,6 +205,7 @@ class FeedPreviewItem {
       framingNote: framingNote ?? this.framingNote,
       provenanceNote: provenanceNote ?? this.provenanceNote,
       heroImageUrl: heroImageUrl ?? this.heroImageUrl,
+      galleryImageUrls: galleryImageUrls ?? this.galleryImageUrls,
       isLiked: isLiked ?? this.isLiked,
       isSaved: isSaved ?? this.isSaved,
       likeCount: likeCount ?? this.likeCount,
@@ -241,6 +249,11 @@ class FeedPreviewItem {
       framingNote: piece.framingMounting,
       provenanceNote: piece.provenance,
       heroImageUrl: piece.mediaUrl,
+      galleryImageUrls: ([...piece.images]
+            ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder)))
+          .map((image) => image.mediaUrl)
+          .where((url) => url.isNotEmpty)
+          .toList(growable: false),
       seriesName: series?.name ?? '',
       seriesThumbs: seriesThumbs,
       seriesThumbUrls: seriesThumbUrls,
@@ -317,6 +330,7 @@ class FeedPreviewItem {
         if (framingNote != null) 'framingNote': framingNote,
         if (provenanceNote != null) 'provenanceNote': provenanceNote,
         if (heroImageUrl != null) 'heroImageUrl': heroImageUrl,
+        if (galleryImageUrls.isNotEmpty) 'galleryImageUrls': galleryImageUrls,
         'isLiked': isLiked,
         'isSaved': isSaved,
         'likeCount': likeCount,
@@ -358,6 +372,9 @@ class FeedPreviewItem {
       framingNote: json['framingNote'] as String?,
       provenanceNote: json['provenanceNote'] as String?,
       heroImageUrl: json['heroImageUrl'] as String?,
+      galleryImageUrls:
+          (json['galleryImageUrls'] as List?)?.whereType<String>().toList() ??
+              const [],
       isLiked: json['isLiked'] as bool? ?? false,
       isSaved: json['isSaved'] as bool? ?? false,
       likeCount: json['likeCount'] as int? ?? 0,
@@ -401,5 +418,9 @@ FeedAspectRatio aspectRatioFromDimensions(String? dimensions) {
 /// missing — callers already show a neutral broken-image placeholder for
 /// an unloadable URL, so there is no fake stand-in photo here.
 String feedPreviewImageUrl(FeedPreviewItem item, {int imageIndex = 0}) {
+  if (item.galleryImageUrls.isNotEmpty) {
+    final index = imageIndex.clamp(0, item.galleryImageUrls.length - 1);
+    return item.galleryImageUrls[index];
+  }
   return item.heroImageUrl ?? '';
 }

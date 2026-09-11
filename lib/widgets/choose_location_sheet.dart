@@ -36,8 +36,8 @@ class ChooseLocationSheet extends StatefulWidget {
 }
 
 class _ChooseLocationSheetState extends State<ChooseLocationSheet> {
-  static const _sheetBg = Color(0xFF231F1B);
-  static const _handleColor = Color(0xFF4A4843);
+  static const _sheetBg = HomeFeedTokens.background;
+  static const _handleColor = Color(0xFFC8C5BC);
 
   static const _initialSize = 0.33;
   static const _maxSize = 0.88;
@@ -150,7 +150,7 @@ class _ChooseLocationSheetState extends State<ChooseLocationSheet> {
                       style: GoogleFonts.inter(
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
-                        color: HomeFeedTokens.textInverse,
+                        color: HomeFeedTokens.textPrimary,
                       ),
                     ),
                   ),
@@ -227,14 +227,18 @@ class _UseCurrentLocationTile extends StatelessWidget {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               else
-                const Icon(Icons.my_location, size: 16, color: Colors.white),
+                const Icon(
+                  Icons.my_location,
+                  size: 16,
+                  color: HomeFeedTokens.textPrimary,
+                ),
               const SizedBox(width: 10),
               Text(
                 'Use current location',
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
-                  color: HomeFeedTokens.textInverse,
+                  color: HomeFeedTokens.textPrimary,
                 ),
               ),
             ],
@@ -269,7 +273,7 @@ class _LocationListTile extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
-                  color: HomeFeedTokens.textInverse,
+                  color: HomeFeedTokens.textPrimary,
                 ),
               ),
               const SizedBox(height: 2),

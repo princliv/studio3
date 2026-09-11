@@ -121,7 +121,7 @@ class _PostVideoEditPageState extends State<PostVideoEditPage> {
     final ready = _controller != null && _controller!.value.isInitialized;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: HomeFeedTokens.background,
       body: Column(
         children: [
           _VideoEditBanner(
@@ -140,10 +140,12 @@ class _PostVideoEditPageState extends State<PostVideoEditPage> {
                   : _failed
                   ? const Icon(
                       Icons.videocam_off_outlined,
-                      color: Colors.white54,
+                      color: HomeFeedTokens.textSecondary,
                       size: 48,
                     )
-                  : const CircularProgressIndicator(color: Colors.white),
+                  : const CircularProgressIndicator(
+                      color: HomeFeedTokens.textSecondary,
+                    ),
             ),
           ),
           if (ready) ...[
@@ -157,7 +159,7 @@ class _PostVideoEditPageState extends State<PostVideoEditPage> {
                     style: GoogleFonts.inter(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
-                      color: HomeFeedTokens.textInverse,
+                      color: HomeFeedTokens.textPrimary,
                     ),
                   ),
                   Text(
@@ -165,7 +167,7 @@ class _PostVideoEditPageState extends State<PostVideoEditPage> {
                     style: GoogleFonts.inter(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
-                      color: HomeFeedTokens.textInverse,
+                      color: HomeFeedTokens.textPrimary,
                     ),
                   ),
                 ],
@@ -173,10 +175,10 @@ class _PostVideoEditPageState extends State<PostVideoEditPage> {
             ),
             SliderTheme(
               data: SliderTheme.of(context).copyWith(
-                activeTrackColor: HomeFeedTokens.textInverse,
-                inactiveTrackColor: const Color(0xFF4A4843),
-                thumbColor: HomeFeedTokens.textInverse,
-                overlayColor: Colors.white24,
+                activeTrackColor: HomeFeedTokens.textPrimary,
+                inactiveTrackColor: HomeFeedTokens.skeletonBase,
+                thumbColor: HomeFeedTokens.textPrimary,
+                overlayColor: HomeFeedTokens.textPrimary.withValues(alpha: 0.14),
                 rangeThumbShape: const RoundRangeSliderThumbShape(
                   enabledThumbRadius: 8,
                 ),
@@ -195,7 +197,7 @@ class _PostVideoEditPageState extends State<PostVideoEditPage> {
               children: [
                 Icon(
                   _muted ? Icons.volume_off : Icons.volume_up,
-                  color: Colors.white,
+                  color: HomeFeedTokens.textPrimary,
                   size: 20,
                 ),
                 const SizedBox(width: 10),
@@ -205,7 +207,7 @@ class _PostVideoEditPageState extends State<PostVideoEditPage> {
                     style: GoogleFonts.inter(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
-                      color: HomeFeedTokens.textInverse,
+                      color: HomeFeedTokens.textPrimary,
                     ),
                   ),
                 ),
@@ -213,7 +215,7 @@ class _PostVideoEditPageState extends State<PostVideoEditPage> {
                   value: _muted,
                   onChanged: (value) => setState(() => _muted = value),
                   activeThumbColor: Colors.white,
-                  activeTrackColor: const Color(0xFF3B82F6),
+                  activeTrackColor: HomeFeedTokens.sky600,
                 ),
               ],
             ),
@@ -243,7 +245,7 @@ class _VideoEditBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
-      color: Colors.black,
+      color: HomeFeedTokens.background,
       child: Padding(
         padding: EdgeInsets.only(top: topInset),
         child: SizedBox(
@@ -259,6 +261,10 @@ class _VideoEditBanner extends StatelessWidget {
                     PostMediaAssets.closeIcon,
                     width: 14,
                     height: 14,
+                    colorFilter: const ColorFilter.mode(
+                      HomeFeedTokens.textPrimary,
+                      BlendMode.srcIn,
+                    ),
                   ),
                 ),
                 Expanded(
@@ -268,7 +274,7 @@ class _VideoEditBanner extends StatelessWidget {
                       style: GoogleFonts.inter(
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
-                        color: HomeFeedTokens.textInverse,
+                        color: HomeFeedTokens.textPrimary,
                       ),
                     ),
                   ),

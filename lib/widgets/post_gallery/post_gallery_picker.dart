@@ -6,6 +6,7 @@ import 'package:photo_manager/photo_manager.dart';
 
 import '../../services/permission_service.dart';
 import '../../services/photo_library_service.dart';
+import '../../theme/home_feed_tokens.dart';
 
 enum _LoadState { loading, denied, ready }
 
@@ -29,6 +30,7 @@ class PostGalleryPicker extends StatefulWidget {
     required this.onPermissionPermanentlyDenied,
     this.maxSelection = 10,
     this.allowVideos = false,
+    this.initialSelection = const [],
   });
 
   final ValueNotifier<bool> openNotifier;
@@ -39,6 +41,11 @@ class PostGalleryPicker extends StatefulWidget {
   /// When true (Scene posts), the grid mixes in videos alongside photos,
   /// uses a 3:4 cell ratio, and selecting a video is exclusive of photos.
   final bool allowVideos;
+  /// Assets already picked before this picker opened (e.g. re-entering the
+  /// gallery via "add more" on the piece cover-selection screen) — seeded
+  /// into the selection in order so they show pre-checked with their
+  /// existing numbering instead of the user losing their prior picks.
+  final List<AssetEntity> initialSelection;
 
   @override
   State<PostGalleryPicker> createState() => _PostGalleryPickerState();
@@ -49,7 +56,7 @@ class _PostGalleryPickerState extends State<PostGalleryPicker> {
   List<_AlbumEntry> _albums = const [];
   _AlbumEntry? _selectedAlbum;
   List<AssetEntity> _assets = const [];
-  final List<AssetEntity> _selected = [];
+  late final List<AssetEntity> _selected = List.of(widget.initialSelection);
 
   @override
   void initState() {
@@ -160,7 +167,9 @@ class _PostGalleryPickerState extends State<PostGalleryPicker> {
     switch (_state) {
       case _LoadState.loading:
         return const Center(
-          child: CircularProgressIndicator(color: Colors.white54),
+          child: CircularProgressIndicator(
+            color: HomeFeedTokens.textSecondary,
+          ),
         );
       case _LoadState.denied:
         return _PermissionFallback(onRetry: _retry);
@@ -169,8 +178,8 @@ class _PostGalleryPickerState extends State<PostGalleryPicker> {
           padding: EdgeInsets.zero,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 3,
-            crossAxisSpacing: 2,
-            mainAxisSpacing: 2,
+            crossAxisSpacing: 3,
+            mainAxisSpacing: 3,
             childAspectRatio: widget.allowVideos ? 3 / 4 : 1.0,
           ),
           itemCount: _assets.length,
@@ -180,7 +189,8 @@ class _PostGalleryPickerState extends State<PostGalleryPicker> {
   }
 
   Widget _buildCell(AssetEntity asset) {
-    final selected = _selected.any((a) => a.id == asset.id);
+    final selectedIndex = _selected.indexWhere((a) => a.id == asset.id);
+    final selected = selectedIndex >= 0;
     final isVideo = asset.type == AssetType.video;
     return GestureDetector(
       onTap: () => _toggleSelect(asset),
@@ -219,23 +229,19 @@ class _PostGalleryPickerState extends State<PostGalleryPicker> {
                 ),
               ),
             ),
-          if (selected) Container(color: Colors.black.withValues(alpha: 0.35)),
-          Positioned(
-            top: 6,
-            right: 6,
-            child: Container(
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: selected ? Colors.white : Colors.black.withValues(alpha: 0.3),
-                border: Border.all(color: Colors.white, width: 1.2),
+          if (selected)
+            Container(
+              color: Colors.white.withValues(alpha: 0.67),
+              alignment: Alignment.center,
+              child: Text(
+                '${selectedIndex + 1}',
+                style: GoogleFonts.inter(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w400,
+                  color: HomeFeedTokens.textPrimary,
+                ),
               ),
-              child: selected
-                  ? const Icon(Icons.check, size: 14, color: Colors.black)
-                  : null,
             ),
-          ),
         ],
       ),
     );
@@ -243,7 +249,7 @@ class _PostGalleryPickerState extends State<PostGalleryPicker> {
 
   Widget _buildAlbumMenu() {
     return ColoredBox(
-      color: Colors.black,
+      color: HomeFeedTokens.background,
       child: ListView.builder(
         padding: EdgeInsets.zero,
         itemCount: _albums.length,
@@ -263,20 +269,23 @@ class _PostGalleryPickerState extends State<PostGalleryPicker> {
                         asset: entry.cover!,
                         size: 100,
                       )
-                    : const ColoredBox(color: Colors.white10),
+                    : ColoredBox(color: HomeFeedTokens.skeletonBase),
               ),
             ),
             title: Text(
               entry.path.name,
               style: GoogleFonts.inter(
-                color: Colors.white,
+                color: HomeFeedTokens.textPrimary,
                 fontSize: 15,
                 fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
               ),
             ),
             subtitle: Text(
               '${entry.count}',
-              style: GoogleFonts.inter(color: Colors.white54, fontSize: 13),
+              style: GoogleFonts.inter(
+                color: HomeFeedTokens.textSecondary,
+                fontSize: 13,
+              ),
             ),
           );
         },
@@ -320,7 +329,9 @@ class _AssetThumbnailState extends State<_AssetThumbnail> {
       future: _future,
       builder: (context, snapshot) {
         final bytes = snapshot.data;
-        if (bytes == null) return const ColoredBox(color: Colors.white10);
+        if (bytes == null) {
+          return ColoredBox(color: HomeFeedTokens.skeletonBase);
+        }
         return Image.memory(bytes, fit: BoxFit.cover);
       },
     );
@@ -338,22 +349,26 @@ class _PermissionFallback extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.photo_library_outlined, color: Colors.white, size: 56),
+          const Icon(
+            Icons.photo_library_outlined,
+            color: HomeFeedTokens.textPrimary,
+            size: 56,
+          ),
           const SizedBox(height: 16),
           Text(
             'Please give access to your gallery',
             style: GoogleFonts.inter(
               fontSize: 15,
               fontWeight: FontWeight.w500,
-              color: Colors.white,
+              color: HomeFeedTokens.textPrimary,
             ),
           ),
           const SizedBox(height: 20),
           FilledButton(
             onPressed: onRetry,
             style: FilledButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: Colors.black,
+              backgroundColor: HomeFeedTokens.textPrimary,
+              foregroundColor: HomeFeedTokens.textInverse,
               padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(100),
