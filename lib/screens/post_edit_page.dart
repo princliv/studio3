@@ -15,6 +15,7 @@ import '../utils/crop_cover_math.dart'
     show CropAspectRatio, CropCoverMath, CropFitMode;
 import '../utils/image_adjust_math.dart';
 import '../widgets/post_crop_preview.dart';
+import 'piece_scene_style_editor.dart';
 
 part 'post_image_editor_page.dart';
 
@@ -36,6 +37,7 @@ class PostEditPage extends StatefulWidget {
   final int initialImageIndex;
   final List<PostImageTransform>? initialTransforms;
   final VoidCallback? onClose;
+
   /// Piece flow only — "+" tile on the cover-reorder strip. Given how many
   /// more images can still be picked, returns the full updated asset
   /// selection (or null if the user cancelled) — the cover screen then
@@ -46,7 +48,8 @@ class PostEditPage extends StatefulWidget {
     List<String> imagePaths,
     List<PostImageTransform> transforms,
     int previewImageIndex,
-  )? onNext;
+  )?
+  onNext;
 
   @override
   State<PostEditPage> createState() => _PostEditPageState();
@@ -97,13 +100,17 @@ class _PostEditPageState extends State<PostEditPage> {
   void initState() {
     super.initState();
     _imagePaths = List<String>.from(widget.customImagePaths ?? const []);
-    _transforms = widget.initialTransforms != null &&
+    _transforms =
+        widget.initialTransforms != null &&
             widget.initialTransforms!.length == _imagePaths.length
         ? widget.initialTransforms!.map((t) => t.copy()).toList()
         : List.generate(
             _imagePaths.length,
-            (_) => PostImageTransform(),
+            (_) => PostImageTransform(aspectRatio: CropAspectRatio.ratio3x4),
           );
+    for (final t in _transforms) {
+      t.aspectRatio = CropAspectRatio.ratio3x4;
+    }
     _activeImageIndex = widget.initialImageIndex.clamp(
       0,
       _imagePaths.length - 1,
@@ -119,9 +126,7 @@ class _PostEditPageState extends State<PostEditPage> {
       ui.Image? decoded;
       if (path.startsWith('assets/')) {
         final data = await rootBundle.load(path);
-        final codec = await ui.instantiateImageCodec(
-          data.buffer.asUint8List(),
-        );
+        final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
         final frame = await codec.getNextFrame();
         decoded = frame.image;
       } else {
@@ -253,8 +258,7 @@ class _PostEditPageState extends State<PostEditPage> {
       _editTool = 'crop';
       if (tool == CropSubTool.rotate) {
         _activeCropSubTool = CropSubTool.rotate;
-        _showRotationValue =
-            _currentTransform.rotationDegrees.abs() > 0.01;
+        _showRotationValue = _currentTransform.rotationDegrees.abs() > 0.01;
         return;
       }
       if (tool == CropSubTool.flipHorizontal) {
@@ -328,7 +332,11 @@ class _PostEditPageState extends State<PostEditPage> {
   /// — Fill shows the true filled-edge-to-edge output (pannable/pinchable
   /// in crop mode), Fit shows the true letterboxed output (never
   /// interactive) — see `PostCropPreview.buildTransformedContent`.
-  Size _cropFrameSize(double maxWidth, double maxHeight, CropAspectRatio ratio) {
+  Size _cropFrameSize(
+    double maxWidth,
+    double maxHeight,
+    CropAspectRatio ratio,
+  ) {
     var width = maxWidth;
     var height = width / ratio.value;
     if (height > maxHeight) {
@@ -366,8 +374,11 @@ class _PostEditPageState extends State<PostEditPage> {
     // `PostImageTransform.resolvedCropRect`), and outside crop mode this
     // just shows the real, non-interactive result.
     final isInteractive = isFillMode && _isCropMode;
-    final viewportSize =
-        _cropFrameSize(maxCropWidth, maxCropHeight, _currentTransform.aspectRatio);
+    final viewportSize = _cropFrameSize(
+      maxCropWidth,
+      maxCropHeight,
+      _currentTransform.aspectRatio,
+    );
 
     return Scaffold(
       backgroundColor: HomeFeedTokens.background,
@@ -564,7 +575,9 @@ class _PostEditPageState extends State<PostEditPage> {
               const SizedBox(height: 8),
               Center(
                 child: _AdjustDial(
-                  value: _currentTransform.adjustValueFor(_activeAdjustSubTool!),
+                  value: _currentTransform.adjustValueFor(
+                    _activeAdjustSubTool!,
+                  ),
                   onChanged: _onAdjustValueChanged,
                   onDragEnd: _onAdjustDragEnd,
                 ),
@@ -600,15 +613,12 @@ class _PostEditPageState extends State<PostEditPage> {
 
   static const _piecesMaxSelection = 5;
 
-  /// Opens the focused single-image editor (Instagram-style: crop/adjust
-  /// tools are hidden until explicitly requested) for the active image,
-  /// applying whatever transform it returns on "Done"; discards on close.
   Future<void> _openImageEditor() async {
     final path = _imagePaths[_activeImageIndex];
     final result = await Navigator.push<PostImageTransform>(
       context,
       MaterialPageRoute(
-        builder: (_) => PostImageEditorPage(
+        builder: (_) => PieceSceneStyleEditor(
           imagePath: path,
           transform: _transforms[_activeImageIndex],
           imageAspect: _aspectForPath(path),
@@ -620,59 +630,8 @@ class _PostEditPageState extends State<PostEditPage> {
     }
   }
 
-  /// Merges newly-picked assets into the existing gallery by resolved file
-  /// path — images still present keep their existing (and possibly edited)
-  /// transform and relative order; only genuinely new picks get a fresh
-  /// [PostImageTransform] (Figma 2716:5774's "+" tile).
-  Future<void> _pickMoreImages() async {
-    final onPickMore = widget.onPickMore;
-    if (onPickMore == null) return;
-    final remaining = _piecesMaxSelection - _imagePaths.length;
-    if (remaining <= 0) return;
-    final assets = await onPickMore(remaining);
-    if (assets == null || !mounted) return;
-
-    final newPaths = <String>[];
-    for (final asset in assets) {
-      final file = await asset.file;
-      if (file != null) newPaths.add(file.path);
-    }
-    if (!mounted) return;
-
-    final activePath = _imagePaths.isNotEmpty
-        ? _imagePaths[_activeImageIndex]
-        : null;
-    final oldPaths = List<String>.from(_imagePaths);
-    final oldTransforms = List<PostImageTransform>.from(_transforms);
-    final mergedTransforms = newPaths.map((path) {
-      final existingIndex = oldPaths.indexOf(path);
-      return existingIndex >= 0
-          ? oldTransforms[existingIndex]
-          : PostImageTransform();
-    }).toList();
-
-    setState(() {
-      _imagePaths
-        ..clear()
-        ..addAll(newPaths);
-      _transforms
-        ..clear()
-        ..addAll(mergedTransforms);
-      _activeImageIndex = activePath != null && _imagePaths.contains(activePath)
-          ? _imagePaths.indexOf(activePath)
-          : 0;
-    });
-    for (final path in newPaths.toSet()) {
-      _loadImageAspect(path);
-    }
-  }
-
-  /// Piece flow's cover-selection step (Figma 2716:5774): a fixed-3:4
-  /// preview of the active image with drag-to-reorder thumbnails below —
-  /// the first thumbnail is always the post's cover. Crop/adjust are hidden
-  /// by default (Instagram-style) — tapping the Edit button on the preview
-  /// opens a dedicated single-image editor instead of showing the tools
-  /// directly on this screen.
+  /// Piece cover-selection step: all picked photos, reorder, then the
+  /// pencil opens Fit/Fill · Crop · Adjust for that image.
   Widget _buildPieceCoverFlow(BuildContext context) {
     final topInset = MediaQuery.paddingOf(context).top;
 
@@ -783,6 +742,53 @@ class _PostEditPageState extends State<PostEditPage> {
       ),
     );
   }
+
+  /// Merges newly-picked assets into the existing gallery by resolved file
+  /// path — images still present keep their existing (and possibly edited)
+  /// transform and relative order; only genuinely new picks get a fresh
+  /// [PostImageTransform] (Figma 2716:5774's "+" tile).
+  Future<void> _pickMoreImages() async {
+    final onPickMore = widget.onPickMore;
+    if (onPickMore == null) return;
+    final remaining = _piecesMaxSelection - _imagePaths.length;
+    if (remaining <= 0) return;
+    final assets = await onPickMore(remaining);
+    if (assets == null || !mounted) return;
+
+    final newPaths = <String>[];
+    for (final asset in assets) {
+      final file = await asset.file;
+      if (file != null) newPaths.add(file.path);
+    }
+    if (!mounted) return;
+
+    final activePath = _imagePaths.isNotEmpty
+        ? _imagePaths[_activeImageIndex]
+        : null;
+    final oldPaths = List<String>.from(_imagePaths);
+    final oldTransforms = List<PostImageTransform>.from(_transforms);
+    final mergedTransforms = newPaths.map((path) {
+      final existingIndex = oldPaths.indexOf(path);
+      return existingIndex >= 0
+          ? oldTransforms[existingIndex]
+          : PostImageTransform(aspectRatio: CropAspectRatio.ratio3x4);
+    }).toList();
+
+    setState(() {
+      _imagePaths
+        ..clear()
+        ..addAll(newPaths);
+      _transforms
+        ..clear()
+        ..addAll(mergedTransforms);
+      _activeImageIndex = activePath != null && _imagePaths.contains(activePath)
+          ? _imagePaths.indexOf(activePath)
+          : 0;
+    });
+    for (final path in newPaths.toSet()) {
+      _loadImageAspect(path);
+    }
+  }
 }
 
 class _CenteredThumbStrip extends StatelessWidget {
@@ -798,7 +804,8 @@ class _CenteredThumbStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final contentWidth = itemCount * _PostEditPageState._thumbSize +
+        final contentWidth =
+            itemCount * _PostEditPageState._thumbSize +
             (itemCount - 1) * _PostEditPageState._thumbGap;
 
         if (contentWidth <= constraints.maxWidth) {
@@ -807,7 +814,8 @@ class _CenteredThumbStrip extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 for (var index = 0; index < itemCount; index++) ...[
-                  if (index > 0) const SizedBox(width: _PostEditPageState._thumbGap),
+                  if (index > 0)
+                    const SizedBox(width: _PostEditPageState._thumbGap),
                   itemBuilder(context, index),
                 ],
               ],
@@ -829,10 +837,7 @@ class _CenteredThumbStrip extends StatelessWidget {
 }
 
 class _EditResetDoneRow extends StatelessWidget {
-  const _EditResetDoneRow({
-    required this.onReset,
-    required this.onDone,
-  });
+  const _EditResetDoneRow({required this.onReset, required this.onDone});
 
   static const _errorRed = Color(0xFFC03030);
 
@@ -876,10 +881,7 @@ class _EditResetDoneRow extends StatelessWidget {
 }
 
 class _EditThumbPreview extends StatelessWidget {
-  const _EditThumbPreview({
-    required this.assetPath,
-    required this.transform,
-  });
+  const _EditThumbPreview({required this.assetPath, required this.transform});
 
   final String assetPath;
   final PostImageTransform transform;
@@ -913,10 +915,7 @@ class _EditThumbPreview extends StatelessWidget {
 /// for the mode a tap would switch *to* (Fit mode shows the Fill icon, and
 /// vice versa) — no existing custom SVG for this, so plain Material icons.
 class _FitFillToggleButton extends StatelessWidget {
-  const _FitFillToggleButton({
-    required this.fitMode,
-    required this.onTap,
-  });
+  const _FitFillToggleButton({required this.fitMode, required this.onTap});
 
   final CropFitMode fitMode;
   final VoidCallback onTap;
@@ -936,7 +935,9 @@ class _FitFillToggleButton extends StatelessWidget {
           border: Border.all(color: Colors.white24, width: 1),
         ),
         child: Icon(
-          switchingToFill ? Icons.fullscreen_rounded : Icons.fit_screen_outlined,
+          switchingToFill
+              ? Icons.fullscreen_rounded
+              : Icons.fit_screen_outlined,
           color: Colors.white,
           size: 20,
         ),
@@ -1090,10 +1091,7 @@ class _AdjustToolButton extends StatelessWidget {
 }
 
 class _CropAspectSelector extends StatelessWidget {
-  const _CropAspectSelector({
-    required this.selected,
-    required this.onSelected,
-  });
+  const _CropAspectSelector({required this.selected, required this.onSelected});
 
   static const _selectorBg = Color(0xE6231F1B);
 
@@ -1113,14 +1111,16 @@ class _CropAspectSelector extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            for (final ratio in CropAspectRatio.values) ...[
+            for (final ratio in const [
+              CropAspectRatio.ratio3x4,
+              CropAspectRatio.ratio16x9,
+            ]) ...[
               _CropAspectChip(
                 label: ratio.label,
                 selected: selected == ratio,
                 onTap: () => onSelected(ratio),
               ),
-              if (ratio != CropAspectRatio.values.last)
-                const SizedBox(width: 4),
+              if (ratio != CropAspectRatio.ratio16x9) const SizedBox(width: 4),
             ],
           ],
         ),
@@ -1461,10 +1461,7 @@ class _EditBanner extends StatelessWidget {
 }
 
 class _EditToolSelector extends StatelessWidget {
-  const _EditToolSelector({
-    required this.editTool,
-    required this.onChanged,
-  });
+  const _EditToolSelector({required this.editTool, required this.onChanged});
 
   static const _selectorBg = Color(0xE6231F1B);
 
@@ -1531,9 +1528,6 @@ class _EditToolTab extends StatelessWidget {
   }
 }
 
-/// Banner for the piece flow's "Set your cover" step (Figma 2716:5774) — a
-/// back chevron (returns to the gallery step, not a flow-exit "X") and a
-/// plain-text Next, no pill background.
 class _SetCoverBanner extends StatelessWidget {
   const _SetCoverBanner({
     required this.topInset,
@@ -1612,8 +1606,6 @@ class _SetCoverBanner extends StatelessWidget {
   }
 }
 
-/// Translucent corner label used for the "Cover" and "n/total" badges on
-/// the cover-selection preview (Figma 2716:5774).
 class _CoverPillBadge extends StatelessWidget {
   const _CoverPillBadge({required this.text, required this.opacity});
 

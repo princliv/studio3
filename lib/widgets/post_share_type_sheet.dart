@@ -101,7 +101,7 @@ class _SheetBody extends StatelessWidget {
               _ShareTypeRow(
                 iconAsset: PostMediaAssets.shareSceneIcon,
                 title: 'Scene',
-                subtitle: 'Process, studio, or anything else',
+                subtitle: 'One photo or video',
                 onTap: () => Navigator.pop(context, 'scene'),
               ),
             ],

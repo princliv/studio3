@@ -192,8 +192,12 @@ class PostPublishService {
         bytes: bytes,
         contentType: 'image/png',
       );
-      final mediaAspectRatio =
-          transform.aspectRatio == CropAspectRatio.ratio16x9 ? '16:9' : '3:4';
+      final mediaAspectRatio = switch (transform.aspectRatio) {
+        CropAspectRatio.ratio16x9 => '16:9',
+        CropAspectRatio.ratio9x16 => '9:16',
+        CropAspectRatio.ratio1x1 => '1:1',
+        CropAspectRatio.ratio3x4 => '3:4',
+      };
       await _posts.create({
         'mediaUrl': mediaUrl,
         'mediaType': 'image',

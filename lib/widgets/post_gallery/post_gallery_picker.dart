@@ -38,8 +38,8 @@ class PostGalleryPicker extends StatefulWidget {
   final ValueChanged<List<AssetEntity>> onSelectionChanged;
   final VoidCallback onPermissionPermanentlyDenied;
   final int maxSelection;
-  /// When true (Scene posts), the grid mixes in videos alongside photos,
-  /// uses a 3:4 cell ratio, and selecting a video is exclusive of photos.
+  /// When true (Scene posts), the grid mixes videos alongside photos.
+  /// Selecting a video is exclusive of photos.
   final bool allowVideos;
   /// Assets already picked before this picker opened (e.g. re-entering the
   /// gallery via "add more" on the piece cover-selection screen) — seeded
@@ -114,6 +114,16 @@ class _PostGalleryPickerState extends State<PostGalleryPicker> {
       widget.onSelectionChanged(List.unmodifiable(_selected));
       return;
     }
+    // Single-select (scenes): tapping another cell replaces the current pick.
+    if (widget.maxSelection <= 1) {
+      setState(() {
+        _selected
+          ..clear()
+          ..add(asset);
+      });
+      widget.onSelectionChanged(List.unmodifiable(_selected));
+      return;
+    }
     // Video selection is exclusive: picking a video clears any photos, and
     // picking a photo while a video is selected clears the video first, so
     // the outgoing selection is always either N photos or exactly 1 video.
@@ -176,11 +186,11 @@ class _PostGalleryPickerState extends State<PostGalleryPicker> {
       case _LoadState.ready:
         return GridView.builder(
           padding: EdgeInsets.zero,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 3,
             crossAxisSpacing: 3,
             mainAxisSpacing: 3,
-            childAspectRatio: widget.allowVideos ? 3 / 4 : 1.0,
+            childAspectRatio: 1,
           ),
           itemCount: _assets.length,
           itemBuilder: (context, index) => _buildCell(_assets[index]),
@@ -231,11 +241,11 @@ class _PostGalleryPickerState extends State<PostGalleryPicker> {
             ),
           if (selected)
             Container(
-              color: Colors.white.withValues(alpha: 0.67),
+              color: const Color.fromRGBO(255, 255, 255, 0.68),
               alignment: Alignment.center,
               child: Text(
                 '${selectedIndex + 1}',
-                style: GoogleFonts.inter(
+                style: GoogleFonts.geist(
                   fontSize: 32,
                   fontWeight: FontWeight.w400,
                   color: HomeFeedTokens.textPrimary,

@@ -140,6 +140,7 @@ flutter:
     - assets/post/crop/
     - assets/post/adjust/
     - assets/post/create/
+    - assets/post/scene/
     - assets/nav/
     - assets/profile/
 

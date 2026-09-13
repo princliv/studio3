@@ -35,6 +35,7 @@ import 'screens/saved_page.dart';
 import 'screens/event_page.dart';
 import 'screens/profile_page.dart';
 import 'screens/post_page.dart';
+import 'screens/scene_post_page.dart';
 import 'screens/inbox_page.dart';
 import 'screens/onboarding/onboarding_page.dart';
 import 'screens/edit_profile_page.dart';
@@ -166,7 +167,8 @@ class Studio3App extends StatelessWidget {
         },
         '/post': (context) {
           final type = ModalRoute.of(context)?.settings.arguments as String?;
-          return PostPage(postType: type == 'scene' ? 'scene' : 'piece');
+          if (type == 'scene') return const ScenePostPage();
+          return const PostPage();
         },
         '/saved': (context) => const SavedPage(),
         // Inquiries deferred to v2 — legacy /chat route redirects to Conversations inbox.
